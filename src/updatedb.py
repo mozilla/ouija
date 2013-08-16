@@ -4,7 +4,12 @@ import MySQLdb
 import datetime
 import time
 
-branches = ['mozilla-central']
+branch_paths = {
+    'mozilla-central': 'mozilla-central',
+    'mozilla-inbound': 'integration/mozilla-inbound'
+}
+
+branches = ['mozilla-inbound']
 
 def getCSetResults(branch, revision):
     """
@@ -30,7 +35,7 @@ def getPushLog(branch):
     startdate = datetime.date.today() - datetime.timedelta(days=7)
 
     conn = httplib.HTTPSConnection('hg.mozilla.org')
-    pushlog = "/mozilla-central/pushlog?startdate=%04d-%02d-%02d" % (startdate.year, startdate.month, startdate.day)
+    pushlog = "/%s/pushlog?startdate=%04d-%02d-%02d" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
     conn.request("GET", pushlog)
     response = conn.getresponse()
 

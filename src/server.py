@@ -21,6 +21,65 @@ class TestSummary(object):
         self.red = 0
         self.blue = 0
 
+def binify(bins, data):
+
+    result = []
+    for i, bin in enumerate(bins):
+        if i > 0:
+            result.append(len(filter(lambda x: x >= bins[i - 1] and x < bin, data))) 
+        else:
+            result.append(len(filter(lambda x: x < bin, data)))
+
+    result.append(len(filter(lambda x: x >= bins[-1], data)))
+
+    return result
+
+def run_resultstimeseries_query(platform):
+    db = MySQLdb.connect(host="localhost",
+                         user="root",
+                         passwd="root",
+                         db="ouija")
+
+    cursor = db.cursor()
+
+    cursor.execute('select result, duration from testjobs where platform="%s" order by duration;' % platform)
+
+    results = cursor.fetchall()
+
+    greens = []
+    oranges = []
+    reds = []
+    blues = []
+    totals = []
+
+    for result in results:
+        res = result[0]
+        if res == 'success':
+            greens.append(int(result[1]))
+        elif res == 'testfailed':
+            oranges.append(int(result[1]))
+        elif res == 'retry':
+            blues.append(int(result[1]))
+        elif res == 'exception' or res == 'busted':
+            reds.append(int(result[1]))
+        totals.append(int(result[1]))
+
+    cursor.close()
+    db.close()
+
+    bins = map(lambda x: x*60, [10, 20, 30, 40, 50]) #minutes
+
+    data = {}
+    data['total'] = len(greens) + len(oranges) + len(reds) + len(blues) 
+    data['labels'] = ["< 10","10 - 20","20 - 30","30 - 40","40 - 50","> 50"]
+    data['green'] = binify(bins, greens)
+    data['orange'] = binify(bins, oranges)
+    data['red'] = binify(bins, reds)
+    data['blue'] = binify(bins, blues)
+    data['totals'] = binify(bins, totals)
+
+    return json.dumps(data)
+
 def run_slaves_query():
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -113,7 +172,7 @@ def run_platform_query(platform):
 
     return cset_summaries, test_summaries
 
-def generate_slave_response(host, platform):
+def generate_slave_response(platform):
     html = "<h1>slaves</h1>"
 
     slaves = run_slaves_query().items()
@@ -125,7 +184,7 @@ def generate_slave_response(host, platform):
     html += '</table>'
     return  html
 
-def generate_platform_response(host, platform):
+def generate_platform_response(platform):
 
     cset_summaries, test_summaries = run_platform_query(platform)
     tests = sorted(test_summaries.keys())
@@ -141,8 +200,7 @@ def generate_platform_response(host, platform):
         total_blue += len(summary.blue)
 
     total = float(total_green + total_orange + total_red + total_blue)
-    revhtml = '<img src="http://%s/ouija.gif" width=200/>' % host
-    revhtml += '<h1>%s</h1>' % platform
+    revhtml = '<h1>%s</h1>' % platform
     revhtml += '<table><tr><td></td><td>&nbsp;</td>'
     for test in tests:
         revhtml += '<td class="result">%s</td>' % test
@@ -196,14 +254,32 @@ def generate_platform_response(host, platform):
 
 def application(environ, start_response):
 
-    host = environ['HTTP_HOST'].split(':')[0]
-
     if "REQUEST_METHOD" in environ and environ["REQUEST_METHOD"] == "GET":
         pass
     elif "REQUEST_METHOD" in environ and environ["REQUEST_METHOD"] == "POST":
         pass
 
-    html = """
+
+    request = environ['REQUEST_URI']
+
+    if request.startswith('/data/results'):
+
+        platform = 'android4.0'
+        options = request.find('?')
+        if options != -1: 
+            platform = request[options + len('?platform='):]
+        print('>>>> platform: ', platform)
+
+        response_body = run_resultstimeseries_query(platform)
+        status = "200 OK"
+        response_headers = [("Content-Type", "application/json"),
+                            ("Content-Length", str(len(response_body)))]
+        start_response(status, response_headers)
+        return [str(response_body)] 
+    else:
+        request = request[request.find('/data/'):]
+
+        html = """
 <html>
 <head></head>
 <body>
@@ -212,19 +288,19 @@ def application(environ, start_response):
 </html>
 """
 
-    platform = environ['PATH_INFO'][1:]
+        platform = request[len('/data/'):]
+        print('>>>', platform)
+        if request == '/data/slaves':
+            revhtml = generate_slave_response(platform)
+        else:
+            revhtml = generate_platform_response(platform)
 
-    if platform == 'slaves':
-        revhtml = generate_slave_response(host, platform)
-    else:
-        revhtml = generate_platform_response(host, platform)
-
-    response_body = html % revhtml
-    status = "200 OK"
-    response_headers = [("Content-Type", "text/html"),
-                        ("Content-Length", str(len(response_body)))]
-    start_response(status, response_headers)
-    return [str(response_body)]
+        response_body = html % revhtml
+        status = "200 OK"
+        response_headers = [("Content-Type", "text/html"),
+                            ("Content-Length", str(len(response_body)))]
+        start_response(status, response_headers)
+        return [str(response_body)]
 
 if __name__ == '__main__':
     httpd = make_server("0.0.0.0", 8080, application)

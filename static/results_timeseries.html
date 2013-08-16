@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="Chart.min.js"></script>
+    <script type="text/javascript">
+
+        function renderChart(raw_data, ctx)
+        {
+            var data = {
+                labels : raw_data.labels,
+                datasets : [ 
+                    {
+                        fillColor : "rgba(0,220,0,0.5)",
+                        strokeColor : "rgba(0,220,0,1)",
+                        pointColor : "rgba(0,220,0,1)",
+                        pointStrokeColor : "#fff",
+                        data : raw_data.green
+                    },
+                    {
+                        fillColor : "rgba(0,0,220,0.5)",
+                        strokeColor : "rgba(0,0,220,1)",
+                        pointColor : "rgba(0,0,220,1)",
+                        pointStrokeColor : "#fff",
+                        data : raw_data.blue
+                    },
+                    {
+                        fillColor : "rgba(220,110,0,0.5)",
+                        strokeColor : "rgba(220,110,0,1)",
+                        pointColor : "rgba(220,110,0,0,1)",
+                        pointStrokeColor : "#fff",
+                        data : raw_data.orange
+                    } 
+                ]
+            }
+
+            var chart = new Chart(ctx).Line(data, {'bezierCurve':false, 'animation':false});
+
+        }
+
+        var req = new XMLHttpRequest();
+        req.onload = function(e) {
+
+            var raw_data = JSON.parse(req.response);
+            var ctx = document.getElementById('chart1').getContext('2d');
+            renderChart(raw_data, ctx);
+
+        }; 
+
+        req.open('get', '/data/results?platform=android2.2', true);
+        req.send();
+
+        var req2 = new XMLHttpRequest();
+        req2.onload = function(e) {
+
+            var raw_data = JSON.parse(req2.response);
+            var ctx = document.getElementById('chart2').getContext('2d');
+            renderChart(raw_data, ctx);
+
+        }; 
+        req2.open('get', '/data/results?platform=android4.0', true);
+        req2.send();
+
+
+    </script>
+</head>
+<body>
+<div style="text-align: center">
+<h1>Test Results</h1>
+</div>
+<h2>Android 2.2</h2>
+<canvas id="chart1" width=800 height=400></canvas>
+<h2>Android 4.0</h2>
+<canvas id="chart2" width=800 height=400></canvas>
+</body>
+</html>
