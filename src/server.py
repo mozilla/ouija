@@ -123,7 +123,7 @@ def run_platform_query(platform):
                          db="ouija")
 
     cursor = db.cursor()
-    cursor.execute("""SELECT distinct revision FROM `testjobs` WHERE platform = '%s' AND branch = 'mozilla-central' order by date asc limit 30;""" % platform)
+    cursor.execute("""SELECT distinct revision FROM `testjobs` WHERE platform = '%s' AND branch = 'mozilla-central' order by date desc limit 30;""" % platform)
 
     csets = cursor.fetchall()
 
