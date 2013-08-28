@@ -1,7 +1,9 @@
+import argparse
 import json, urllib, httplib
 import re
 import MySQLdb
 import datetime
+import sys
 import time
 
 branch_paths = {
@@ -9,7 +11,7 @@ branch_paths = {
     'mozilla-inbound': 'integration/mozilla-inbound'
 }
 
-branches = ['mozilla-inbound']
+branches = ['mozilla-central']
 
 def getCSetResults(branch, revision):
     """
@@ -28,11 +30,10 @@ def getCSetResults(branch, revision):
     cdata = json.loads(data)
     return cdata
 
-def getPushLog(branch):
+def getPushLog(branch, startdate):
     """
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
-    startdate = datetime.date.today() - datetime.timedelta(days=7)
 
     conn = httplib.HTTPSConnection('hg.mozilla.org')
     pushlog = "/%s/pushlog?startdate=%04d-%02d-%02d" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
@@ -89,6 +90,16 @@ def parseBuilder(buildername, branch):
 
     return platform, buildtype, testtype
 
+def clearResults(branch, startdate):
+    db = MySQLdb.connect(host="localhost",
+                         user="root",
+                         passwd="root",
+                         db="ouija")
+
+    cur = db.cursor()
+    cur.execute('delete from testjobs where branch="%s" and date >= "%04d-%02d-%02d"' % (branch, startdate.year, startdate.month, startdate.day)) 
+    cur.close()
+
 def uploadResults(data, branch, revision, date):
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -132,17 +143,26 @@ def uploadResults(data, branch, revision, date):
             sql += ", '%s'" % date
             sql += ')'
             cur.execute(sql)
+    cur.close()
 
+def parseResults(args):
+    startdate = datetime.date.today() - datetime.timedelta(days=args.delta)
+    revisions = getPushLog(args.branch, startdate)
 
-def parseResults():
-    revisions = []
-    for branch in branches:
-        revisions = getPushLog(branch)
-
-        for revision,date in revisions:
-            print "%s - %s" % (revision, date)
-            data = getCSetResults(branch, revision)
-            uploadResults(data, branch, revision, date)
+    clearResults(args.branch, startdate)
+    for revision,date in revisions:
+        print "%s - %s" % (revision, date)
+        data = getCSetResults(args.branch, revision)
+        uploadResults(data, args.branch, revision, date)
 
 if __name__ == '__main__':
-    parseResults()
+    parser = argparse.ArgumentParser(description='Update ouija database.')
+    parser.add_argument('--branch', dest='branch', default='mozilla-central',
+                        help='Branch for which to retrieve results.')
+    parser.add_argument('--delta', dest='delta', type=int, default=1,
+                        help='Number of days in past to use as start date.')
+    args = parser.parse_args()
+    if args.branch not in branches:
+        print('error: unknown branch: ' + args.branch)
+        sys.exit(1)
+    parseResults(args)
