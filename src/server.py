@@ -260,7 +260,8 @@ def application(environ, start_response):
         pass
 
 
-    request = environ['REQUEST_URI']
+#    request = environ['REQUEST_URI']
+    request = environ.get('REQUEST_URI', environ['PATH_INFO'])
 
     if request.startswith('/data/results'):
 
@@ -303,6 +304,6 @@ def application(environ, start_response):
         return [str(response_body)]
 
 if __name__ == '__main__':
-    httpd = make_server("0.0.0.0", 8080, application)
+    httpd = make_server("0.0.0.0", 8314, application)
     httpd.serve_forever()
 
