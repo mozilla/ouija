@@ -1,0 +1,106 @@
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script type="text/javascript">
+        // parse get parameters
+        var platform = location.search.substr(1).split('=')[1];
+        document.title = 'Ouija | ' + platform + ' Failure Rate';
+
+        var req = new XMLHttpRequest();
+        req.onload = function(e) {
+
+            document.getElementById('page_header').innerHTML = platform;
+
+            var raw_data = JSON.parse(req.response);
+
+            var testTypes = raw_data.testTypes;
+            var testResults = raw_data.byTest;
+            var revisionResults = raw_data.byRevision;
+
+            var tbl = document.getElementById('results');
+
+            // insert data into upper table
+            for (var i=0; i<testTypes.length; i++) {
+                var result = testResults[testTypes[i]];
+
+                for (var j=0; j<tbl.rows.length; j++) {
+                    row = tbl.rows[j];
+                    cell = row.insertCell(i+1);
+                    textNode = j==0 ? testTypes[i] : result[row.id];
+                    cell.innerHTML = textNode;
+                }
+            }
+
+            // fill failure rates
+            document.getElementById('failure_rate').innerHTML = raw_data.failureRate;
+            document.getElementById('failure_exclude_retry').innerHTML = raw_data.failureRateNoRetries;
+
+            var tbl = document.getElementById('green_results');
+            var tableHead = tbl.rows[0];
+
+            // remove total and percentage stats
+            testTypes.splice(-2, 2);
+
+            // insert revisions into lower table
+            for (var revision in revisionResults) {
+                var revision_id = revisionResults[revision].cset_id;
+                var row = tbl.insertRow(-1);
+
+                rev = row.insertCell(0);
+                rev.innerHTML = revision_id;
+            }
+
+            // insert data into lower table
+            for (var i=0; i<testTypes.length; i++) {
+                var test = testTypes[i];
+
+                for (var j=0; j<tbl.rows.length; j++) {
+                    cell = tbl.rows[j].insertCell(-1);
+                    textNode = j==0 ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
+                    cell.innerHTML = textNode;
+                }
+            }
+        }
+
+        req.open('get', '/data/platform?platform=' + platform, true);
+        req.send();
+    </script>
+</head>
+<body>
+    <div style="text-align: center">
+        <h1 id="page_header"></h1>
+    </div>
+    <table id="results">
+        <tr>
+            <td>Status</td>
+        </tr>
+        <tr id="green">
+            <td>Green</td>
+        </tr>
+        <tr id="orange">
+            <td>Orange</td>
+        </tr>
+        <tr id="red">
+            <td>Red</td>
+        </tr>
+        <tr id="blue">
+            <td>Blue</td>
+        </tr>
+    </table>
+    <strong>
+        <p>Total Failure Rate:
+            <span id="failure_rate"></span>
+        </p>
+        <p>Total Failure Rate (excluding retries):
+            <span id="failure_exclude_retry"></span>
+        </p>
+    </strong>
+    </br>
+    <p>greenResults</p>
+    <table id="green_results">
+        <tr>
+            <td class="cset">changeset</th>
+        </tr>
+    </table>
+</body>
+</html>

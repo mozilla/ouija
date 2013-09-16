@@ -1,0 +1,54 @@
+<html>
+<head>
+    <title>Ouija | Slave failures</title>
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script type="text/javascript">
+        var req = new XMLHttpRequest();
+        req.onload = function(e) {
+
+            var raw_data = JSON.parse(req.response);
+            var table = document.getElementById('results');
+
+            var to_sort = [];
+
+            for (var item in raw_data) {
+                to_sort.push({key: item, value: raw_data[item].total});
+            }
+
+            to_sort.sort(function(x, y) {return y.value - x.value});
+
+            for (var i=0; i<to_sort.length; i++) {
+
+                var slave_name = to_sort[i].key;
+                var results = raw_data[slave_name];
+                var row = table.insertRow(-1);
+
+                var slave = row.insertCell(0);
+                var fail = row.insertCell(1);
+                var retry = row.insertCell(2);
+                var total = row.insertCell(3);
+
+                slave.innerHTML = slave_name;
+                fail.innerHTML = results.fail;
+                retry.innerHTML = results.retry;
+                total.innerHTML = results.total;
+            }
+        }
+
+        req.open('get', '/data/slaves', true);
+        req.send();
+    </script>
+</head>
+<body>
+    <div style="text-align: center">
+        <h1>Slaves</h1>
+    </div>
+    <table id="results">
+        <tr>
+            <td>Slave</td>
+            <td>Fails</td>
+            <td>Retries</td>
+            <td>Total</td>
+        </tr>
+</body>
+</html>
