@@ -24,6 +24,13 @@ class TestSummary(object):
         self.blue = 0
 
 
+def create_db_connnection():
+    return MySQLdb.connect(host="localhost",
+                           user="root",
+                           passwd="root",
+                           db="ouija")
+
+
 def serialize_to_json(object):
     """Serialize class objects to json"""
     try:
@@ -46,14 +53,12 @@ def binify(bins, data):
     return result
 
 
-def run_resultstimeseries_query(platform):
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
+def run_resultstimeseries_query(query_dict):
+    platform = query_dict.get('platform', ['android4.0'])[0]
+    print('>>>> platform: ', platform)
 
+    db = create_db_connnection()
     cursor = db.cursor()
-
     cursor.execute("""select result, duration from testjobs
                       where platform="%s" order by duration;""" % platform)
 
@@ -94,27 +99,25 @@ def run_resultstimeseries_query(platform):
     return json.dumps(data)
 
 
-def run_slaves_query():
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
-
+def run_slaves_query(query_dict):
+    db = create_db_connnection()
     cursor = db.cursor()
-
     cursor.execute("""select slave, result from testjobs
-                      where result="retry" or result="testfailed"
+                      where result in ("retry", "testfailed", "success")
                       order by slave;""")
 
     data = {}
-    summary = {result: 0 for result in ['retry', 'fail', 'total']}
+    keys = 'retry fail success total'
+    summary = {result: 0 for result in keys.split()}
 
     for name, result in cursor.fetchall():
         data.setdefault(name, summary.copy())
         if result == 'testfailed':
             data[name]['fail'] += 1
-        else:
+        elif result == 'retry':
             data[name]['retry'] += 1
+        else:
+            data[name]['success'] += 1
         data[name]['total'] += 1
 
     cursor.close()
@@ -123,12 +126,11 @@ def run_slaves_query():
     return json.dumps(data)
 
 
-def run_platform_query(platform):
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
+def run_platform_query(query_dict):
+    platform = query_dict['platform'][0]
+    print('>>> platform', platform)
 
+    db = create_db_connnection()
     cursor = db.cursor()
     cursor.execute("""select distinct revision from testjobs
                       where platform = '%s' and branch = 'mozilla-central'
@@ -219,21 +221,15 @@ def application(environ, start_response):
     query_dict = parse_qs(request.query)
 
     if request.path == '/data/results':
-        platform = query_dict.get('platform', ['android4.0'])[0]
-        print('>>>> platform: ', platform)
-        response_body = run_resultstimeseries_query(platform)
+        request_handler = run_resultstimeseries_query
 
     elif request.path == '/data/slaves':
-        response_body = run_slaves_query()
+        request_handler = run_slaves_query
 
     elif request.path == '/data/platform':
-        platform = query_dict['platform'][0]
-        print('>>> platform', platform)
-        response_body = run_platform_query(platform)
+        request_handler = run_platform_query
 
-    else:
-        raise Exception('Unhandled request')
-
+    response_body = request_handler(query_dict)
     status = "200 OK"
     response_headers = [("Content-Type", "application/json"),
                         ("Content-Length", str(len(response_body)))]

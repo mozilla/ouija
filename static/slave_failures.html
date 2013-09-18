@@ -7,7 +7,7 @@
         req.onload = function(e) {
 
             var raw_data = JSON.parse(req.response);
-            var table = document.getElementById('results');
+            var tbl = document.getElementById('results');
 
             var to_sort = [];
 
@@ -21,33 +21,50 @@
 
                 var slave_name = to_sort[i].key;
                 var results = raw_data[slave_name];
-                var row = table.insertRow(-1);
+                var row = tbl.insertRow(-1);
 
-                var slave = row.insertCell(0);
-                var fail = row.insertCell(1);
-                var retry = row.insertCell(2);
-                var total = row.insertCell(3);
+                // hide rows with no failures and retries
+                if (results.fail==0 && results.retry==0) {
+                    row.className = 'hidden';
+                }
 
-                slave.innerHTML = slave_name;
-                fail.innerHTML = results.fail;
-                retry.innerHTML = results.retry;
-                total.innerHTML = results.total;
+                row.insertCell(0).innerHTML = slave_name;
+                row.insertCell(1).innerHTML = results.fail;
+                row.insertCell(2).innerHTML = results.retry;
+                row.insertCell(3).innerHTML = results.success;
+                row.insertCell(4).innerHTML = results.total;
             }
         }
 
         req.open('get', '/data/slaves', true);
         req.send();
+
+        function showHidden() {
+            var hiddenRows = document.getElementsByClassName('hidden');
+            var isChecked = document.getElementById('showHidden').checked;
+            var visibility = isChecked == true ? 'table-row' : 'none';
+
+            for (var i=0; i<hiddenRows.length; i++) {
+                hiddenRows[i].style.display = visibility;
+            }
+        }
     </script>
 </head>
 <body>
     <div style="text-align: center">
         <h1>Slaves</h1>
     </div>
+    <p>By default slaves that have no failures or retries are not shown</br>
+        Toggle checkbox to see results for all slaves
+    </p>
+    <input type="checkbox" id="showHidden" onclick="showHidden()">Display all slaves
+    </br></br>
     <table id="results">
         <tr>
             <td>Slave</td>
             <td>Fails</td>
             <td>Retries</td>
+            <td>Passes</td>
             <td>Total</td>
         </tr>
 </body>

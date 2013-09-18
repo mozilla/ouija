@@ -7,3 +7,6 @@ table,td {
 td {
     padding: 2px;
 }
+.hidden {
+    display: none;
+}
