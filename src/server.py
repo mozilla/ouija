@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import json
+
+from itertools import groupby
 from collections import Counter
 from urlparse import urlparse, parse_qs
 from wsgiref.simple_server import make_server
@@ -16,14 +18,6 @@ class CSetSummary(object):
         self.orange = Counter()
         self.red = Counter()
         self.blue = Counter()
-
-
-class TestSummary(object):
-    def __init__(self):
-        self.green = 0
-        self.orange = 0
-        self.red = 0
-        self.blue = 0
 
 
 def create_db_connnection():
@@ -47,6 +41,25 @@ def get_date_range(dates):
 
     return {'startDate': start_date.strftime('%Y-%m-%d %H:%M'),
             'endDate': end_date.strftime('%Y-%m-%d %H:%M')}
+
+
+def calculate_fail_rate(passes, retries, totals):
+    # skip calculation for slaves and platform with no failures
+    if passes == totals:
+        results = [0, 0]
+
+    else:
+        results = []
+        denominators = [totals, totals - retries]
+        for denominator in denominators:
+            try:
+                result = 100 - (passes * 100) / float(denominator)
+            except ZeroDivisionError:
+                result = 0
+            results.append(round(result, 2))
+
+    return dict(zip(['failRate', 'failRateNoRetries'], results))
+
 
 def binify(bins, data):
 
@@ -112,12 +125,13 @@ def run_slaves_query(query_dict):
     db = create_db_connnection()
     cursor = db.cursor()
     cursor.execute("""select slave, result, date from testjobs
-                      where result in ("retry", "testfailed", "success")
+                      where result in
+                      ("retry", "testfailed", "success", "busted", "exception")
                       order by slave;""")
 
     data = {}
-    keys = 'retry fail success total'
-    summary = {result: 0 for result in keys.split()}
+    labels = 'fail retry infra success total'.split()
+    summary = {result: 0 for result in labels}
 
     dates = []
 
@@ -127,15 +141,43 @@ def run_slaves_query(query_dict):
             data[name]['fail'] += 1
         elif result == 'retry':
             data[name]['retry'] += 1
-        else:
+        elif result == 'success':
             data[name]['success'] += 1
+        elif result == 'busted' or result == 'exception':
+            data[name]['infra'] += 1
         data[name]['total'] += 1
         dates.append(date)
 
     cursor.close()
     db.close()
 
-    return json.dumps([data, get_date_range(dates)])
+    # calculate failure rate for slaves
+    for slave, results in data.iteritems():
+        fail_rates = calculate_fail_rate(results['success'],
+                                         results['retry'],
+                                         results['total'])
+        data[slave].update(fail_rates)
+
+    platforms = {}
+
+    # group slaves by platform and calculate platform failure rate
+    slaves = sorted(data.keys())
+    for platform, slave_group in groupby(slaves, lambda x: x.rsplit('-', 1)[0]):
+        platforms[platform] = {}
+        results = {}
+        slaves = list(slave_group)
+
+        for label in ['success', 'retry', 'total']:
+            r = reduce(lambda x, y: x + y,
+                       [data[slave][label] for slave in slaves])
+            results[label] = r
+
+        fail_rates = calculate_fail_rate(results['success'],
+                                         results['retry'],
+                                         results['total'])
+        platforms[platform].update(fail_rates)
+
+    return json.dumps([data, platforms, get_date_range(dates)])
 
 
 def run_platform_query(query_dict):
@@ -154,8 +196,12 @@ def run_platform_query(query_dict):
     test_summaries = {}
     dates = []
 
+    labels = 'green orange blue red'.split()
+    summary = {result: 0 for result in labels}
+
     for cset in csets:
         cset_id = cset[0]
+        cset_summary = CSetSummary(cset_id)
 
         cursor.execute("""select result,testtype, date from testjobs
                           where platform='%s' and buildtype='opt' and revision='%s'
@@ -163,29 +209,25 @@ def run_platform_query(query_dict):
 
         test_results = cursor.fetchall()
 
-        cset_summary = CSetSummary(cset_id)
-
         for res, testtype, date in test_results:
-
-            test_summary = test_summaries.setdefault(testtype, TestSummary())
+            test_summary = test_summaries.setdefault(testtype, summary.copy())
 
             if res == 'success':
                 cset_summary.green[testtype] += 1
-                test_summary.green += 1
+                test_summary['green'] += 1
             elif res == 'testfailed':
                 cset_summary.orange[testtype] += 1
-                test_summary.orange += 1
+                test_summary['orange'] += 1
             elif res == 'retry':
                 cset_summary.blue[testtype] += 1
-                test_summary.blue += 1
+                test_summary['blue'] += 1
             elif res == 'exception' or res == 'busted':
                 cset_summary.red[testtype] += 1
-                test_summary.red += 1
+                test_summary['red'] += 1
             elif res == 'usercancel':
                 print('>>>> usercancel')
             else:
                 print('>>>> UNRECOGNIZED RESULT: ', result)
-
             dates.append(date)
 
         cset_summaries.append(cset_summary)
@@ -202,16 +244,15 @@ def run_platform_query(query_dict):
     percentage = {}
 
     for test in test_summaries:
-        values = test_summaries[test].__dict__
-        total.update(values)
-
+        total.update(test_summaries[test])
     test_count = sum(total.values())
 
     for key in total:
         percentage[key] = round((100.0 * total[key] / test_count), 2)
 
-    fail_rate = 100.0 - (100.0 * total['green']) / test_count
-    fail_rate_exclude_retries = 100.0 - (100.0 * total['green']) / (test_count - total['blue'])
+    fail_rates = calculate_fail_rate(passes=total['green'],
+                                     retries=total['blue'],
+                                     totals=test_count)
 
     test_summaries['total'] = total
     test_summaries['percentage'] = percentage
@@ -219,8 +260,7 @@ def run_platform_query(query_dict):
     result = {'testTypes': test_types,
               'byRevision': cset_summaries,
               'byTest': test_summaries,
-              'failureRate': round(fail_rate, 2),
-              'failureRateNoRetries': round(fail_rate_exclude_retries, 2),
+              'failRates': fail_rates,
               'dates': get_date_range(dates)}
 
     return json.dumps(result, default=serialize_to_json)

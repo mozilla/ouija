@@ -20,6 +20,7 @@
             var testTypes = raw_data.testTypes;
             var testResults = raw_data.byTest;
             var revisionResults = raw_data.byRevision;
+            var failRates = raw_data.failRates;
             var dates = raw_data.dates;
 
             // insert dates
@@ -41,8 +42,10 @@
             }
 
             // fill failure rates
-            document.getElementById('failure_rate').innerHTML = raw_data.failureRate;
-            document.getElementById('failure_exclude_retry').innerHTML = raw_data.failureRateNoRetries;
+            document.getElementById('failure_rate').innerHTML = failRates['failRate'];
+            document.getElementById('failure_exclude_retry').innerHTML = failRates['failRateNoRetries'];
+
+            sorttable.makeSortable(tbl);
 
             sorttable.makeSortable(tbl);
 
@@ -112,10 +115,10 @@
         </p>
     </strong>
     </br>
-    <p>greenResults</p>
+    <p>Green Results</p>
     <table id="green_results">
         <tr>
-            <td class="cset">changeset</th>
+            <td class="cset">changeset</td>
         </tr>
     </table>
 </body>

@@ -8,7 +8,8 @@
         req.onload = function(e) {
             var raw_data = JSON.parse(req.response);
             var slaves_data = raw_data[0];
-            var dates = raw_data[1];
+            var platform_data = raw_data[1];
+            var dates = raw_data[2];
 
             // insert dates
             document.getElementById('startDate').innerHTML = dates.startDate;
@@ -28,19 +29,41 @@
                 var results = slaves_data[slave];
                 results['slave'] = slave;
 
-                var row = tbl.insertRow(-1);
-
-                var labels = getTableColumns();
-                for (var j=0; j<labels.length; j++) {
-                    row.insertCell(-1).innerHTML = results[labels[j]];
+                // get platform failure rate
+                for (var item in platform_data) {
+                    var re = RegExp("^" + item + "-.*");
+                    if (results['slave'].match(re) != null) {
+                        var failRates = platform_data[item];
+                        results['pFailRate'] = failRates['failRate'];
+                        results['pFailRateNoRetries'] = failRates['failRateNoRetries'];
+                    }
                 }
+
+                var row = tbl.insertRow(-1);
 
                 // hide rows with no failures and retries
                 if (results.success == results.total) {
                     row.className = 'hidden';
                 }
+
+                var labels = getTableColumns();
+                for (var j=0; j<labels.length; j++) {
+                    var cell = row.insertCell(-1);
+
+                    if (labels[j] == 'sfr') {
+                        cell.dataset['withRetries'] = results['failRate'];
+                        cell.dataset['noRetries'] = results['failRateNoRetries'];
+                    } else if (labels[j] == 'pfr') {
+                        cell.dataset['withRetries'] = results['pFailRate'];
+                        cell.dataset['noRetries'] = results['pFailRateNoRetries'];
+                    } else {
+                        cell.innerHTML = results[labels[j]];
+                    }
+                }
             }
 
+            // populate sfr and pfr columns
+            switchFailRates();
             // make table sortable
             sorttable.makeSortable(tbl);
 
@@ -48,6 +71,32 @@
 
         req.open('get', '/data/slaves', true);
         req.send();
+
+        function switchFailRates() {
+            var isChecked = document.getElementById('includeRetries').checked;
+            var attrToUse = isChecked == true ? 'withRetries' : 'noRetries';
+
+            var tblRows = document.getElementById('results').rows;
+            var labels = getTableColumns();
+            var sfrIndex = labels.indexOf('sfr');
+            var pfrIndex = labels.indexOf('pfr');
+
+            for (var i=1; i<tblRows.length; i++) {
+                var sfrCell = tblRows[i].cells[sfrIndex];
+                var sfr = sfrCell.dataset[attrToUse];
+                sfrCell.innerHTML = sfr;
+
+                var pfrCell = tblRows[i].cells[pfrIndex];
+                var pfr = pfrCell.dataset[attrToUse];
+                pfrCell.innerHTML = pfr;
+
+                if (parseFloat(sfr) > parseFloat(pfr)) {
+                    sfrCell.className = 'alert';
+                } else {
+                    sfrCell.removeAttribute('class');
+                }
+            }
+        }
 
         function showHidden() {
             var hiddenRows = document.getElementsByClassName('hidden');
@@ -80,15 +129,21 @@
     <p>By default slaves that have no failures or retries are not shown</br>
         Toggle checkbox to see results for all slaves
     </p>
-    <input type="checkbox" id="showHidden" onclick="showHidden()">Display all slaves
+        <input type="checkbox" id="showHidden" onclick="showHidden()">
+        <label for="showHidden">Display all slaves</label>
+        <input type="checkbox" id="includeRetries" onclick="switchFailRates()">
+        <label for="includeRetries">Include retries in FR calculation</label>
     </br></br>
     <table id="results">
         <tr>
             <td data-type="slave">Slave</td>
             <td data-type="fail">Fails</td>
             <td data-type="retry">Retries</td>
+            <td data-type="infra">Infra</td>
             <td data-type="success">Passes</td>
             <td data-type="total">Total</td>
+            <td data-type="sfr">% failure</td>
+            <td data-type="pfr">Expected % failure</td>
         </tr>
     </table>
 </body>

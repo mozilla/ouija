@@ -21,3 +21,8 @@ td {
 .hidden {
     display: none;
 }
+
+.alert {
+    font-weight: bold;
+    color: #ff0000;
+}
