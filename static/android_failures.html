@@ -1,6 +1,7 @@
 <html>
 <head>
     <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script src="/js/sorttable.js"></script>
     <script type="text/javascript">
         // parse get parameters
         var platform = location.search.substr(1).split('=')[1];
@@ -35,6 +36,8 @@
             document.getElementById('failure_rate').innerHTML = raw_data.failureRate;
             document.getElementById('failure_exclude_retry').innerHTML = raw_data.failureRateNoRetries;
 
+            sorttable.makeSortable(tbl);
+
             var tbl = document.getElementById('green_results');
             var tableHead = tbl.rows[0];
 
@@ -60,6 +63,9 @@
                     cell.innerHTML = textNode;
                 }
             }
+
+            sorttable.makeSortable(tbl);
+
         }
 
         req.open('get', '/data/platform?platform=' + platform, true);

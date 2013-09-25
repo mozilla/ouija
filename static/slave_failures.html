@@ -2,6 +2,7 @@
 <head>
     <title>Ouija | Slave failures</title>
     <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script src="/js/sorttable.js"></script>
     <script type="text/javascript">
         var req = new XMLHttpRequest();
         req.onload = function(e) {
@@ -34,6 +35,9 @@
                 row.insertCell(3).innerHTML = results.success;
                 row.insertCell(4).innerHTML = results.total;
             }
+
+            sorttable.makeSortable(tbl);
+
         }
 
         req.open('get', '/data/slaves', true);
