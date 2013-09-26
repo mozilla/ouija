@@ -5,18 +5,26 @@
     <script type="text/javascript">
         // parse get parameters
         var platform = location.search.substr(1).split('=')[1];
-        document.title = 'Ouija | ' + platform + ' Failure Rate';
+        var capitalizedPlatform = platform.charAt(0).toUpperCase() + platform.substr(1);
+        document.title = 'Ouija | ' + capitalizedPlatform + ' Failure Rate';
 
         var req = new XMLHttpRequest();
         req.onload = function(e) {
 
-            document.getElementById('page_header').innerHTML = platform;
+            header = document.createElement('h1');
+            header.innerHTML = capitalizedPlatform;
+            document.getElementById('page_header').appendChild(header);
 
             var raw_data = JSON.parse(req.response);
 
             var testTypes = raw_data.testTypes;
             var testResults = raw_data.byTest;
             var revisionResults = raw_data.byRevision;
+            var dates = raw_data.dates;
+
+            // insert dates
+            document.getElementById('startDate').innerHTML = dates.startDate;
+            document.getElementById('endDate').innerHTML = dates.endDate;
 
             var tbl = document.getElementById('results');
 
@@ -73,9 +81,11 @@
     </script>
 </head>
 <body>
-    <div style="text-align: center">
-        <h1 id="page_header"></h1>
-    </div>
+    <div id="page_header"></div>
+    <p>
+        <strong>Results displayed for:</strong>
+        <span id="startDate"></span> &mdash; <span id="endDate"></span>
+    </p>
     <table id="results">
         <tr>
             <td>Status</td>

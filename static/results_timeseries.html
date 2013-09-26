@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Ouija | Test results time series</title>
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
     <script src="/js/Chart.min.js"></script>
     <script type="text/javascript">
 
@@ -41,8 +43,14 @@
         req.onload = function(e) {
 
             var raw_data = JSON.parse(req.response);
+            var chart_data = raw_data[0];
+            var dates = raw_data[1];
+
+            document.getElementById('startDate1').innerHTML = dates.startDate;
+            document.getElementById('endDate1').innerHTML = dates.endDate;
+
             var ctx = document.getElementById('chart1').getContext('2d');
-            renderChart(raw_data, ctx);
+            renderChart(chart_data, ctx);
 
         }; 
 
@@ -53,8 +61,14 @@
         req2.onload = function(e) {
 
             var raw_data = JSON.parse(req2.response);
+            var chart_data = raw_data[0];
+            var dates = raw_data[1];
+
+            document.getElementById('startDate2').innerHTML = dates.startDate;
+            document.getElementById('endDate2').innerHTML = dates.endDate;
+
             var ctx = document.getElementById('chart2').getContext('2d');
-            renderChart(raw_data, ctx);
+            renderChart(chart_data, ctx);
 
         }; 
         req2.open('get', '/data/results?platform=android4.0', true);
@@ -64,12 +78,20 @@
     </script>
 </head>
 <body>
-<div style="text-align: center">
-<h1>Test Results</h1>
-</div>
-<h2>Android 2.2</h2>
-<canvas id="chart1" width=800 height=400></canvas>
-<h2>Android 4.0</h2>
-<canvas id="chart2" width=800 height=400></canvas>
+    <div id="page_header">
+        <h1>Test Results</h1>
+    </div>
+    <h2>Android 2.2</h2>
+    <p>
+        <strong>Results displayed for:</strong>
+        <span id="startDate1"></span> &mdash; <span id="endDate1"></span>
+    </p>
+    <canvas id="chart1" width=800 height=400></canvas>
+    <h2>Android 4.0</h2>
+    <p>
+        Results displayed for:
+        <span id="startDate2"></span> &mdash; <span id="endDate2"></span>
+    </p>
+    <canvas id="chart2" width=800 height=400></canvas>
 </body>
 </html>

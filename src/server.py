@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import json
-import MySQLdb
 from collections import Counter
 from urlparse import urlparse, parse_qs
 from wsgiref.simple_server import make_server
+from wsgiref.util import request_uri
+
+import MySQLdb
 
 
 class CSetSummary(object):
@@ -39,6 +41,13 @@ def serialize_to_json(object):
         raise TypeError(repr(object) + 'is not JSON serializable')
 
 
+def get_date_range(dates):
+    start_date = min(dates)
+    end_date = max(dates)
+
+    return {'startDate': start_date.strftime('%Y-%m-%d %H:%M'),
+            'endDate': end_date.strftime('%Y-%m-%d %H:%M')}
+
 def binify(bins, data):
 
     result = []
@@ -54,15 +63,13 @@ def binify(bins, data):
 
 
 def run_resultstimeseries_query(query_dict):
-    platform = query_dict.get('platform', ['android4.0'])[0]
+    platform = query_dict.get('platform', 'android4.0')
     print('>>>> platform: ', platform)
 
     db = create_db_connnection()
     cursor = db.cursor()
-    cursor.execute("""select result, duration from testjobs
+    cursor.execute("""select result, duration, date from testjobs
                       where platform="%s" order by duration;""" % platform)
-
-    results = cursor.fetchall()
 
     greens = []
     oranges = []
@@ -70,25 +77,27 @@ def run_resultstimeseries_query(query_dict):
     blues = []
     totals = []
 
-    for result in results:
-        res = result[0]
-        if res == 'success':
-            greens.append(int(result[1]))
-        elif res == 'testfailed':
-            oranges.append(int(result[1]))
-        elif res == 'retry':
-            blues.append(int(result[1]))
-        elif res == 'exception' or res == 'busted':
-            reds.append(int(result[1]))
-        totals.append(int(result[1]))
+    dates = []
+
+    for result, duration, date in cursor.fetchall():
+        if result == 'success':
+            greens.append(int(duration))
+        elif result == 'testfailed':
+            oranges.append(int(duration))
+        elif result == 'retry':
+            blues.append(int(duration))
+        elif result == 'exception' or result == 'busted':
+            reds.append(int(duration))
+        totals.append(int(duration))
+        dates.append(date)
 
     cursor.close()
     db.close()
 
-    bins = map(lambda x: x*60, [10, 20, 30, 40, 50]) #minutes
+    bins = map(lambda x: x*60, [10, 20, 30, 40, 50])  # minutes
 
     data = {}
-    data['total'] = len(greens) + len(oranges) + len(reds) + len(blues) 
+    data['total'] = len(totals)
     data['labels'] = ["< 10","10 - 20","20 - 30","30 - 40","40 - 50","> 50"]
     data['green'] = binify(bins, greens)
     data['orange'] = binify(bins, oranges)
@@ -96,13 +105,13 @@ def run_resultstimeseries_query(query_dict):
     data['blue'] = binify(bins, blues)
     data['totals'] = binify(bins, totals)
 
-    return json.dumps(data)
+    return json.dumps([data, get_date_range(dates)])
 
 
 def run_slaves_query(query_dict):
     db = create_db_connnection()
     cursor = db.cursor()
-    cursor.execute("""select slave, result from testjobs
+    cursor.execute("""select slave, result, date from testjobs
                       where result in ("retry", "testfailed", "success")
                       order by slave;""")
 
@@ -110,7 +119,9 @@ def run_slaves_query(query_dict):
     keys = 'retry fail success total'
     summary = {result: 0 for result in keys.split()}
 
-    for name, result in cursor.fetchall():
+    dates = []
+
+    for name, result, date in cursor.fetchall():
         data.setdefault(name, summary.copy())
         if result == 'testfailed':
             data[name]['fail'] += 1
@@ -119,15 +130,16 @@ def run_slaves_query(query_dict):
         else:
             data[name]['success'] += 1
         data[name]['total'] += 1
+        dates.append(date)
 
     cursor.close()
     db.close()
 
-    return json.dumps(data)
+    return json.dumps([data, get_date_range(dates)])
 
 
 def run_platform_query(query_dict):
-    platform = query_dict['platform'][0]
+    platform = query_dict['platform']
     print('>>> platform', platform)
 
     db = create_db_connnection()
@@ -140,11 +152,12 @@ def run_platform_query(query_dict):
 
     cset_summaries = []
     test_summaries = {}
+    dates = []
 
     for cset in csets:
         cset_id = cset[0]
 
-        cursor.execute("""select result,testtype from testjobs
+        cursor.execute("""select result,testtype, date from testjobs
                           where platform='%s' and buildtype='opt' and revision='%s'
                           order by testtype""" % (platform, cset_id))
 
@@ -152,7 +165,7 @@ def run_platform_query(query_dict):
 
         cset_summary = CSetSummary(cset_id)
 
-        for res, testtype in test_results:
+        for res, testtype, date in test_results:
 
             test_summary = test_summaries.setdefault(testtype, TestSummary())
 
@@ -172,6 +185,8 @@ def run_platform_query(query_dict):
                 print('>>>> usercancel')
             else:
                 print('>>>> UNRECOGNIZED RESULT: ', result)
+
+            dates.append(date)
 
         cset_summaries.append(cset_summary)
 
@@ -193,10 +208,10 @@ def run_platform_query(query_dict):
     test_count = sum(total.values())
 
     for key in total:
-        percentage[key] = '%.2f' % (100.0 * total[key] / test_count)
+        percentage[key] = round((100.0 * total[key] / test_count), 2)
 
-    fail_rate = '%.2f' % (100.0 - 100.0 * total['green'] / test_count)
-    fail_rate_exclude_retries = '%.2f' % (100.0 - 100.0 * total['green'] / (test_count - total['blue']))
+    fail_rate = 100.0 - (100.0 * total['green']) / test_count
+    fail_rate_exclude_retries = 100.0 - (100.0 * total['green']) / (test_count - total['blue'])
 
     test_summaries['total'] = total
     test_summaries['percentage'] = percentage
@@ -204,21 +219,21 @@ def run_platform_query(query_dict):
     result = {'testTypes': test_types,
               'byRevision': cset_summaries,
               'byTest': test_summaries,
-              'failureRate': fail_rate,
-              'failureRateNoRetries': fail_rate_exclude_retries}
+              'failureRate': round(fail_rate, 2),
+              'failureRateNoRetries': round(fail_rate_exclude_retries, 2),
+              'dates': get_date_range(dates)}
 
     return json.dumps(result, default=serialize_to_json)
 
 
 def application(environ, start_response):
 
-    if "REQUEST_METHOD" in environ and environ["REQUEST_METHOD"] == "GET":
-        pass
-    elif "REQUEST_METHOD" in environ and environ["REQUEST_METHOD"] == "POST":
-        pass
-
-    request = urlparse(environ.get('REQUEST_URI', environ['PATH_INFO']))
+    request = urlparse(request_uri(environ))
     query_dict = parse_qs(request.query)
+
+    for key, value in query_dict.items():
+        if len(value) == 1:
+            query_dict[key] = value[0]
 
     if request.path == '/data/results':
         request_handler = run_resultstimeseries_query

@@ -6,36 +6,42 @@
     <script type="text/javascript">
         var req = new XMLHttpRequest();
         req.onload = function(e) {
-
             var raw_data = JSON.parse(req.response);
-            var tbl = document.getElementById('results');
+            var slaves_data = raw_data[0];
+            var dates = raw_data[1];
 
+            // insert dates
+            document.getElementById('startDate').innerHTML = dates.startDate;
+            document.getElementById('endDate').innerHTML = dates.endDate;
+
+            // default soring by total runs desc
             var to_sort = [];
-
-            for (var item in raw_data) {
-                to_sort.push({key: item, value: raw_data[item].total});
+            for (var item in slaves_data) {
+                to_sort.push({key: item, value: slaves_data[item].total});
             }
-
             to_sort.sort(function(x, y) {return y.value - x.value});
 
+            // populate results table
+            var tbl = document.getElementById('results');
             for (var i=0; i<to_sort.length; i++) {
+                var slave = to_sort[i].key;
+                var results = slaves_data[slave];
+                results['slave'] = slave;
 
-                var slave_name = to_sort[i].key;
-                var results = raw_data[slave_name];
                 var row = tbl.insertRow(-1);
 
+                var labels = getTableColumns();
+                for (var j=0; j<labels.length; j++) {
+                    row.insertCell(-1).innerHTML = results[labels[j]];
+                }
+            }
+
                 // hide rows with no failures and retries
-                if (results.fail==0 && results.retry==0) {
+                if (results.success == results.total) {
                     row.className = 'hidden';
                 }
 
-                row.insertCell(0).innerHTML = slave_name;
-                row.insertCell(1).innerHTML = results.fail;
-                row.insertCell(2).innerHTML = results.retry;
-                row.insertCell(3).innerHTML = results.success;
-                row.insertCell(4).innerHTML = results.total;
-            }
-
+            // make table sortable
             sorttable.makeSortable(tbl);
 
         }
@@ -46,18 +52,31 @@
         function showHidden() {
             var hiddenRows = document.getElementsByClassName('hidden');
             var isChecked = document.getElementById('showHidden').checked;
-            var visibility = isChecked == true ? 'table-row' : 'none';
+            var styleValue = isChecked == true ? 'table-row' : 'none';
 
             for (var i=0; i<hiddenRows.length; i++) {
-                hiddenRows[i].style.display = visibility;
+                hiddenRows[i].style.display = styleValue;
             }
+        }
+
+        function getTableColumns() {
+            var columns = new Array();
+            var firstRow = document.getElementById('results').rows[0];
+            for (var i=0; i<firstRow.cells.length; i++) {
+                columns.push(firstRow.cells[i].dataset['type']);
+            }
+            return columns;
         }
     </script>
 </head>
 <body>
-    <div style="text-align: center">
+    <div id="page_header">
         <h1>Slaves</h1>
     </div>
+    <p>
+        <strong>Results displayed for:</strong>
+        <span id="startDate"></span> &mdash; <span id="endDate"></span>
+    </p>
     <p>By default slaves that have no failures or retries are not shown</br>
         Toggle checkbox to see results for all slaves
     </p>
@@ -65,11 +84,12 @@
     </br></br>
     <table id="results">
         <tr>
-            <td>Slave</td>
-            <td>Fails</td>
-            <td>Retries</td>
-            <td>Passes</td>
-            <td>Total</td>
+            <td data-type="slave">Slave</td>
+            <td data-type="fail">Fails</td>
+            <td data-type="retry">Retries</td>
+            <td data-type="success">Passes</td>
+            <td data-type="total">Total</td>
         </tr>
+    </table>
 </body>
 </html>
