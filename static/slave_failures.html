@@ -34,12 +34,12 @@
                 for (var j=0; j<labels.length; j++) {
                     row.insertCell(-1).innerHTML = results[labels[j]];
                 }
-            }
 
                 // hide rows with no failures and retries
                 if (results.success == results.total) {
                     row.className = 'hidden';
                 }
+            }
 
             // make table sortable
             sorttable.makeSortable(tbl);
