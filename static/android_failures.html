@@ -13,7 +13,7 @@
 
             header = document.createElement('h1');
             header.innerHTML = capitalizedPlatform;
-            document.getElementById('page_header').appendChild(header);
+            document.getElementById('pageHeader').appendChild(header);
 
             var raw_data = JSON.parse(req.response);
 
@@ -42,8 +42,8 @@
             }
 
             // fill failure rates
-            document.getElementById('failure_rate').innerHTML = failRates['failRate'];
-            document.getElementById('failure_exclude_retry').innerHTML = failRates['failRateNoRetries'];
+            document.getElementById('failure_rate').innerHTML = failRates['failRateWithRetries'];
+            document.getElementById('failure_exclude_retry').innerHTML = failRates['failRate'];
 
             sorttable.makeSortable(tbl);
 
@@ -82,9 +82,9 @@
     </script>
 </head>
 <body>
-    <div id="page_header"></div>
+    <div id="pageHeader"></div>
     <p>
-        <strong>Results displayed for:</strong>
+        <strong>Data fetched for:</strong>
         <span id="startDate"></span> &mdash; <span id="endDate"></span>
     </p>
     <table id="results">

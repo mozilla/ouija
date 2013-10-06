@@ -43,8 +43,8 @@
         req.onload = function(e) {
 
             var raw_data = JSON.parse(req.response);
-            var chart_data = raw_data[0];
-            var dates = raw_data[1];
+            var chart_data = raw_data.data;
+            var dates = raw_data.dates;
 
             document.getElementById('startDate1').innerHTML = dates.startDate;
             document.getElementById('endDate1').innerHTML = dates.endDate;
@@ -61,8 +61,8 @@
         req2.onload = function(e) {
 
             var raw_data = JSON.parse(req2.response);
-            var chart_data = raw_data[0];
-            var dates = raw_data[1];
+            var chart_data = raw_data.data;
+            var dates = raw_data.dates;
 
             document.getElementById('startDate2').innerHTML = dates.startDate;
             document.getElementById('endDate2').innerHTML = dates.endDate;
@@ -78,18 +78,18 @@
     </script>
 </head>
 <body>
-    <div id="page_header">
+    <div id="pageHeader">
         <h1>Test Results</h1>
     </div>
     <h2>Android 2.2</h2>
     <p>
-        <strong>Results displayed for:</strong>
+        <strong>Data fetched for:</strong>
         <span id="startDate1"></span> &mdash; <span id="endDate1"></span>
     </p>
     <canvas id="chart1" width=800 height=400></canvas>
     <h2>Android 4.0</h2>
     <p>
-        Results displayed for:
+        <strong>Data fetched for:</strong>
         <span id="startDate2"></span> &mdash; <span id="endDate2"></span>
     </p>
     <canvas id="chart2" width=800 height=400></canvas>

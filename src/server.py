@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import json
-
+import re
+from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
 from urlparse import urlparse, parse_qs
@@ -35,12 +36,54 @@ def serialize_to_json(object):
         raise TypeError(repr(object) + 'is not JSON serializable')
 
 
-def get_date_range(dates):
-    start_date = min(dates)
-    end_date = max(dates)
+def json_response(func):
+    """Decorator: Serialize response to json"""
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return json.dumps(result or {'error': 'No data found for your request'},
+                          default=serialize_to_json)
+    return wrapper
 
-    return {'startDate': start_date.strftime('%Y-%m-%d %H:%M'),
-            'endDate': end_date.strftime('%Y-%m-%d %H:%M')}
+
+def get_date_range(dates):
+    if dates:
+        return {'startDate': min(dates).strftime('%Y-%m-%d %H:%M'),
+                'endDate': max(dates).strftime('%Y-%m-%d %H:%M')}
+
+
+def clean_date_params(query_dict):
+    """Parse request date params"""
+    now = datetime.now()
+
+    # get dates params
+    start_date_param = query_dict.get('startDate')
+    end_date_param = query_dict.get('endDate')
+
+    # parse dates
+    end_date = (parse_date(end_date_param) or now) + timedelta(days=1)
+    start_date = parse_date(start_date_param) or end_date - timedelta(days=8)
+
+    # validate dates
+    if start_date > now or start_date.date() >= end_date.date():
+        start_date = now - timedelta(days=7)
+        end_date = now + timedelta(days=1)
+
+    return start_date, end_date
+
+
+def parse_date(date_):
+    if date_ is None:
+        return
+
+    masks = ['%Y-%m-%d',
+             '%Y-%m-%dT%H:%M',
+             '%Y-%m-%d %H:%M']
+
+    for mask in masks:
+        try:
+            return datetime.strptime(date_, mask)
+        except ValueError:
+            pass
 
 
 def calculate_fail_rate(passes, retries, totals):
@@ -50,7 +93,7 @@ def calculate_fail_rate(passes, retries, totals):
 
     else:
         results = []
-        denominators = [totals, totals - retries]
+        denominators = [totals - retries, totals]
         for denominator in denominators:
             try:
                 result = 100 - (passes * 100) / float(denominator)
@@ -58,7 +101,7 @@ def calculate_fail_rate(passes, retries, totals):
                 result = 0
             results.append(round(result, 2))
 
-    return dict(zip(['failRate', 'failRateNoRetries'], results))
+    return dict(zip(['failRate', 'failRateWithRetries'], results))
 
 
 def binify(bins, data):
@@ -75,6 +118,7 @@ def binify(bins, data):
     return result
 
 
+@json_response
 def run_resultstimeseries_query(query_dict):
     platform = query_dict.get('platform', 'android4.0')
     print('>>>> platform: ', platform)
@@ -84,6 +128,8 @@ def run_resultstimeseries_query(query_dict):
     cursor.execute("""select result, duration, date from testjobs
                       where platform="%s" order by duration;""" % platform)
 
+    query_results = cursor.fetchall()
+
     greens = []
     oranges = []
     reds = []
@@ -92,7 +138,7 @@ def run_resultstimeseries_query(query_dict):
 
     dates = []
 
-    for result, duration, date in cursor.fetchall():
+    for result, duration, date in query_results:
         if result == 'success':
             greens.append(int(duration))
         elif result == 'testfailed':
@@ -118,16 +164,27 @@ def run_resultstimeseries_query(query_dict):
     data['blue'] = binify(bins, blues)
     data['totals'] = binify(bins, totals)
 
-    return json.dumps([data, get_date_range(dates)])
+    return {'data': data, 'dates': get_date_range(dates)}
 
 
+@json_response
 def run_slaves_query(query_dict):
+    start_date, end_date = clean_date_params(query_dict)
+
     db = create_db_connnection()
     cursor = db.cursor()
     cursor.execute("""select slave, result, date from testjobs
                       where result in
                       ("retry", "testfailed", "success", "busted", "exception")
-                      order by slave;""")
+                      and date between "%s" and "%s"
+                      order by slave;""" % (start_date, end_date))
+
+    query_results = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    if not query_results:
+        return
 
     data = {}
     labels = 'fail retry infra success total'.split()
@@ -135,7 +192,7 @@ def run_slaves_query(query_dict):
 
     dates = []
 
-    for name, result, date in cursor.fetchall():
+    for name, result, date in query_results:
         data.setdefault(name, summary.copy())
         if result == 'testfailed':
             data[name]['fail'] += 1
@@ -148,15 +205,12 @@ def run_slaves_query(query_dict):
         data[name]['total'] += 1
         dates.append(date)
 
-    cursor.close()
-    db.close()
-
     # calculate failure rate for slaves
     for slave, results in data.iteritems():
         fail_rates = calculate_fail_rate(results['success'],
                                          results['retry'],
                                          results['total'])
-        data[slave].update(fail_rates)
+        data[slave]['sfr'] = fail_rates
 
     platforms = {}
 
@@ -177,9 +231,12 @@ def run_slaves_query(query_dict):
                                          results['total'])
         platforms[platform].update(fail_rates)
 
-    return json.dumps([data, platforms, get_date_range(dates)])
+    return {'slaves': data,
+            'platforms': platforms,
+            'dates': get_date_range(dates)}
 
 
+@json_response
 def run_platform_query(query_dict):
     platform = query_dict['platform']
     print('>>> platform', platform)
@@ -203,7 +260,7 @@ def run_platform_query(query_dict):
         cset_id = cset[0]
         cset_summary = CSetSummary(cset_id)
 
-        cursor.execute("""select result,testtype, date from testjobs
+        cursor.execute("""select result, testtype, date from testjobs
                           where platform='%s' and buildtype='opt' and revision='%s'
                           order by testtype""" % (platform, cset_id))
 
@@ -257,17 +314,24 @@ def run_platform_query(query_dict):
     test_summaries['total'] = total
     test_summaries['percentage'] = percentage
 
-    result = {'testTypes': test_types,
-              'byRevision': cset_summaries,
-              'byTest': test_summaries,
-              'failRates': fail_rates,
-              'dates': get_date_range(dates)}
+    return {'testTypes': test_types,
+            'byRevision': cset_summaries,
+            'byTest': test_summaries,
+            'failRates': fail_rates,
+            'dates': get_date_range(dates)}
 
-    return json.dumps(result, default=serialize_to_json)
+
+def handler404(start_response):
+    status = "404 NOT FOUND"
+    response_body = "Not found"
+    response_headers = [("Content-Type", "text/html"),
+                        ("Content-Length", str(len(response_body)))]
+    start_response(status, response_headers)
+    return response_body
 
 
 def application(environ, start_response):
-
+    # get request path and request params
     request = urlparse(request_uri(environ))
     query_dict = parse_qs(request.query)
 
@@ -275,16 +339,22 @@ def application(environ, start_response):
         if len(value) == 1:
             query_dict[key] = value[0]
 
-    if request.path == '/data/results':
-        request_handler = run_resultstimeseries_query
+    # map request handler to request path
+    urlpatterns = (
+        ('/data/results(/)?$', run_resultstimeseries_query),
+        ('/data/slaves(/)?$', run_slaves_query),
+        ('/data/platform(/)?$', run_platform_query),
+        )
 
-    elif request.path == '/data/slaves':
-        request_handler = run_slaves_query
+    # dispatch request to request handler
+    for pattern, request_handler in urlpatterns:
+        if re.match(pattern, request.path, re.I):
+            response_body = request_handler(query_dict)
+            break
+    else:
+        # error handling
+        return handler404(start_response)
 
-    elif request.path == '/data/platform':
-        request_handler = run_platform_query
-
-    response_body = request_handler(query_dict)
     status = "200 OK"
     response_headers = [("Content-Type", "application/json"),
                         ("Content-Length", str(len(response_body)))]
