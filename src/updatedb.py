@@ -76,7 +76,7 @@ def parseBuilder(buildername, branch):
 
     platforms = ['linux32', 'linux32', 'linux32', 'linux32', 'linux64', 'linux64', 'linux64', 'linux64', 'osx10.6', 'osx10.7', 'osx10.7', 'osx10.8', 'winxp', 'winxp', 'win7', 'win764', 'win8', 'android-armv6', 'android-armv6', 'android-x86', 'android2.2', 'android-no-ion', 'android4.0', 'b2g-vm', 'b2g-emulator']
 
-    platformtext = ['Linux', 'Ubuntu HW 12.04', 'Ubuntu VM 12.04', 'Rev3 Fedora 12', 'Linux x86-64', 'Rev3 Fedora 12x64', 'Ubuntu VM 12.04 x64', 'Ubuntu HW 12.04 x64', 'Rev4 MacOSX Snow Leopard 10.6', 'Rev4 MacOSX Lion 10.7', 'OS X 10.7', 'Rev5 MacOSX Mountain Lion 10.8', 'WINNT 5.2', 'Windows XP 32-bit', 'Windows 7 32-bit', 'Windows 7 64-bit', 'WINNT 6.2', 'Android Armv6', 'Android Armv6 Tegra 250', 'Android X86', 'Android Tegra 250', 'Android no-ionmonkey', 'Android 4.0 Panda', 'b2g_ics_armv7a_gecko_emulator_vm', 'b2g_ics_armv7a_gecko_emulator']
+    platformtext = ['Linux', 'Ubuntu HW 12.04', 'Ubuntu VM 12.04', 'Rev3 Fedora 12', 'Linux x86-64', 'Rev3 Fedora 12x64', 'Ubuntu VM 12.04 x64', 'Ubuntu HW 12.04 x64', 'Rev4 MacOSX Snow Leopard 10.6', 'Rev4 MacOSX Lion 10.7', 'OS X 10.7', 'Rev5 MacOSX Mountain Lion 10.8', 'WINNT 5.2', 'Windows XP 32-bit', 'Windows 7 32-bit', 'Windows 7 64-bit', 'WINNT 6.2', 'Android Armv6', 'Android Armv6 Tegra 250', 'Android X86', 'Android 2.2 Tegra', 'Android no-ionmonkey', 'Android 4.0 Panda', 'b2g_ics_armv7a_gecko_emulator_vm', 'b2g_ics_armv7a_gecko_emulator']
 
     index = 0
     for p in platformtext:
