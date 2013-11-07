@@ -171,13 +171,21 @@ def run_resultstimeseries_query(query_dict):
 def run_slaves_query(query_dict):
     start_date, end_date = clean_date_params(query_dict)
 
+    days_to_show = (end_date - start_date).days
+    if days_to_show <= 8:
+        jobs = 5
+    else:
+        jobs = int(round(days_to_show * 0.4))
+
+    info = '''Only slaves with more than %d jobs are displayed.''' % jobs
+
     db = create_db_connnection()
     cursor = db.cursor()
     cursor.execute("""select slave, result, date from testjobs
                       where result in
                       ("retry", "testfailed", "success", "busted", "exception")
-                      and date between "%s" and "%s"
-                      order by slave;""" % (start_date, end_date))
+                      and date between "{0}" and "{1}"
+                      order by slave;""".format(start_date, end_date))
 
     query_results = cursor.fetchall()
     cursor.close()
@@ -205,8 +213,12 @@ def run_slaves_query(query_dict):
         data[name]['total'] += 1
         dates.append(date)
 
-    # calculate failure rate for slaves
-    for slave, results in data.iteritems():
+    # filter slaves
+    slave_list = [slave for slave in data if data[slave]['total'] > jobs]
+
+    # calculate failure rate only for slaves that we're going to display
+    for slave in slave_list:
+        results = data[slave]
         fail_rates = calculate_fail_rate(results['success'],
                                          results['retry'],
                                          results['total'])
@@ -217,9 +229,14 @@ def run_slaves_query(query_dict):
     # group slaves by platform and calculate platform failure rate
     slaves = sorted(data.keys())
     for platform, slave_group in groupby(slaves, lambda x: x.rsplit('-', 1)[0]):
+        slaves = list(slave_group)
+
+        # don't calculate failure rate for platform we're not going to show
+        if not any(slave in slaves for slave in slave_list):
+            continue
+
         platforms[platform] = {}
         results = {}
-        slaves = list(slave_group)
 
         for label in ['success', 'retry', 'total']:
             r = reduce(lambda x, y: x + y,
@@ -231,9 +248,15 @@ def run_slaves_query(query_dict):
                                          results['total'])
         platforms[platform].update(fail_rates)
 
+    # remove data that we don't need
+    for slave in data.keys():
+        if slave not in slave_list:
+            del data[slave]
+
     return {'slaves': data,
             'platforms': platforms,
-            'dates': get_date_range(dates)}
+            'dates': get_date_range(dates),
+            'disclaimer': info}
 
 
 @json_response

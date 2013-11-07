@@ -32,7 +32,7 @@ $(function() {
 function showHidden() {
   $('.hidden').toggle(
     $('#showHidden').is(':checked'));
-};
+}
 
 
 function fetchData(queryString) {
@@ -44,22 +44,29 @@ function fetchData(queryString) {
       var errMsg = 'Ajax request failed';
       handleError(errMsg);
     });
-};
+}
 
 
 function handleError(errMsg) {
   $('.reportDates').hide();
   clearResultsTable();
   $('#error').text(errMsg).show();
-};
+}
 
 
 function clearResultsTable() {
   var rows = $('#results tr').slice(1);
-  if (rows.length > 1) {
+  if (rows.length > 0) {
     rows.remove();
-  };
-};
+  }
+}
+
+
+function insertDates(dates) {
+  $('.reportDates').show();
+  $('#startDate').text(dates.startDate);
+  $('#endDate').text(dates.endDate);
+}
 
 
 function insertData(json) {
@@ -67,16 +74,18 @@ function insertData(json) {
   if (json.error) {
     handleError(json.error);
     return;
-  };
+  }
 
-  var slaves_data = json.slaves;
-  var platform_data = json.platforms;
-  var dates = json.dates;
+  var slaves_data = json.slaves,
+      platform_data = json.platforms,
+      dates = json.dates,
+      info = json.disclaimer;
 
   // insert dates
-  $('.reportDates').show();
-  $('#startDate').text(dates.startDate);
-  $('#endDate').text(dates.endDate);
+  insertDates(dates);
+
+  // insert disclaimer
+  $('#info').text(info);
 
   // globally used variables
   var tbl = $('#results');
@@ -100,9 +109,9 @@ function insertData(json) {
     // get platform failure rate
     $.each(platform_data, function(index, value) {
       var re = RegExp("^" + index + "-.*");
-      if (results['slave'].match(re) != null) {
+      if (results['slave'].match(re) !== null) {
         results['pfr'] = value;
-      };
+      }
     });
 
     // insert rows
@@ -136,12 +145,12 @@ function insertData(json) {
   // make table sortable
   sorttable.makeSortable(tbl[0]);
 
-};
+}
 
 
 function switchFailRates() {
   var isChecked = $('#includeRetries').is(':checked');
-  var attrToUse = isChecked == true ? 'withRetries' : 'noRetries';
+  var attrToUse = isChecked === true ? 'withRetries' : 'noRetries';
 
   var tblRows = $('#results').find('tr').slice(1);
   var labels = getTableColumns();
@@ -163,7 +172,7 @@ function switchFailRates() {
       sfrCell.removeClass('alert');
     }
   });
-};
+}
 
 
 function getTableColumns() {
@@ -172,4 +181,4 @@ function getTableColumns() {
     labels.push(this.dataset['type']);
   });
   return labels;
-};
+}
