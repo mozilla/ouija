@@ -2,6 +2,7 @@
 
 import json
 import re
+import calendar
 from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
@@ -166,6 +167,39 @@ def run_resultstimeseries_query(query_dict):
 
     return {'data': data, 'dates': get_date_range(dates)}
 
+@json_response
+def run_results_day_flot_query(query_dict):
+    """ This function returns the total failures/total jobs data per day for all platforms. It is sending the data in the format required by flot.Flot is a jQuery package used for 'attractive' plotting """
+
+    platforms = ['android4.0','android2.2','linux32','winxp','win7','win8','osx10.6','osx10.7','osx10.8']
+    db = create_db_connnection()
+
+    data_platforms = {}
+    for platform in platforms:
+        cursor = db.cursor()
+        cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as totals from testjobs
+                          where platform="%s" group by day""" % ('testfailed',platform))
+
+        query_results = cursor.fetchall()
+
+        dates = []
+        data = {}
+        data['failures'] = []
+        data['totals'] = []
+
+        for day,fail,total in query_results:
+            dates.append(day)
+            timestamp = calendar.timegm(day.timetuple()) * 1000
+            data['failures'].append((timestamp,int(fail)))
+            data['totals'].append((timestamp,int(total)))
+
+        cursor.close()
+
+        data_platforms[platform] = {'data': data, 'dates': get_date_range(dates)}
+
+    db.close()
+
+    return data_platforms
 
 @json_response
 def run_slaves_query(query_dict):
@@ -367,6 +401,7 @@ def application(environ, start_response):
         ('/data/results(/)?$', run_resultstimeseries_query),
         ('/data/slaves(/)?$', run_slaves_query),
         ('/data/platform(/)?$', run_platform_query),
+        ('/data/results/flot/day(/)?$',run_results_day_flot_query)
         )
 
     # dispatch request to request handler

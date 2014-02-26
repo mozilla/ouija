@@ -62,3 +62,8 @@ body.loading {
 body.loading .modal {
     display: block;
 }
+
+.legend table {
+  border-spacing: 5px;
+  width: auto;
+}

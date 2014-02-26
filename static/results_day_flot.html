@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>Ouija | Test results time series</title>
+   <link rel="stylesheet" type="text/css" href="/css/style.css">
+   <script src="http://code.jquery.com/jquery-2.1.0.min.js"></script>
+   <script src="js/flot/jquery.flot.min.js"></script>
+   <script src="js/flot/jquery.flot.time.min.js"></script>
+   <script src="js/flot/jquery.flot.selection.min.js"></script>
+   <script src="js/get_data_flot.js"></script>
+   <script src="js/plotGraph.js"></script>
+   <script type="text/javascript">
+
+    // getData is a function defined in get_data_flot.js. It sends a get request to the python webserver to get data for all platforms
+    var data_platform = getData();
+    var datasets = {};
+
+    // Probably there is a better way to do this without using setTimeout. Though I am doing every get request synchronously,somehow the graph is not getting plotted if I don't use setTimeout. Should figure out the problem and do it in a better way without using setTimeout.
+    setTimeout(function() {
+      // getDataSets function is included in get_data_flot.js file. Gets the data in the format required by flot.
+      datasets = getDataSets(data_platform);
+
+      // plotGraph function is included in the plotGraph.js file.
+      plotGraph(datasets, data_platform);
+    },500);
+
+    </script>
+
+</head>
+<body>
+    <div id="pageHeader">
+        <h1>Test Results</h1>
+    </div>
+    <div class="container">
+      <h2 id='heading' style="padding-left: 20px;"></h2>
+      <p style="padding-left: 20px;">
+          <strong>Data fetched for:</strong>
+          <span id="startDate"></span> &mdash; <span id="endDate"></span>
+      </p>
+      <div id="graph" style="float:left; width:1000px; height:450px;"></div>
+      <p id="choices" style="float:right; width:130px;"></p>
+    </div>
+</body>
