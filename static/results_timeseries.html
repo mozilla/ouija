@@ -74,6 +74,23 @@
         req2.open('get', '/data/results?platform=android4.0', true);
         req2.send();
 
+        var req3 = new XMLHttpRequest();
+        req3.onload = function(e) {
+
+            var raw_data = JSON.parse(req3.response);
+            var chart_data = raw_data.data;
+            var dates = raw_data.dates;
+
+            document.getElementById('startDate3').innerHTML = dates.startDate;
+            document.getElementById('endDate3').innerHTML = dates.endDate;
+
+            var ctx = document.getElementById('chart3').getContext('2d');
+            renderChart(chart_data, ctx);
+
+        }; 
+        req3.open('get', '/data/results?platform=android2.3', true);
+        req3.send();
+
 
     </script>
 </head>
@@ -93,5 +110,11 @@
         <span id="startDate2"></span> &mdash; <span id="endDate2"></span>
     </p>
     <canvas id="chart2" width=800 height=400></canvas>
+    <h2>Android 2.3</h2>
+    <p>
+        <strong>Data fetched for:</strong>
+        <span id="startDate3"></span> &mdash; <span id="endDate3"></span>
+    </p>
+    <canvas id="chart3" width=800 height=400></canvas>
 </body>
 </html>
