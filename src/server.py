@@ -412,7 +412,8 @@ def application(environ, start_response):
             break
     else:
         # When running outside of Apache, we need to handle serving
-        # static files as well.
+        # static files as well. TODO: This helps with testing, but
+        # could be more robust.
         # need to strip off leading '/' for relative path
         static_path = os.path.join('..', 'static', request.path[1:])
         if os.path.exists(static_path):
