@@ -3,17 +3,28 @@ ouija
 
 Failure rate analysis for tbpl.
 
-Installation
+# Installation
 
-Dependencies:
-* Apache
-** libapache2-mod-wsgi
+The production ouija server is running on Ubuntu, so this is probably the easiest environment in which to get things running, but other distributions of linux should be fine as well. We use Apache on the production server, but Ouija will run standalone for testing as well.
+
+## Dependencies:
 * MySQL
 * Python
-** python-mysqldb
+* python-mysqldb
 
-1) Copy the apache configuration file from config/apache2/default to /etc/apache2/sites-available/default. Update the paths to be valid for your system.
-2) Restart Apache.
-3) Create the MySQL database using the sql/schema.sql script.
-4) Run the src/updatedb.py to get initial data in your database.
+## Database configuration:
+Ouija assumes MySQL has been installed with a root user using the password 'root'. Create the MySQL database using the sql/schema.sql script.
 
+    mysql --user root --password < schema.sql
+    
+Fetch data for the database using the src/updatedb.py script. The delta argument controls how many days worth of data need to be fetched. Two should be sufficient to get started.
+
+    python updatedb.py --delta 2
+
+## Start the app
+Start the application:
+
+    cd src
+    python server.py
+
+You should see ouija running at http://localhost:8314/index.html.

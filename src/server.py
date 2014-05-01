@@ -3,6 +3,7 @@
 import json
 import re
 import calendar
+import os
 from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
@@ -410,8 +411,21 @@ def application(environ, start_response):
             response_body = request_handler(query_dict)
             break
     else:
-        # error handling
-        return handler404(start_response)
+        # When running outside of Apache, we need to handle serving
+        # static files as well. TODO: This helps with testing, but
+        # could be more robust.
+        # need to strip off leading '/' for relative path
+        static_path = os.path.join('..', 'static', request.path[1:])
+        if os.path.exists(static_path):
+            with open(static_path, 'r') as f:
+                response_body = f.read() 
+            status = "200 OK"
+            response_headers = [("Content-Type", "html"),
+                                ("Content-Length", str(len(response_body)))]
+            start_response(status, response_headers)
+            return response_body
+        else:
+            return handler404(start_response)
 
     status = "200 OK"
     response_headers = [("Content-Type", "application/json"),
