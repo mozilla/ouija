@@ -7,6 +7,11 @@ from itertools import groupby
 from collections import Counter
 from functools import wraps
 
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
 import MySQLdb
 from flask import Flask, request, json, Response, abort
 
@@ -395,16 +400,6 @@ def run_platform_query():
 @json_response
 def handler404(error):
     return {"status": 404, "msg": str(error)}
-
-
-@app.route("/<string:filename>")
-def template(filename):
-    filename = os.path.join(static_path, filename)
-    if os.path.exists(filename):
-        with open(filename, 'r') as f:
-            response_body = f.read()
-        return response_body
-    abort(404)
 
 
 if __name__ == "__main__": app.run(host="0.0.0.0", port=8314, debug=True)
