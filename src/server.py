@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 
-import json
-import re
-import calendar
 import os
+import calendar
 from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
-from urlparse import urlparse, parse_qs
-from wsgiref.simple_server import make_server
-from wsgiref.util import request_uri
+from functools import wraps
 
 import MySQLdb
+from flask import Flask, request, json, Response, abort
 
+static_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+app = Flask(__name__, static_url_path="", static_folder=static_path)
 
 class CSetSummary(object):
     def __init__(self, cset_id):
@@ -40,10 +39,17 @@ def serialize_to_json(object):
 
 def json_response(func):
     """Decorator: Serialize response to json"""
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
-        return json.dumps(result or {'error': 'No data found for your request'},
-                          default=serialize_to_json)
+        result = json.dumps(func(*args, **kwargs) or {"error": "No data found for your request"},
+                            default=serialize_to_json)
+        headers = [
+            ("Content-Type", "application/json"),
+            ("Content-Length", str(len(result)))
+        ]
+        return Response(result, status=200, headers=headers)
+
     return wrapper
 
 
@@ -107,11 +113,10 @@ def calculate_fail_rate(passes, retries, totals):
 
 
 def binify(bins, data):
-
     result = []
     for i, bin in enumerate(bins):
         if i > 0:
-            result.append(len(filter(lambda x: x >= bins[i - 1] and x < bin, data))) 
+            result.append(len(filter(lambda x: x >= bins[i - 1] and x < bin, data)))
         else:
             result.append(len(filter(lambda x: x < bin, data)))
 
@@ -120,9 +125,10 @@ def binify(bins, data):
     return result
 
 
+@app.route("/data/results/")
 @json_response
-def run_resultstimeseries_query(query_dict):
-    platform = query_dict.get('platform', 'android4.0')
+def run_resultstimeseries_query():
+    platform = request.args.get("platform", "android4.0")
     print('>>>> platform: ', platform)
 
     db = create_db_connnection()
@@ -155,11 +161,11 @@ def run_resultstimeseries_query(query_dict):
     cursor.close()
     db.close()
 
-    bins = map(lambda x: x*60, [10, 20, 30, 40, 50])  # minutes
+    bins = map(lambda x: x * 60, [10, 20, 30, 40, 50])  # minutes
 
     data = {}
     data['total'] = len(totals)
-    data['labels'] = ["< 10","10 - 20","20 - 30","30 - 40","40 - 50","> 50"]
+    data['labels'] = ["< 10", "10 - 20", "20 - 30", "30 - 40", "40 - 50", "> 50"]
     data['green'] = binify(bins, greens)
     data['orange'] = binify(bins, oranges)
     data['red'] = binify(bins, reds)
@@ -168,18 +174,20 @@ def run_resultstimeseries_query(query_dict):
 
     return {'data': data, 'dates': get_date_range(dates)}
 
+
+@app.route("/data/results/flot/day/")
 @json_response
-def run_results_day_flot_query(query_dict):
+def run_results_day_flot_query():
     """ This function returns the total failures/total jobs data per day for all platforms. It is sending the data in the format required by flot.Flot is a jQuery package used for 'attractive' plotting """
 
-    platforms = ['android4.0','android2.2','linux32','winxp','win7','win8','osx10.6','osx10.7','osx10.8']
+    platforms = ['android4.0', 'android2.2', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
     db = create_db_connnection()
 
     data_platforms = {}
     for platform in platforms:
         cursor = db.cursor()
         cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as totals from testjobs
-                          where platform="%s" group by day""" % ('testfailed',platform))
+                          where platform="%s" group by day""" % ('testfailed', platform))
 
         query_results = cursor.fetchall()
 
@@ -188,11 +196,11 @@ def run_results_day_flot_query(query_dict):
         data['failures'] = []
         data['totals'] = []
 
-        for day,fail,total in query_results:
+        for day, fail, total in query_results:
             dates.append(day)
             timestamp = calendar.timegm(day.timetuple()) * 1000
-            data['failures'].append((timestamp,int(fail)))
-            data['totals'].append((timestamp,int(total)))
+            data['failures'].append((timestamp, int(fail)))
+            data['totals'].append((timestamp, int(total)))
 
         cursor.close()
 
@@ -202,9 +210,11 @@ def run_results_day_flot_query(query_dict):
 
     return data_platforms
 
+
+@app.route("/data/slaves/")
 @json_response
-def run_slaves_query(query_dict):
-    start_date, end_date = clean_date_params(query_dict)
+def run_slaves_query():
+    start_date, end_date = clean_date_params(request.args)
 
     days_to_show = (end_date - start_date).days
     if days_to_show <= 8:
@@ -294,9 +304,11 @@ def run_slaves_query(query_dict):
             'disclaimer': info}
 
 
+@app.route("/data/platform/")
 @json_response
-def run_platform_query(query_dict):
-    platform = query_dict['platform']
+def run_platform_query():
+    platform = request.args.get("platform")
+    # platform = query_dict['platform']
     print('>>> platform', platform)
 
     db = create_db_connnection()
@@ -379,61 +391,20 @@ def run_platform_query(query_dict):
             'dates': get_date_range(dates)}
 
 
-def handler404(start_response):
-    status = "404 NOT FOUND"
-    response_body = "Not found"
-    response_headers = [("Content-Type", "text/html"),
-                        ("Content-Length", str(len(response_body)))]
-    start_response(status, response_headers)
-    return response_body
+@app.errorhandler(404)
+@json_response
+def handler404(error):
+    return {"status": 404, "msg": str(error)}
 
 
-def application(environ, start_response):
-    # get request path and request params
-    request = urlparse(request_uri(environ))
-    query_dict = parse_qs(request.query)
-
-    for key, value in query_dict.items():
-        if len(value) == 1:
-            query_dict[key] = value[0]
-
-    # map request handler to request path
-    urlpatterns = (
-        ('/data/results(/)?$', run_resultstimeseries_query),
-        ('/data/slaves(/)?$', run_slaves_query),
-        ('/data/platform(/)?$', run_platform_query),
-        ('/data/results/flot/day(/)?$',run_results_day_flot_query)
-        )
-
-    # dispatch request to request handler
-    for pattern, request_handler in urlpatterns:
-        if re.match(pattern, request.path, re.I):
-            response_body = request_handler(query_dict)
-            break
-    else:
-        # When running outside of Apache, we need to handle serving
-        # static files as well. TODO: This helps with testing, but
-        # could be more robust.
-        # need to strip off leading '/' for relative path
-        static_path = os.path.join('..', 'static', request.path[1:])
-        if os.path.exists(static_path):
-            with open(static_path, 'r') as f:
-                response_body = f.read() 
-            status = "200 OK"
-            response_headers = [("Content-Type", "html"),
-                                ("Content-Length", str(len(response_body)))]
-            start_response(status, response_headers)
-            return response_body
-        else:
-            return handler404(start_response)
-
-    status = "200 OK"
-    response_headers = [("Content-Type", "application/json"),
-                        ("Content-Length", str(len(response_body)))]
-    start_response(status, response_headers)
-    return response_body
+@app.route("/<string:filename>")
+def template(filename):
+    filename = os.path.join(static_path, filename)
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            response_body = f.read()
+        return response_body
+    abort(404)
 
 
-if __name__ == '__main__':
-    httpd = make_server("0.0.0.0", 8314, application)
-    httpd.serve_forever()
+if __name__ == "__main__": app.run(host="0.0.0.0", port=8314, debug=True)
