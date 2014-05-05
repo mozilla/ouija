@@ -8,7 +8,7 @@
 		allow from all
 	</Directory>
 
-	WSGIScriptAlias /data /home/ubuntu/ouija/src/server.py
+	WSGIScriptAlias / /home/ubuntu/ouija/src/ouija.wsgi
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
 
