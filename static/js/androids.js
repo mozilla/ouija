@@ -65,24 +65,24 @@
          * @param revisionResults
          */
         function renderRevisions(testTypes, revisionResults) {
-            var tbl = document.getElementById('green_results');
+            var tbl = document.getElementById('green_results'), row, cell, textNode;
 
             // remove total and percentage stats
             testTypes.splice(-2, 2);
 
             // insert revisions into lower table
             for (var revision in revisionResults) {
-                var revision_id = revisionResults[revision].cset_id, row = tbl.insertRow(-1);
-                (row.insertCell(0)).innerHTML = revision_id;
+                row = tbl.insertRow(-1);
+                (row.insertCell(0)).innerHTML = revisionResults[revision].cset_id;
             }
 
             // insert data into lower table
-            for (var i=0; i<testTypes.length; i++) {
+            for (var i=0; i < testTypes.length; i++) {
                 var test = testTypes[i];
 
                 for (var j=0; j<tbl.rows.length; j++) {
                     cell = tbl.rows[j].insertCell(-1);
-                    textNode = j==0 ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
+                    textNode = (j == 0) ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
                     cell.innerHTML = textNode;
                 }
             }
@@ -91,14 +91,16 @@
         }
 
         function done(data) {
-            console.info("rendering results...");
-
-            renderDates(data.dates.startDate, data.dates.endDate);
-            renderResults(data.testTypes, data.byTest, data.failRates);
-            renderRevisions(data.testTypes, data.byRevision);
-
             if ($error.is(":visible")) $error.hide();
             $dates.show();
+
+            clearTables(function () {
+                console.info("rendering results...");
+
+                renderDates(data.dates.startDate, data.dates.endDate);
+                renderResults(data.testTypes, data.byTest, data.failRates);
+                renderRevisions(data.testTypes, data.byRevision);
+            });
         }
 
         function fail(error) {
@@ -108,10 +110,7 @@
 
         function fetchData(e) {
             if (e) e.preventDefault();
-
-            clearTables(function () {
-                $.getJSON("/data/platform/", $form.serialize()).done(done).fail(fail);
-            });
+            $.getJSON("/data/platform/", $form.serialize()).done(done).fail(fail);
         }
 
         $form.append("<input type='hidden' name='platform' value='%s' />".replace("%s", platform)).submit(fetchData);
