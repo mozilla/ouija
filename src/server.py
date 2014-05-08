@@ -7,6 +7,11 @@ from itertools import groupby
 from collections import Counter
 from functools import wraps
 
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
 import MySQLdb
 from flask import Flask, request, json, Response, abort
 
