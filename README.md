@@ -10,7 +10,8 @@ The production ouija server is running on Ubuntu, so this is probably the easies
 ## Dependencies:
 * MySQL
 * Python
-* python-mysqldb
+* MySql-python
+* Flask
 
 ## Database configuration:
 Ouija assumes MySQL has been installed with a root user using the password 'root'. Create the MySQL database using the sql/schema.sql script.
