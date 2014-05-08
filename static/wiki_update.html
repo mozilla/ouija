@@ -2,26 +2,21 @@
 <html>
 <head>
     <link rel="stylesheet" type="text/css" href="/css/style.css">
-    <script src="/js/sorttable.js"></script>
     <script type="text/javascript">
-        // parse get parameters
         document.title = 'Ouija | Wiki_page_Failure Rate';
         var req_android_2_2 = new XMLHttpRequest();
         req_android_2_2.onload = function(e) {
-
-            var raw_data = JSON.parse(req_android_2_2.response);
-
-            var failRates_2_2 = raw_data.failRates;
-            var dates = raw_data.dates;
+            var raw_data_2_2 = JSON.parse(req_android_2_2.response);
+            var failRates_2_2 = raw_data_2_2.failRates;
+            var dates = raw_data_2_2.dates;
 
             // insert dates
             document.getElementById('startDate').innerHTML = dates.startDate;
             document.getElementById('endDate').innerHTML = dates.endDate;
 
-            /// fill failure rates
+            /// fill failure rates for android 2.2
             document.getElementById('failure_rate_2_2').innerHTML = failRates_2_2['failRateWithRetries'];
             document.getElementById('failure_exclude_retry_2_2').innerHTML = failRates_2_2['failRate'];
-
         }
         req_android_2_2.open('get', '/data/platform?platform=android2.2', true);
         req_android_2_2.send();
@@ -30,14 +25,12 @@
     <script type="text/javascript">
         var req_android_2_3 = new XMLHttpRequest();
         req_android_2_3.onload = function(e) {
+            var raw_data_2_3 = JSON.parse(req_android_2_3.response);
+            var failRates_2_3 = raw_data_2_3.failRates;
 
-        var raw_data_2_3 = JSON.parse(req_android_2_3.response);
-        var failRates_2_3 = raw_data_2_3.failRates;
-
-         /// fill failure rates
-        document.getElementById('failure_rate_2_3').innerHTML = failRates_2_3['failRateWithRetries'];
-        document.getElementById('failure_exclude_retry_2_3').innerHTML = failRates_2_3['failRate'];
-
+            /// fill failure rates for android 2.3
+            document.getElementById('failure_rate_2_3').innerHTML = failRates_2_3['failRateWithRetries'];
+            document.getElementById('failure_exclude_retry_2_3').innerHTML = failRates_2_3['failRate'];
         }
         req_android_2_3.open('get', '/data/platform?platform=android2.3', true);
         req_android_2_3.send();
@@ -46,14 +39,12 @@
     <script type="text/javascript">
         var req_android_4_0 = new XMLHttpRequest();
         req_android_4_0.onload = function(e) {
+            var raw_data_4_0 = JSON.parse(req_android_4_0.response);
+            var failRates_4_0 = raw_data_4_0.failRates;
 
-        var raw_data_4_0 = JSON.parse(req_android_4_0.response);
-        var failRates_4_0 = raw_data_4_0.failRates;
-
-         /// fill failure rates
-        document.getElementById('failure_rate_4_0').innerHTML = failRates_4_0['failRateWithRetries'];
-        document.getElementById('failure_exclude_retry_4_0').innerHTML = failRates_4_0['failRate'];
-
+             /// fill failure rates for android 4.0
+            document.getElementById('failure_rate_4_0').innerHTML = failRates_4_0['failRateWithRetries'];
+            document.getElementById('failure_exclude_retry_4_0').innerHTML = failRates_4_0['failRate'];
         }
         req_android_4_0.open('get', '/data/platform?platform=android4.0', true);
         req_android_4_0.send();
