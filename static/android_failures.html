@@ -1,7 +1,11 @@
 <html>
 <head>
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
     <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
     <script src="/js/sorttable.js"></script>
+    <script src="/js/datepicker.js"></script>    
     <script type="text/javascript">
         // parse get parameters
         var platform = location.search.substr(1).split('=')[1];
@@ -10,11 +14,13 @@
 
         var req = new XMLHttpRequest();
         req.onload = function(e) {
-
-            header = document.createElement('h1');
+			
+            var header = document.createElement('h1');
             header.innerHTML = capitalizedPlatform;
-            document.getElementById('pageHeader').appendChild(header);
-
+			
+			var pageHeader = document.getElementById("pageHeader"); 
+			pageHeader.insertBefore(header, pageHeader.firstChild);
+            
             var raw_data = JSON.parse(req.response);
 
             var testTypes = raw_data.testTypes;
@@ -82,11 +88,22 @@
     </script>
 </head>
 <body>
-    <div id="pageHeader"></div>
-    <p>
-        <strong>Data fetched for:</strong>
-        <span id="startDate"></span> &mdash; <span id="endDate"></span>
-    </p>
+    <div id="pageHeader">
+        <p id="error" class="alert"></p>
+		<div class="reportDates">
+		    <strong>Data fetched for:</strong>
+		    <span id="startDate"></span> &mdash; <span id="endDate"></span>
+		</div>
+    </div>
+    <!-- #pageHeader -->
+    <br />
+    <form>
+        <label for="from">Start date: </label>
+        <input type="text" id="from" size="10" name="startDate"/>
+        <label for="to">End date: </label>
+        <input type="text" id="to" size="10" name="endDate"/>
+        <input type="submit" value="Get data"/>   	
+    </form>
     <table id="results">
         <tr>
             <td>Status</td>
