@@ -18,9 +18,24 @@
         pageHeader.insertBefore(headerElem, pageHeader.firstChild);
 
         function clearTables(fn) {
-            //var rows = $('#results tr').slice(1);
-            //if (rows.length > 0)
-              //  rows.remove();
+            var tr  = $("#results tr");
+
+            for (var i = 0, n = tr.length; i < n; i++) {
+                for (var j = 1, k = tr[i].children.length; j < k; j++)
+                    $(tr[i].children[j]).remove();
+            }
+
+            tr = $("#green_results tr");
+
+            for (var i = 0, n = tr.length; i < n; i++) {
+                if (i == 0) {
+                    for (var j = tr[i].children.length; j !== 0; j--)
+                        $(tr[i].children[j]).remove();
+                } else {
+                    $(tr[i]).remove();
+                }
+            }
+
             fn();
         }
 
@@ -82,7 +97,15 @@
 
                 for (var j=0; j<tbl.rows.length; j++) {
                     cell = tbl.rows[j].insertCell(-1);
-                    textNode = (j == 0) ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
+
+                    // TODO: remove this...
+                    if (j == 0) {
+                        textNode = testTypes[i];
+                    } else {
+                        textNode = (revisionResults[j-1] === undefined) ? 0 : (revisionResults[j-1].green[test] || 0);
+                    }
+                    // TODO: put this back...
+                    //textNode = (j == 0) ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
                     cell.innerHTML = textNode;
                 }
             }
@@ -100,6 +123,13 @@
                 renderDates(data.dates.startDate, data.dates.endDate);
                 renderResults(data.testTypes, data.byTest, data.failRates);
                 renderRevisions(data.testTypes, data.byRevision);
+
+                var tr = $("#green_results tr");
+
+                setTimeout(function () {
+
+                }, 2000)
+
             });
         }
 
