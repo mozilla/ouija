@@ -18,22 +18,22 @@
         pageHeader.insertBefore(headerElem, pageHeader.firstChild);
 
         function clearTables(fn) {
-            var tr  = $("#results tr");
+            var tr  = $("#results tr"), i, j;
 
-            for (var i = 0, n = tr.length; i < n; i++) {
-                for (var j = 1, k = tr[i].children.length; j < k; j++)
+            for (i = 0; i < tr.length; i++) {
+                for (j = tr[i].children.length; j !== 0; j--)
                     $(tr[i].children[j]).remove();
             }
 
             tr = $("#green_results tr");
 
-            for (var i = 0, n = tr.length; i < n; i++) {
-                if (i == 0) {
-                    for (var j = tr[i].children.length; j !== 0; j--)
-                        $(tr[i].children[j]).remove();
-                } else {
-                    $(tr[i]).remove();
-                }
+            for (i = 0; i < tr.length; i++) {
+                if (i === 0) {
+                	for (j = tr[i].children.length; j !== 0; j--)
+                    	$(tr[i].children[j]).remove();
+            	} else {
+            		$(tr[i]).remove();
+            	}
             }
 
             fn();
@@ -74,38 +74,27 @@
 
             sorttable.makeSortable(tbl);
         }
-
+		
         /**
          * @param testTypes
          * @param revisionResults
          */
         function renderRevisions(testTypes, revisionResults) {
-            var tbl = document.getElementById('green_results'), row, cell, textNode;
-
+			var tbl = document.getElementById('green_results'), cell, textNode, test;
+				
             // remove total and percentage stats
             testTypes.splice(-2, 2);
 
             // insert revisions into lower table
-            for (var revision in revisionResults) {
-                row = tbl.insertRow(-1);
-                (row.insertCell(0)).innerHTML = revisionResults[revision].cset_id;
-            }
+            for (var revision in revisionResults)
+                $(tbl).append("<tr><td>" + revisionResults[revision].cset_id + "</td></tr>")
 
             // insert data into lower table
-            for (var i=0; i < testTypes.length; i++) {
-                var test = testTypes[i];
-
-                for (var j=0; j<tbl.rows.length; j++) {
-                    cell = tbl.rows[j].insertCell(-1);
-
-                    // TODO: remove this...
-                    if (j == 0) {
-                        textNode = testTypes[i];
-                    } else {
-                        textNode = (revisionResults[j-1] === undefined) ? 0 : (revisionResults[j-1].green[test] || 0);
-                    }
-                    // TODO: put this back...
-                    //textNode = (j == 0) ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
+            for (var i = 0; i < testTypes.length; i++) {
+                test = testTypes[i];
+                for (var j = 0; j < tbl.rows.length; j++) {
+                    cell = tbl.rows[j].insertCell(-1),
+                  	textNode = (j == 0) ? test : (revisionResults[j-1].green[test] || 0);
                     cell.innerHTML = textNode;
                 }
             }
@@ -123,13 +112,6 @@
                 renderDates(data.dates.startDate, data.dates.endDate);
                 renderResults(data.testTypes, data.byTest, data.failRates);
                 renderRevisions(data.testTypes, data.byRevision);
-
-                var tr = $("#green_results tr");
-
-                setTimeout(function () {
-
-                }, 2000)
-
             });
         }
 
