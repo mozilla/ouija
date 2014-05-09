@@ -107,8 +107,12 @@
             $dates.show();
 
             clearTables(function () {
-                console.info("rendering results...");
-
+                if (!data.dates) {
+                    data.dates = {
+                        "startDate": "",
+                        "endDate": ""
+                    };
+                }
                 renderDates(data.dates.startDate, data.dates.endDate);
                 renderResults(data.testTypes, data.byTest, data.failRates);
                 renderRevisions(data.testTypes, data.byRevision);
