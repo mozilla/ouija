@@ -80,7 +80,7 @@
          * @param revisionResults
          */
         function renderRevisions(testTypes, revisionResults) {
-			var tbl = document.getElementById('green_results'), cell, textNode, test;
+            var tbl = document.getElementById('green_results'), cell, textNode, test;
 				
             // remove total and percentage stats
             testTypes.splice(-2, 2);
@@ -93,8 +93,8 @@
             for (var i = 0; i < testTypes.length; i++) {
                 test = testTypes[i];
                 for (var j = 0; j < tbl.rows.length; j++) {
-                    cell = tbl.rows[j].insertCell(-1),
-                  	textNode = (j == 0) ? test : (revisionResults[j-1].green[test] || 0);
+                    cell = tbl.rows[j].insertCell(-1);
+                    textNode = (j == 0) ? test : (revisionResults[j-1].green[test] || 0);
                     cell.innerHTML = textNode;
                 }
             }
