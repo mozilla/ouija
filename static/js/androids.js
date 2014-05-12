@@ -32,7 +32,7 @@
                     for (j = tr[i].children.length; j !== 0; j--)
                         $(tr[i].children[j]).remove();
             	} else {
-            		$(tr[i]).remove();
+                    $(tr[i]).remove();
             	}
             }
 
