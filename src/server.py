@@ -308,14 +308,17 @@ def run_slaves_query():
 @json_response
 def run_platform_query():
     platform = request.args.get("platform")
-    # platform = query_dict['platform']
-    print('>>> platform', platform)
+    start_date, end_date = clean_date_params(request.args)
+
+    print('>>> platform', platform, "startDate:", start_date, "endDate:", end_date)
 
     db = create_db_connnection()
     cursor = db.cursor()
     cursor.execute("""select distinct revision from testjobs
-                      where platform = '%s' and branch = 'mozilla-central'
-                      order by date desc limit 30;""" % platform)
+                      where platform = '%s'
+                      and branch = 'mozilla-central'
+                      and date between '%s' and '%s'
+                      order by date desc;""" % (platform, start_date, end_date))
 
     csets = cursor.fetchall()
 

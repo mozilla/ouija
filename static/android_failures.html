@@ -1,92 +1,33 @@
 <html>
 <head>
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
     <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
     <script src="/js/sorttable.js"></script>
-    <script type="text/javascript">
-        // parse get parameters
-        var platform = location.search.substr(1).split('=')[1];
-        var capitalizedPlatform = platform.charAt(0).toUpperCase() + platform.substr(1);
-        document.title = 'Ouija | ' + capitalizedPlatform + ' Failure Rate';
-
-        var req = new XMLHttpRequest();
-        req.onload = function(e) {
-
-            header = document.createElement('h1');
-            header.innerHTML = capitalizedPlatform;
-            document.getElementById('pageHeader').appendChild(header);
-
-            var raw_data = JSON.parse(req.response);
-
-            var testTypes = raw_data.testTypes;
-            var testResults = raw_data.byTest;
-            var revisionResults = raw_data.byRevision;
-            var failRates = raw_data.failRates;
-            var dates = raw_data.dates;
-
-            // insert dates
-            document.getElementById('startDate').innerHTML = dates.startDate;
-            document.getElementById('endDate').innerHTML = dates.endDate;
-
-            var tbl = document.getElementById('results');
-
-            // insert data into upper table
-            for (var i=0; i<testTypes.length; i++) {
-                var result = testResults[testTypes[i]];
-
-                for (var j=0; j<tbl.rows.length; j++) {
-                    row = tbl.rows[j];
-                    cell = row.insertCell(i+1);
-                    textNode = j==0 ? testTypes[i] : result[row.id];
-                    cell.innerHTML = textNode;
-                }
-            }
-
-            // fill failure rates
-            document.getElementById('failure_rate').innerHTML = failRates['failRateWithRetries'];
-            document.getElementById('failure_exclude_retry').innerHTML = failRates['failRate'];
-
-            sorttable.makeSortable(tbl);
-
-            var tbl = document.getElementById('green_results');
-            var tableHead = tbl.rows[0];
-
-            // remove total and percentage stats
-            testTypes.splice(-2, 2);
-
-            // insert revisions into lower table
-            for (var revision in revisionResults) {
-                var revision_id = revisionResults[revision].cset_id;
-                var row = tbl.insertRow(-1);
-
-                rev = row.insertCell(0);
-                rev.innerHTML = revision_id;
-            }
-
-            // insert data into lower table
-            for (var i=0; i<testTypes.length; i++) {
-                var test = testTypes[i];
-
-                for (var j=0; j<tbl.rows.length; j++) {
-                    cell = tbl.rows[j].insertCell(-1);
-                    textNode = j==0 ? testTypes[i] : (revisionResults[j-1].green[test] || 0);
-                    cell.innerHTML = textNode;
-                }
-            }
-
-            sorttable.makeSortable(tbl);
-
-        }
-
-        req.open('get', '/data/platform?platform=' + platform, true);
-        req.send();
-    </script>
+    <script src="/js/datepicker.js"></script>
+    <script src="/js/androids.js"></script>
 </head>
 <body>
-    <div id="pageHeader"></div>
-    <p>
-        <strong>Data fetched for:</strong>
-        <span id="startDate"></span> &mdash; <span id="endDate"></span>
-    </p>
+    <div id="pageHeader">
+        <p id="error" class="alert"></p>
+		<div class="reportDates">
+		    <strong>Data fetched for:</strong>
+		    <span id="startDate"></span> &mdash; <span id="endDate"></span>
+		</div>
+    </div>
+    <!-- end #pageHeader -->
+
+    <br />
+    <form>
+        <label for="from">Start date: </label>
+        <input type="text" id="from" size="10" name="startDate"/>
+        <label for="to">End date: </label>
+        <input type="text" id="to" size="10" name="endDate"/>
+        <input type="submit" value="Get data"/>   	
+    </form>
+    <!-- end form -->
+
     <table id="results">
         <tr>
             <td>Status</td>
@@ -119,5 +60,6 @@
             <td class="cset">changeset</td>
         </tr>
     </table>
+    <div class="modal"></div>
 </body>
 </html>
