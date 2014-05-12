@@ -29,8 +29,8 @@
 
             for (i = 0; i < tr.length; i++) {
                 if (i === 0) {
-                	for (j = tr[i].children.length; j !== 0; j--)
-                		$(tr[i].children[j]).remove();
+                    for (j = tr[i].children.length; j !== 0; j--)
+                        $(tr[i].children[j]).remove();
             	} else {
             		$(tr[i]).remove();
             	}
@@ -87,7 +87,7 @@
 
             // insert revisions into lower table
             for (var revision in revisionResults)
-                $(tbl).append("<tr><td>" + revisionResults[revision].cset_id + "</td></tr>")
+                $(tbl).append("<tr><td>" + revisionResults[revision].cset_id + "</td></tr>");
 
             // insert data into lower table
             for (var i = 0; i < testTypes.length; i++) {
