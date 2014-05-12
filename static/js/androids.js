@@ -3,7 +3,7 @@
     $(document).ready(function () {
 
         var platform = location.search.substr(1).split('=')[1],
-            title    = title = platform.charAt(0).toUpperCase() + platform.substr(1),
+            title    = platform.charAt(0).toUpperCase() + platform.substr(1),
             $form    = $("form"),
             $error   = $("#error"),
             $dates   = $(".reportDates"),
