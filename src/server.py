@@ -318,7 +318,7 @@ def run_platform_query():
                       where platform = '%s'
                       and branch = 'mozilla-central'
                       and date between '%s' and '%s'
-                      order by date desc limit 30;""" % (platform, start_date, end_date))
+                      order by date desc;""" % (platform, start_date, end_date))
 
     csets = cursor.fetchall()
 
