@@ -30,7 +30,7 @@
             for (i = 0; i < tr.length; i++) {
                 if (i === 0) {
                 	for (j = tr[i].children.length; j !== 0; j--)
-                    	$(tr[i].children[j]).remove();
+                		$(tr[i].children[j]).remove();
             	} else {
             		$(tr[i]).remove();
             	}
