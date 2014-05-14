@@ -1,53 +1,37 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="/css/style.css">
-    <script type="text/javascript">
-        document.title = 'Ouija | Wiki_page_Failure Rate';
-        var req_android_2_2 = new XMLHttpRequest();
-        req_android_2_2.onload = function(e) {
-            var raw_data_2_2 = JSON.parse(req_android_2_2.response);
-            var failRates_2_2 = raw_data_2_2.failRates;
-            var dates = raw_data_2_2.dates;
+     <script type="text/javascript">
+        var platforms = ["android2.2","android2.3","android4.0"];
+        var pIndex = 0;
+        function fetch_print(pIndex) {
+            var android_version = "";
+            if (pIndex < platforms.length) {
+                android_version = platforms[pIndex];
+            }
+            var request = new XMLHttpRequest();
+            request.onload = function (e) {
+                var raw = JSON.parse(request.response);
+                var failRates = raw.failRates;
+                var dates = raw.dates;
+                
+                // insert dates
+                document.getElementById('startDate').innerHTML = dates.startDate;
+                document.getElementById('endDate').innerHTML = dates.endDate;
 
-            // insert dates
-            document.getElementById('startDate').innerHTML = dates.startDate;
-            document.getElementById('endDate').innerHTML = dates.endDate;
-
-            /// fill failure rates for android 2.2
-            document.getElementById('failure_rate_2_2').innerHTML = failRates_2_2['failRateWithRetries'];
-            document.getElementById('failure_exclude_retry_2_2').innerHTML = failRates_2_2['failRate'];
+                //Storing values of failrates
+                document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
+                document.getElementById('failure_exclude_retry'+android_version).innerHTML = failRates['failRate'];
+            }
+            request.open('get', '/data/platform?platform='+android_version,true);
+            request.send();
+            document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
+            document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
         }
-        req_android_2_2.open('get', '/data/platform?platform=android2.2', true);
-        req_android_2_2.send();
-    </script>
-    
-    <script type="text/javascript">
-        var req_android_2_3 = new XMLHttpRequest();
-        req_android_2_3.onload = function(e) {
-            var raw_data_2_3 = JSON.parse(req_android_2_3.response);
-            var failRates_2_3 = raw_data_2_3.failRates;
-
-            /// fill failure rates for android 2.3
-            document.getElementById('failure_rate_2_3').innerHTML = failRates_2_3['failRateWithRetries'];
-            document.getElementById('failure_exclude_retry_2_3').innerHTML = failRates_2_3['failRate'];
-        }
-        req_android_2_3.open('get', '/data/platform?platform=android2.3', true);
-        req_android_2_3.send();
-    </script>
-
-    <script type="text/javascript">
-        var req_android_4_0 = new XMLHttpRequest();
-        req_android_4_0.onload = function(e) {
-            var raw_data_4_0 = JSON.parse(req_android_4_0.response);
-            var failRates_4_0 = raw_data_4_0.failRates;
-
-             /// fill failure rates for android 4.0
-            document.getElementById('failure_rate_4_0').innerHTML = failRates_4_0['failRateWithRetries'];
-            document.getElementById('failure_exclude_retry_4_0').innerHTML = failRates_4_0['failRate'];
-        }
-        req_android_4_0.open('get', '/data/platform?platform=android4.0', true);
-        req_android_4_0.send();
+        do{
+            fetch_print(pIndex);
+            pIndex++;   
+        }while (pIndex < platforms.length);
     </script>
 </head>
 <body>
@@ -56,18 +40,5 @@
         <strong>Data fetched for:</strong>
         <span id="startDate"></span> &mdash; <span id="endDate"></span>
     </p>
-    * Android 2.2 Total failure rate: [[http://54.215.155.53/android_failures.html?platform=android2.2   <span id="failure_rate_2_2"></span>%]]
-    <br/>
-    * Android 2.2 Total Failure Rate (excluding retries): [[http://54.215.155.53/android_failures.html?platform=android2.2   <span id="failure_exclude_retry_2_2"> </span>%]]
-    <br/>
-    <br/>
-    * Android 2.3 Total failure rate: [[http://54.215.155.53/android_failures.html?platform=android2.3  <span id="failure_rate_2_3"></span>%]]
-    </br>
-    * Android 2.3 Total Failure Rate (excluding retries): [[http://54.215.155.53/android_failures.html?platform=android2.3   <span id="failure_exclude_retry_2_3"></span>%]]
-    <br/>
-    <br/>
-    * Android 4.0 Total failure rate: [[http://54.215.155.53/android_failures.html?platform=android4.0  <span id="failure_rate_4_0"></span>%]]
-    </br>
-    * Android 4.0 Total Failure Rate (excluding retries): [[http://54.215.155.53/android_failures.html?platform=android4.0   <span id="failure_exclude_retry_4_0"></span> %]]
 </body>
 </html>
