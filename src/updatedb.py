@@ -8,10 +8,12 @@ import time
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
-    'mozilla-inbound': 'integration/mozilla-inbound'
+    'mozilla-inbound': 'integration/mozilla-inbound',
+    'b2g-inbound': 'integration/b2g-inbound',
+    'fx-team': 'integration/fx-team'
 }
 
-branches = ['mozilla-central']
+branches = ['mozilla-central', 'mozilla-inbound', 'b2g-inbound', 'fx-team']
 
 def getCSetResults(branch, revision):
     """
@@ -55,9 +57,11 @@ def getPushLog(branch, startdate):
 
         matches = dateid.match(line)
         if matches:
-            date = "%s %s" % (matches.group(1), matches.group(2))
+            ymd = map(int, matches.groups(2)[0].split('-'))
+            hms = map(int, matches.groups(2)[1].split(':'))
+            date = datetime.datetime(ymd[0], ymd[1], ymd[2], hms[0], hms[1], hms[2])
 
-        if push and date:
+        if push and date and date >= startdate:
             pushes.append([push, date])
             push = None
             date = None
@@ -93,7 +97,7 @@ def parseBuilder(buildername, branch):
 def clearResults(branch, startdate):
 
     date_183_days_ago = datetime.date.today() - datetime.timedelta(days=183)
-    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, date_183_days_ago.year, date_183_days_ago.month, date_183_days_ago.day)
+    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, startdate.hour, startdate.minute, startdate.second, date_183_days_ago.year, date_183_days_ago.month, date_183_days_ago.day)
 
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -150,24 +154,30 @@ def uploadResults(data, branch, revision, date):
     cur.close()
 
 def parseResults(args):
-    startdate = datetime.date.today() - datetime.timedelta(days=args.delta)
+    startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
-    revisions = getPushLog(args.branch, startdate)
+    if args.branch == 'all':
+        result_branches = branches
+    else:
+        result_branches = [args.branch]
 
-    clearResults(args.branch, startdate)
-    for revision,date in revisions:
-        print "%s - %s" % (revision, date)
-        data = getCSetResults(args.branch, revision)
-        uploadResults(data, args.branch, revision, date)
+    for branch in result_branches:
+        revisions = getPushLog(branch, startdate)
+
+        clearResults(branch, startdate)
+        for revision,date in revisions:
+            print "%s - %s" % (revision, date)
+            data = getCSetResults(branch, revision)
+            uploadResults(data, branch, revision, date)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')
-    parser.add_argument('--branch', dest='branch', default='mozilla-central',
+    parser.add_argument('--branch', dest='branch', default='all',
                         help='Branch for which to retrieve results.')
-    parser.add_argument('--delta', dest='delta', type=int, default=1,
-                        help='Number of days in past to use as start date.')
+    parser.add_argument('--delta', dest='delta', type=int, default=12,
+                        help='Number of hours in past to use as start time.')
     args = parser.parse_args()
-    if args.branch not in branches:
+    if args.branch != 'all' and args.branch not in branches:
         print('error: unknown branch: ' + args.branch)
         sys.exit(1)
     parseResults(args)
