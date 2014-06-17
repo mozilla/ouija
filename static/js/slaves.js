@@ -117,8 +117,8 @@ $(function() {
         }
 
         else if (v == 'sfr' || v == 'pfr') {
-          cell.attr('data-no-retries', results[v]['failRate']);
-          cell.attr('data-with-retries', results[v]['failRateWithRetries']);
+          cell.attr('data-no-retries', Number(results[v]['failRate']).toFixed(1));
+          cell.attr('data-with-retries', Number(results[v]['failRateWithRetries']).toFixed(1));
         }
 
         else {
