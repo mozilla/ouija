@@ -25,7 +25,7 @@ class CSetSummary(object):
 def create_db_connnection():
     return MySQLdb.connect(host="localhost",
                            user="root",
-                           passwd="everGrEeN1209!",
+                           passwd="root",
                            db="ouija")
 
 
