@@ -25,7 +25,7 @@ class CSetSummary(object):
 def create_db_connnection():
     return MySQLdb.connect(host="localhost",
                            user="root",
-                           passwd="root",
+                           passwd="everGrEeN1209!",
                            db="ouija")
 
 
@@ -242,22 +242,19 @@ def run_slaves_query():
     data = {}
     labels = 'fail retry infra success total'.split()
     summary = {result: 0 for result in labels}
-    job= 0
+    summary['jobs_since_last_success'] = 0
     dates = []
   
     for name, result, date in query_results:
         data.setdefault(name, summary.copy())
-	data[name]['jobs_since_last_success']=0
         if result == 'testfailed':
             data[name]['fail'] += 1
-	    job +=1
-	    data[name]['jobs_since_last_success'] += 1
+	    data[name]['jobs_since_last_success'] += 1 
         elif result == 'retry':
             data[name]['retry'] += 1
         elif result == 'success':
             data[name]['success'] += 1
-	    job = 0
-	    data[name]['jobs_since_last_success']= 0 
+	    data[name]['jobs_since_last_success'] = 0
         elif result == 'busted' or result == 'exception':
             data[name]['infra'] += 1
         data[name]['total'] += 1
