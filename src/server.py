@@ -399,6 +399,9 @@ def run_platform_query():
 def handler404(error):
     return {"status": 404, "msg": str(error)}
 
+@app.route("/")
+def root_directory():
+    return template("index.html")
 
 @app.route("/<string:filename>")
 def template(filename):
