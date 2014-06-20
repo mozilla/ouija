@@ -15,6 +15,92 @@ branch_paths = {
 
 branches = ['mozilla-central', 'mozilla-inbound', 'b2g-inbound', 'fx-team']
 
+platformXRef = {
+    'Linux'                            : 'linux32',
+    'Ubuntu HW 12.04'                  : 'linux32',
+    'Ubuntu VM 12.04'                  : 'linux32',
+    'Rev3 Fedora 12'                   : 'linux32',
+    'Linux x86-64'                     : 'linux64',
+    'Rev3 Fedora 12x64'                : 'linux64',
+    'Ubuntu VM 12.04 x64'              : 'linux64',
+    'Ubuntu HW 12.04 x64'              : 'linux64',
+    'Ubuntu ASAN VM 12.04 x64'         : 'linux64',
+    'Rev4 MacOSX Snow Leopard 10.6'    : 'osx10.6',
+    'Rev4 MacOSX Lion 10.7'            : 'osx10.7',
+    'OS X 10.7'                        : 'osx10.7',
+    'Rev5 MacOSX Mountain Lion 10.8'   : 'osx10.8',
+    'WINNT 5.2'                        : 'winxp',
+    'Windows XP 32-bit'                : 'winxp',
+    'Windows 7 32-bit'                 : 'win7',
+    'Windows 7 64-bit'                 : 'win764',
+    'WINNT 6.1 x86-64'                 : 'win764',
+    'WINNT 6.2'                        : 'win8',
+    'Android Armv6'                    : 'android-armv6',
+    'Android 2.2 Armv6'                : 'android-armv6',
+    'Android Armv6 Tegra 250'          : 'android-armv6',
+    'Android X86'                      : 'android-x86',
+    'Android 2.2'                      : 'android2.2',
+    'Android 2.2 Tegra'                : 'android2.2',
+    'Android 2.3 Emulator'             : 'android2.3',
+    'Android no-ionmonkey'             : 'android-no-ion',
+    'Android 4.0 Panda'                : 'android4.0',
+    'b2g_emulator_vm'                  : 'b2g-vm',
+    'b2g_ubuntu64_vm'                  : 'b2g-vm',
+    'b2g_ubuntu32_vm'                  : 'b2g-vm',
+    'b2g_ics_armv7a_gecko_emulator_vm' : 'b2g-vm',
+    'b2g_ics_armv7a_gecko_emulator'    : 'b2g-emulator'
+}
+
+#
+# The following platforms were not added
+# We might want to add them in the future
+#
+'''
+b2g_mozilla-central_macosx64_gecko build opt
+b2g_mozilla-central_macosx64_gecko-debug build opt
+b2g_macosx64 opt gaia-ui-test
+
+linux64-br-haz_mozilla-central_dep opt
+
+Android 4.2 x86 build
+Android 4.2 x86 Emulator opt androidx86-set-4
+
+b2g_mozilla-central_win32_gecko-debug build opt
+b2g_mozilla-central_win32_gecko build opt
+b2g_mozilla-central_linux32_gecko build opt
+b2g_mozilla-central_linux32_gecko-debug build opt
+
+b2g_mozilla-central_emulator-kk_periodic opt
+b2g_mozilla-central_emulator-kk-debug_periodic opt
+b2g_mozilla-central_emulator-kk_nonunified opt
+b2g_mozilla-central_emulator-kk-debug_nonunified opt
+
+b2g_mozilla-central_emulator-jb-debug_dep opt
+b2g_mozilla-central_emulator_dep opt
+b2g_mozilla-central_emulator-debug_dep opt
+b2g_mozilla-central_emulator-jb_dep opt
+b2g_mozilla-central_emulator_nonunified opt
+b2g_mozilla-central_emulator-debug_nonunified opt
+b2g_mozilla-central_emulator-jb-debug_nonunified opt
+b2g_mozilla-central_emulator-jb_nonunified opt
+
+b2g_mozilla-central_nexus-4_periodic opt
+b2g_mozilla-central_nexus-4_eng_periodic opt
+
+b2g_mozilla-central_linux64_gecko build opt
+b2g_mozilla-central_linux64_gecko-debug build opt
+
+b2g_mozilla-central_hamachi_eng_dep opt
+b2g_mozilla-central_hamachi_periodic opt
+
+b2g_mozilla-central_flame_eng_dep opt
+b2g_mozilla-central_flame_periodic opt
+
+b2g_mozilla-central_helix_periodic opt
+
+b2g_mozilla-central_wasabi_periodic opt
+'''
+
 def getCSetResults(branch, revision):
     """
       https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34
@@ -68,31 +154,25 @@ def getPushLog(branch, startdate):
     return pushes
 
 def parseBuilder(buildername, branch):
-    parts = buildername.split(branch)
+    # Split on " " + branch + " " because the new platforms have the string mozilla-central
+    # in the platform name. Thus, splitting on just the branch would most likely cause
+    # the logic after the splitting work not so well.
+    parts = buildername.split(" " + branch + " ")
     platform = parts[0]
     buildtype = branch.join(parts[1:])
+
     types = buildtype.split('test')
     buildtype, testtype = types[0].strip(), 'test'.join(types[1:]).strip()
     buildtype = buildtype.strip()
+
     if buildtype not in ['opt', 'debug', 'build'] and not testtype:
         testtype = buildtype
         buildtype = 'opt'
 
-    platforms = ['linux32', 'linux32', 'linux32', 'linux32', 'linux64', 'linux64', 'linux64', 'linux64', 'osx10.6', 'osx10.7', 'osx10.7', 'osx10.8', 'winxp', 'winxp', 'win7', 'win764', 'win8', 'android-armv6', 'android-armv6', 'android-x86', 'android2.2', 'android2.3', 'android-no-ion', 'android4.0', 'b2g-vm', 'b2g-emulator']
-
-    platformtext = ['Linux', 'Ubuntu HW 12.04', 'Ubuntu VM 12.04', 'Rev3 Fedora 12', 'Linux x86-64', 'Rev3 Fedora 12x64', 'Ubuntu VM 12.04 x64', 'Ubuntu HW 12.04 x64', 'Rev4 MacOSX Snow Leopard 10.6', 'Rev4 MacOSX Lion 10.7', 'OS X 10.7', 'Rev5 MacOSX Mountain Lion 10.8', 'WINNT 5.2', 'Windows XP 32-bit', 'Windows 7 32-bit', 'Windows 7 64-bit', 'WINNT 6.2', 'Android Armv6', 'Android Armv6 Tegra 250', 'Android X86', 'Android 2.2 Tegra', 'Android 2.3 Emulator', 'Android no-ionmonkey', 'Android 4.0 Panda', 'b2g_ics_armv7a_gecko_emulator_vm', 'b2g_ics_armv7a_gecko_emulator']
-
-    index = 0
-    for p in platformtext:
+    for p in platformXRef:
         if re.match(p, platform.strip()):
-            break;
-        index += 1
-    if index < len(platforms):
-        platform = platforms[index]
-    else:
-        return '', '', ''
-
-    return platform, buildtype, testtype
+            return platformXRef[p], buildtype, testtype
+    return '','',''
 
 def clearResults(branch, startdate):
 
