@@ -247,14 +247,14 @@ def run_slaves_query():
   
     for name, result, date in query_results:
         data.setdefault(name, summary.copy())
-	 data[name]['jobs_since_last_success'] += 1 
+	data[name]['jobs_since_last_success'] += 1 
         if result == 'testfailed':
             data[name]['fail'] += 1
         elif result == 'retry':
             data[name]['retry'] += 1
         elif result == 'success':
             data[name]['success'] += 1
-	     data[name]['jobs_since_last_success'] = 0
+	    data[name]['jobs_since_last_success'] = 0
         elif result == 'busted' or result == 'exception':
             data[name]['infra'] += 1
         data[name]['total'] += 1
