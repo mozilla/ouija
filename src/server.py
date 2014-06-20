@@ -247,9 +247,9 @@ def run_slaves_query():
   
     for name, result, date in query_results:
         data.setdefault(name, summary.copy())
+	data[name]['jobs_since_last_success'] += 1 
         if result == 'testfailed':
             data[name]['fail'] += 1
-	    data[name]['jobs_since_last_success'] += 1 
         elif result == 'retry':
             data[name]['retry'] += 1
         elif result == 'success':
