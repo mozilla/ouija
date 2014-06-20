@@ -1,12 +1,14 @@
 // This function is used to get the data for all platforms from the python webserver.
 function getData(platforms) {
     var data_platform = {};
+    var json_data = $('#form-datechoices').serialize();
 
     // Sending a synchronous get request because JS has to proceed to the next statement only after this request is completed as the data for all platforms is required for the graph to be plotted successfully.
     $.ajax({
         url: '/data/results/flot/day',
         type: 'get',
         dataType: 'json',
+        data: json_data,
         async: false,
         success: function(data) {
             data_platform = data;

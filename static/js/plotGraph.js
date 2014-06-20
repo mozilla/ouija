@@ -35,6 +35,7 @@ function plotGraph(datasets, data_platform) {
         return markings;
     }
 
+    $( "#choices" ).empty();
     var choiceContainer = $("#choices");
 
     $.each(datasets,function(key,val) {

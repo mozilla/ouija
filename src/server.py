@@ -180,6 +180,8 @@ def run_resultstimeseries_query():
 def run_results_day_flot_query():
     """ This function returns the total failures/total jobs data per day for all platforms. It is sending the data in the format required by flot.Flot is a jQuery package used for 'attractive' plotting """
 
+    start_date, end_date = clean_date_params(request.args)
+
     platforms = ['android4.0', 'android2.2', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
     db = create_db_connnection()
 
@@ -187,7 +189,7 @@ def run_results_day_flot_query():
     for platform in platforms:
         cursor = db.cursor()
         cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as totals from testjobs
-                          where platform="%s" group by day""" % ('testfailed', platform))
+                          where platform="%s" and date >= "%s" and date <= "%s" group by day""" % ('testfailed', platform, start_date, end_date))
 
         query_results = cursor.fetchall()
 
@@ -207,7 +209,6 @@ def run_results_day_flot_query():
         data_platforms[platform] = {'data': data, 'dates': get_date_range(dates)}
 
     db.close()
-
     return data_platforms
 
 
