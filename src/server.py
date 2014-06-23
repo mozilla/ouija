@@ -231,7 +231,7 @@ def run_slaves_query():
                       where result in
                       ("retry", "testfailed", "success", "busted", "exception")
                       and date between "{0}" and "{1}"
-                      order by slave;""".format(start_date, end_date))
+                      order by date;""".format(start_date, end_date))
 
     query_results = cursor.fetchall()
     cursor.close()
@@ -243,17 +243,19 @@ def run_slaves_query():
     data = {}
     labels = 'fail retry infra success total'.split()
     summary = {result: 0 for result in labels}
-
+    summary['jobs_since_last_success'] = 0
     dates = []
-
+  
     for name, result, date in query_results:
         data.setdefault(name, summary.copy())
+        data[name]['jobs_since_last_success'] += 1 
         if result == 'testfailed':
             data[name]['fail'] += 1
         elif result == 'retry':
             data[name]['retry'] += 1
         elif result == 'success':
             data[name]['success'] += 1
+            data[name]['jobs_since_last_success'] = 0
         elif result == 'busted' or result == 'exception':
             data[name]['infra'] += 1
         data[name]['total'] += 1
@@ -269,6 +271,7 @@ def run_slaves_query():
                                          results['retry'],
                                          results['total'])
         data[slave]['sfr'] = fail_rates
+	
 
     platforms = {}
 
@@ -412,6 +415,5 @@ def template(filename):
             response_body = f.read()
         return response_body
     abort(404)
-
 
 if __name__ == "__main__": app.run(host="0.0.0.0", port=8314, debug=True)
