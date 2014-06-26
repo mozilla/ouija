@@ -7,6 +7,7 @@ import sys
 import time
 import gzip
 from StringIO import StringIO
+import threading
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
@@ -237,6 +238,28 @@ def uploadResults(data, branch, revision, date):
             cur.execute(sql)
     cur.close()
 
+
+def getAndUploadResults(branch, revisions):
+    for revision, date in revisions:
+        print "%s - %s" % (revision, date)
+        data = getCSetResults(branch, revision)
+        lock.acquire()
+        uploadResults(data, branch, revision, date)
+        lock.release()
+
+
+def getRange(tid, len_revisions, nthreads):
+    chunk = len_revisions / nthreads;
+    r = len_revisions % nthreads;
+    if (tid < r):
+        start = (chunk + 1) * tid;
+        end = start + chunk;
+    else:
+        start = (chunk + 1) * r + chunk * (tid - r);
+        end = start + chunk - 1;
+    return start, end
+
+
 def parseResults(args):
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
@@ -247,12 +270,12 @@ def parseResults(args):
 
     for branch in result_branches:
         revisions = getPushLog(branch, startdate)
-
         clearResults(branch, startdate)
-        for revision,date in revisions:
-            print "%s - %s" % (revision, date)
-            data = getCSetResults(branch, revision)
-            uploadResults(data, branch, revision, date)
+        for t in range(args.threads):
+            start, end = getRange(t, len(revisions), args.threads)
+            thread = threading.Thread(target=getAndUploadResults, args=(branch,revisions[start:end+1]))
+            thread.start()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')
@@ -260,8 +283,11 @@ if __name__ == '__main__':
                         help='Branch for which to retrieve results.')
     parser.add_argument('--delta', dest='delta', type=int, default=12,
                         help='Number of hours in past to use as start time.')
+    parser.add_argument('--threads', dest='threads', type=int, default=1,
+                        help='Number of threads to use.')
     args = parser.parse_args()
     if args.branch != 'all' and args.branch not in branches:
         print('error: unknown branch: ' + args.branch)
         sys.exit(1)
+    lock = threading.Lock()
     parseResults(args)
