@@ -7,7 +7,8 @@ import sys
 import time
 import gzip
 from StringIO import StringIO
-import threading
+from threading import Thread
+from Queue import Queue
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
@@ -103,6 +104,46 @@ b2g_mozilla-central_helix_periodic opt
 
 b2g_mozilla-central_wasabi_periodic opt
 '''
+
+UPLOAD_JOB, CLEAR_JOB = 0, 1
+
+class DBHandler(Thread):
+
+    def __init__(self, queue):
+        Thread.__init__(self)
+        self.queue = queue
+        self.daemon = True
+
+    def run(self):
+        while True:
+            job_type, job_args = self.queue.get()
+
+            if job_type == UPLOAD_JOB:
+                uploadResults(*job_args)
+            elif job_type == CLEAR_JOB:
+                clearResults(*job_args)
+            else:
+                assert False #Should not happen
+
+            self.queue.task_done()
+
+class Downloader(Thread):
+
+    def __init__(self, download_queue, db_queue):
+        Thread.__init__(self)
+        self.queue = download_queue
+        self.db_queue = db_queue
+        self.daemon = True
+
+    def run(self):
+        while True:
+            branch, revision, date = self.queue.get()
+
+            print "%s - %s" % (revision, date)
+            data = getCSetResults(branch, revision)
+            self.db_queue.put((UPLOAD_JOB, [data, branch, revision, date]))
+
+            self.queue.task_done()
 
 def https_get(host, url):
     conn = httplib.HTTPSConnection(host)
@@ -238,29 +279,14 @@ def uploadResults(data, branch, revision, date):
             cur.execute(sql)
     cur.close()
 
-
-def getAndUploadResults(branch, revisions):
-    for revision, date in revisions:
-        print "%s - %s" % (revision, date)
-        data = getCSetResults(branch, revision)
-        lock.acquire()
-        uploadResults(data, branch, revision, date)
-        lock.release()
-
-
-def getRange(tid, len_revisions, nthreads):
-    chunk = len_revisions / nthreads;
-    r = len_revisions % nthreads;
-    if (tid < r):
-        start = (chunk + 1) * tid;
-        end = start + chunk;
-    else:
-        start = (chunk + 1) * r + chunk * (tid - r);
-        end = start + chunk - 1;
-    return start, end
-
-
 def parseResults(args):
+    db_queue, download_queue = Queue(), Queue()
+
+    DBHandler(db_queue).start()
+
+    for i in range(args.threads):
+        Downloader(download_queue, db_queue).start()
+
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
     if args.branch == 'all':
@@ -270,12 +296,12 @@ def parseResults(args):
 
     for branch in result_branches:
         revisions = getPushLog(branch, startdate)
-        clearResults(branch, startdate)
-        for t in range(args.threads):
-            start, end = getRange(t, len(revisions), args.threads)
-            thread = threading.Thread(target=getAndUploadResults, args=(branch,revisions[start:end+1]))
-            thread.start()
+        db_queue.put((CLEAR_JOB, [branch, startdate]))
+        for revision, date in revisions:
+            download_queue.put((branch, revision, date))
 
+    download_queue.join()
+    db_queue.join()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')
@@ -289,5 +315,4 @@ if __name__ == '__main__':
     if args.branch != 'all' and args.branch not in branches:
         print('error: unknown branch: ' + args.branch)
         sys.exit(1)
-    lock = threading.Lock()
     parseResults(args)
