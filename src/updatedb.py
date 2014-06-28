@@ -6,6 +6,7 @@ import datetime
 import sys
 import time
 import gzip
+import logging
 from StringIO import StringIO
 from threading import Thread
 from Queue import Queue
@@ -107,43 +108,46 @@ b2g_mozilla-central_wasabi_periodic opt
 
 UPLOAD_JOB, CLEAR_JOB = 0, 1
 
-class DBHandler(Thread):
+class Worker(Thread):
 
-    def __init__(self, queue):
-        Thread.__init__(self)
+    def __init__(self, queue, **kargs):
+        Thread.__init__(self, **kargs)
         self.queue = queue
         self.daemon = True
 
     def run(self):
         while True:
-            job_type, job_args = self.queue.get()
+            job_spec = self.queue.get()
+            try:
+                self.do_job(job_spec)
+            except:
+                logging.exception('Error in %s', self.name)
+            finally:
+                self.queue.task_done()
 
-            if job_type == UPLOAD_JOB:
-                uploadResults(*job_args)
-            elif job_type == CLEAR_JOB:
-                clearResults(*job_args)
-            else:
-                assert False #Should not happen
+class DBHandler(Worker):
 
-            self.queue.task_done()
+    def do_job(self, job_spec):
+        job_type, job_args = job_spec
 
-class Downloader(Thread):
+        if job_type == UPLOAD_JOB:
+            uploadResults(*job_args)
+        elif job_type == CLEAR_JOB:
+            clearResults(*job_args)
+        else:
+            assert False #Should not happen
 
-    def __init__(self, download_queue, db_queue):
-        Thread.__init__(self)
-        self.queue = download_queue
+class Downloader(Worker):
+
+    def __init__(self, download_queue, db_queue, **kargs):
+        Worker.__init__(self, download_queue, **kargs)
         self.db_queue = db_queue
-        self.daemon = True
 
-    def run(self):
-        while True:
-            branch, revision, date = self.queue.get()
-
-            print "%s - %s" % (revision, date)
-            data = getCSetResults(branch, revision)
-            self.db_queue.put((UPLOAD_JOB, [data, branch, revision, date]))
-
-            self.queue.task_done()
+    def do_job(self, job_spec):
+        branch, revision, date = job_spec
+        logging.info("%s: %s - %s", self.name, revision, date)
+        data = getCSetResults(branch, revision)
+        self.db_queue.put((UPLOAD_JOB, [data, branch, revision, date]))
 
 def https_get(host, url):
     conn = httplib.HTTPSConnection(host)
@@ -282,10 +286,10 @@ def uploadResults(data, branch, revision, date):
 def parseResults(args):
     db_queue, download_queue = Queue(), Queue()
 
-    DBHandler(db_queue).start()
+    DBHandler(db_queue, name="DBHandler").start()
 
     for i in range(args.threads):
-        Downloader(download_queue, db_queue).start()
+        Downloader(download_queue, db_queue, name="Downloader %s" % (i+1)).start()
 
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
@@ -303,6 +307,7 @@ def parseResults(args):
             download_queue.put((branch, revision, date))
 
     download_queue.join()
+    logging.info('Downloading completed')
     db_queue.join()
 
 if __name__ == '__main__':
@@ -317,4 +322,5 @@ if __name__ == '__main__':
     if args.branch != 'all' and args.branch not in branches:
         print('error: unknown branch: ' + args.branch)
         sys.exit(1)
+    logging.basicConfig(level=logging.INFO)
     parseResults(args)
