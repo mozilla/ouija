@@ -295,8 +295,10 @@ def parseResults(args):
         result_branches = [args.branch]
 
     for branch in result_branches:
-        revisions = getPushLog(branch, startdate)
         db_queue.put((CLEAR_JOB, [branch, startdate]))
+
+    for branch in result_branches:
+        revisions = getPushLog(branch, startdate)
         for revision, date in revisions:
             download_queue.put((branch, revision, date))
 
