@@ -310,6 +310,22 @@ def parseResults(args):
     logging.info('Downloading completed')
     db_queue.join()
 
+    #Sometimes the parent may exit and the child is not immidiately killed.
+    #This may result in the error like the following -
+    #
+    #Exception in thread DBHandler (most likely raised during interpreter shutdown):
+    #Traceback (most recent call last):
+    #File "/usr/lib/python2.7/threading.py", line 810, in __bootstrap_inner
+    #File "updatedb.py", line 120, in run
+    #File "/usr/lib/python2.7/Queue.py", line 168, in get
+    #File "/usr/lib/python2.7/threading.py", line 332, in wait
+    #: 'NoneType' object is not callable
+    #
+    #The following line works as a fix
+    #ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
+
+    time.sleep(0.1)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')
     parser.add_argument('--branch', dest='branch', default='all',
