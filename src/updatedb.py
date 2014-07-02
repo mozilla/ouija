@@ -181,8 +181,8 @@ def parseBuilder(buildername, branch):
 
 def clearResults(branch, startdate):
 
-    date_183_days_ago = datetime.date.today() - datetime.timedelta(days=183)
-    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, startdate.hour, startdate.minute, startdate.second, date_183_days_ago.year, date_183_days_ago.month, date_183_days_ago.day)
+    date_90_days_ago = datetime.date.today() - datetime.timedelta(days=90)
+    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, startdate.hour, startdate.minute, startdate.second, date_90_days_ago.year, date_90_days_ago.month, date_90_days_ago.day)
 
     db = MySQLdb.connect(host="localhost",
                          user="root",
