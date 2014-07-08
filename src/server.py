@@ -129,7 +129,7 @@ def binify(bins, data):
 @json_response
 def run_resultstimeseries_query():
     platform = request.args.get("platform", "android4.0")
-    print('>>>> platform: ', platform)
+    app.logger.debug('platform: ', platform)
 
     db = create_db_connnection()
     cursor = db.cursor()
@@ -245,10 +245,10 @@ def run_slaves_query():
     summary = {result: 0 for result in labels}
     summary['jobs_since_last_success'] = 0
     dates = []
-  
+
     for name, result, date in query_results:
         data.setdefault(name, summary.copy())
-        data[name]['jobs_since_last_success'] += 1 
+        data[name]['jobs_since_last_success'] += 1
         if result == 'testfailed':
             data[name]['fail'] += 1
         elif result == 'retry':
@@ -271,7 +271,7 @@ def run_slaves_query():
                                          results['retry'],
                                          results['total'])
         data[slave]['sfr'] = fail_rates
-	
+
 
     platforms = {}
 
@@ -314,7 +314,9 @@ def run_platform_query():
     platform = request.args.get("platform")
     start_date, end_date = clean_date_params(request.args)
 
-    print('>>> platform', platform, "startDate:", start_date, "endDate:", end_date)
+    app.logger.debug('platform', platform,
+                     "startDate:", start_date.strftime('%Y-%m-%d'),
+                     "endDate:", end_date.strftime('%Y-%m-%d'))
 
     db = create_db_connnection()
     cursor = db.cursor()
@@ -359,9 +361,9 @@ def run_platform_query():
                 cset_summary.red[testtype] += 1
                 test_summary['red'] += 1
             elif res == 'usercancel':
-                print('>>>> usercancel')
+                app.logger.debug('usercancel')
             else:
-                print('>>>> UNRECOGNIZED RESULT: ', result)
+                app.logger.debug('UNRECOGNIZED RESULT: ', result)
             dates.append(date)
 
         cset_summaries.append(cset_summary)

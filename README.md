@@ -12,6 +12,7 @@ The production ouija server is running on Ubuntu, so this is probably the easies
 * Python
 * MySql-python
 * Flask
+* If you use virtualenv or not you can install python dependencies with pip install -r requirements.txt
 
 ## Database configuration:
 Ouija assumes MySQL has been installed with a root user using the password 'root'. Create the MySQL database using the sql/schema.sql script.
