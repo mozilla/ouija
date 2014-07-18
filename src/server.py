@@ -129,7 +129,7 @@ def binify(bins, data):
 @json_response
 def run_resultstimeseries_query():
     platform = request.args.get("platform", "android4.0")
-    app.logger.debug('platform: ', platform)
+    app.logger.debug("platform: %s" % platform)
 
     db = create_db_connnection()
     cursor = db.cursor()
@@ -314,9 +314,13 @@ def run_platform_query():
     platform = request.args.get("platform")
     start_date, end_date = clean_date_params(request.args)
 
-    app.logger.debug('platform', platform,
-                     "startDate:", start_date.strftime('%Y-%m-%d'),
-                     "endDate:", end_date.strftime('%Y-%m-%d'))
+    log_message = """
+        platform: %s
+        startDate: %s
+        endDate: %s
+        """ % (platform, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+
+    app.logger.debug(log_message)
 
     db = create_db_connnection()
     cursor = db.cursor()
@@ -363,7 +367,7 @@ def run_platform_query():
             elif res == 'usercancel':
                 app.logger.debug('usercancel')
             else:
-                app.logger.debug('UNRECOGNIZED RESULT: ', result)
+                app.logger.debug('UNRECOGNIZED RESULT: %s' % result)
             dates.append(date)
 
         cset_summaries.append(cset_summary)
