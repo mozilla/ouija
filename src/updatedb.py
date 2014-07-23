@@ -1,15 +1,15 @@
 import argparse
-import json, urllib, httplib
 import re
 import MySQLdb
 import datetime
 import sys
 import time
-import gzip
 import logging
 from StringIO import StringIO
 from threading import Thread
 from Queue import Queue
+
+import requests
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
@@ -149,19 +149,6 @@ class Downloader(Worker):
         data = getCSetResults(branch, revision)
         self.db_queue.put((UPLOAD_JOB, [data, branch, revision, date]))
 
-def https_get(host, url):
-    conn = httplib.HTTPSConnection(host)
-    conn.request('GET', url, headers={'Accept-encoding':'gzip'})
-    response = conn.getresponse()
-    data = response.read()
-    response.close()
-
-    #see http://www.diveintopython.net/http_web_services/gzip_compression.html
-    if response.getheader('content-encoding', '') == 'gzip':
-        data = gzip.GzipFile(fileobj=StringIO(data)).read()
-
-    return data
-
 def getCSetResults(branch, revision):
     """
       https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34
@@ -169,9 +156,9 @@ def getCSetResults(branch, revision):
       no caching as data will change over time.  Some results will be in asap, others will take
       up to 12 hours (usually < 4 hours)
     """
-    cset = "/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
-    data = https_get('tbpl.mozilla.org', cset)
-    cdata = json.loads(data)
+    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
+    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+    cdata = response.json()
     return cdata
 
 def getPushLog(branch, startdate):
@@ -179,8 +166,9 @@ def getPushLog(branch, startdate):
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
 
-    pushlog = "/%s/pushlog?startdate=%04d-%02d-%02d" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
-    data = https_get('hg.mozilla.org', pushlog)
+    url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
+    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+    data = response.content
     pushes = []
     csetid = re.compile('.*Changeset ([0-9a-f]{12}).*')
     dateid = re.compile('.*([0-9]{4}\-[0-9]{2}\-[0-9]{2})T([0-9\:]+)Z.*')
