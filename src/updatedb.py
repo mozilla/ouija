@@ -5,7 +5,6 @@ import datetime
 import sys
 import time
 import logging
-from StringIO import StringIO
 from threading import Thread
 from Queue import Queue
 
