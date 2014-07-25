@@ -182,7 +182,7 @@ def run_results_day_flot_query():
 
     start_date, end_date = clean_date_params(request.args)
 
-    platforms = ['android4.0', 'android2.2', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
+    platforms = ['android4.0', 'android2.3', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
     db = create_db_connnection()
 
     data_platforms = {}
