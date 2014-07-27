@@ -53,7 +53,9 @@ $(function() {
         tblRows = $('#results').find('tr').slice(1),
         labels = getTableColumns(),
         sfrIndex = labels.indexOf('sfr'),
-        pfrIndex = labels.indexOf('pfr');
+        pfrIndex = labels.indexOf('pfr'),
+        sfrHead = $('.headrow td')[sfrIndex],
+        pfrHead = $('.headrow td')[pfrIndex];
 
     $(tblRows).each(function() {
       var sfrCell = $(this.cells[sfrIndex]),
@@ -70,6 +72,22 @@ $(function() {
         sfrCell.removeClass('alert');
       }
     });
+
+    // monkey patch for sorting
+    applySortIfNeeded(sfrHead);
+    applySortIfNeeded(pfrHead);
+  }
+
+  function applySortIfNeeded(columnHead) {
+    if (columnHead.className.search('sorttable_sorted') != -1) {
+      var classes = columnHead.className.split(' ');
+      columnHead.className = classes[0];
+      sorttable.innerSortFunction.apply(columnHead, []);
+
+      if (classes[1].search('reverse') != -1) {
+        sorttable.innerSortFunction.apply(columnHead, []);
+      }
+    }
   }
 
   function populateResultsTable(slaves, platforms) {
