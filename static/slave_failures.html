@@ -5,7 +5,7 @@
     <link rel="stylesheet" type="text/css" href="/css/style.css">
     <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-    <script src="/js/sorttable.js"></script>
+    <script src="/js/jquery.tablesorter.min.js"></script>
     <script src="/js/datepicker.js"></script>
     <script src="/js/slaves.js"></script>
 </head>
@@ -28,26 +28,30 @@
     </form>
     <p id="info"></p>
     <p>
-        By default slaves that have no failures or retries are not shown</br>
-        Toggle checkbox to see results for all slaves
+        By default slaves that have no failures or retries are not shown.</br>
+        Toggle checkbox to see results for all slaves.
     </p>
-        <input type="checkbox" id="showHidden"/>
-        <label for="showHidden">Display all slaves</label>
-        <input type="checkbox" id="includeRetries"/>
-        <label for="includeRetries">Include retries in FR calculation</label>
+    <input type="checkbox" id="showHidden"/>
+    <label for="showHidden">Display all slaves</label>
+    </br>
+    <input type="checkbox" id="includeRetries"/>
+    <label for="includeRetries">Include retries in FR calculation</label>
     </br></br>
-    <table  id="results">
-        <tr class="headrow">
-            <td data-type="slave">Slave</td>
-            <td data-type="fail"    class="sorttable_numeric">Fails</td>
-            <td data-type="retry"   class="sorttable_numeric">Retries</td>
-            <td data-type="infra"   class="sorttable_numeric">Infra</td>
-            <td data-type="success" class="sorttable_numeric">Passes</td>
-            <td data-type="total"   class="sorttable_numeric">Total</td>
-            <td data-type="sfr"     class="sorttable_numeric">% failure</td>
-            <td data-type="pfr"     class="sorttable_numeric">Expected % failure</td>
-	    <td data-type="jobs_since_last_success"     class="sorttable_numeric">Jobs since last success</td>
-        </tr>
+    <table id="results">
+        <thead>
+            <tr>
+                <th>Slave</th>
+                <th width="10%">Fails</th>
+                <th width="10%">Retries</th>
+                <th width="10%">Infra</th>
+                <th width="10%">Passes</th>
+                <th width="10%">Total</th>
+                <th width="10%">% failure</th>
+                <th width="10%">Expected % failure</th>
+                <th width="10%">Jobs since last success</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
     </table>
     <div class="modal"></div>
 </body>

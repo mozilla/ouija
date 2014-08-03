@@ -4,14 +4,34 @@ table {
     border: 1px solid black;
 }
 
-thead {
-    background-color:#eee;
-    border: 1px solid black;
-}
-
 td {
     padding: 4px;
     border: 1px solid black;
+    text-align: right;
+}
+
+td:first-of-type {
+    text-align: left;
+}
+
+/* headers style for tablesorter */
+.header {
+    padding: 4px;
+    border: 1px solid black;
+    background-image: url(/img/bg.gif);
+    background-repeat: no-repeat;
+    background-position: center right;
+    background-color:#eee;
+    cursor: pointer;
+    padding-right: 20px;
+}
+
+.headerSortUp {
+    background-image: url(/img/asc.gif);
+}
+
+.headerSortDown {
+    background-image: url(/img/desc.gif);
 }
 
 #pageHeader {
@@ -33,7 +53,7 @@ td {
 
 /* resize datepicker calendar */
 .ui-datepicker {
-    font-size: 10pt !important; 
+    font-size: 10pt !important;
 }
 
 /* styling ajax loading indicator */
@@ -45,8 +65,8 @@ td {
     left:       0;
     height:     100%;
     width:      100%;
-    background: rgba( 255, 255, 255, .8 ) 
-                url('/img/ajax-loader.gif') 
+    background: rgba( 255, 255, 255, .8 )
+                url('/img/ajax-loader.gif')
                 50% 50% 
                 no-repeat;
 }

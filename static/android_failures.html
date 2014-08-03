@@ -4,61 +4,70 @@
     <link rel="stylesheet" type="text/css" href="/css/style.css">
     <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-    <script src="/js/sorttable.js"></script>
+    <script src="/js/jquery.tablesorter.min.js"></script>
     <script src="/js/datepicker.js"></script>
     <script src="/js/androids.js"></script>
 </head>
 <body>
     <div id="pageHeader">
+        <h1></h1>
         <p id="error" class="alert"></p>
-		<div class="reportDates">
-		    <strong>Data fetched for:</strong>
-		    <span id="startDate"></span> &mdash; <span id="endDate"></span>
-		</div>
+        <div class="reportDates">
+            <strong>Data fetched for:</strong>
+            <span id="startDate"></span> &mdash; <span id="endDate"></span>
+        </div>
     </div>
     <!-- end #pageHeader -->
 
-    <br />
+    <br/>
     <form>
         <label for="from">Start date: </label>
         <input type="text" id="from" size="10" name="startDate"/>
         <label for="to">End date: </label>
         <input type="text" id="to" size="10" name="endDate"/>
-        <input type="submit" value="Get data"/>   	
+        <input type="submit" value="Get data"/>
+        <input type="hidden" name="platform"/>
     </form>
     <!-- end form -->
 
     <table id="results">
-        <tr>
-            <td>Status</td>
-        </tr>
-        <tr id="green">
-            <td>Green</td>
-        </tr>
-        <tr id="orange">
-            <td>Orange</td>
-        </tr>
-        <tr id="red">
-            <td>Red</td>
-        </tr>
-        <tr id="blue">
-            <td>Blue</td>
-        </tr>
+        <thead>
+            <tr>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="green">
+                <td>Green</td>
+            </tr>
+            <tr id="orange">
+                <td>Orange</td>
+            </tr>
+            <tr id="red">
+                <td>Red</td>
+            </tr>
+            <tr id="blue">
+                <td>Blue</td>
+            </tr>
+        </tbody>
     </table>
     <strong>
         <p>Total Failure Rate:
-            <span id="failure_rate"></span>
+            <span id="withRetry"></span>
         </p>
         <p>Total Failure Rate (excluding retries):
-            <span id="failure_exclude_retry"></span>
+            <span id="excludeRetry"></span>
         </p>
     </strong>
     </br>
     <p>Green Results</p>
-    <table id="green_results">
-        <tr>
-            <td class="cset">changeset</td>
-        </tr>
+    <table id="greenResults">
+        <thead>
+            <tr>
+                <th>changeset</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
     </table>
     <div class="modal"></div>
 </body>
