@@ -127,11 +127,7 @@ $(function() {
       sfrCell.toggleClass("alert", sfr > pfr);
     });
 
-    var resort = sortedBy().filter(function(elem) {
-      return $.inArray(elem[0], [sfrIndex, pfrIndex]) != -1;
-    });
-
-    applySorting(resort);
+    applySorting();
   }
 
   function sortedBy() {
@@ -149,8 +145,8 @@ $(function() {
     return sorting;
   }
 
-  function applySorting(columnList) {
-    var sorting = columnList || sortedBy();
+  function applySorting() {
+    var sorting = sortedBy();
 
     // if table is not sorted, then use default sorting by total jobs desc
     if (sorting.length === 0) {
@@ -168,14 +164,16 @@ $(function() {
     $(".hidden").toggle($("#showHidden").is(":checked"));
   }
 
+  $dates.hide();
   $form.submit(fetchData);
   $("#showHidden").change(showHidden);
   $("#includeRetries").change(switchFailRates);
   $table.tablesorter();
 
-  fetchData();
-
   $(document).on("ajaxStart ajaxStop", function (e) {
       (e.type === "ajaxStart") ? $body.addClass("loading") : $body.removeClass("loading");
   });
+
+  fetchData();
+
 });
