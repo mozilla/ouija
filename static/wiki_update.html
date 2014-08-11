@@ -4,6 +4,7 @@
      <script type="text/javascript">
         var platforms = ["android2.3","android4.0"];
         var pIndex = 0;
+        
         function fetch_print(pIndex) {
             var android_version = "";
             if (pIndex < platforms.length) {
@@ -32,6 +33,20 @@
             fetch_print(pIndex);
             pIndex++;   
         }while (pIndex < platforms.length);
+        //to calculate date
+        var today = new Date(); //to get current day's date
+        var dd = today.getDate();
+        var mm = today.getMonth()+1;//because January is 0!
+        var yyyy = today.getFullYear();
+        
+        if (dd<10) {
+        		dd = '0' + dd	        	
+        }
+        
+        if (mm<10) {
+        		mm= '0' + mm
+        }
+        today = mm +'/'+dd+'/'+yyyy;
     </script>
 </head>
 <body>
