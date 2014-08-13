@@ -5,6 +5,23 @@
         var platforms = ["android2.3","android4.0"];
         var pIndex = 0;
         
+        //to calculate today's date
+        var today = new Date(); //to get current day's date
+        //console.log(today);
+        var s_today = today.toISOString().split('T')[0];//gives YYYY-MM-DD form
+        //console.log(s_today);
+        //calculating the last week date 1 week ago
+        var last_week = new Date(Date.now() - 7*24*60*60*1000);
+        //console.log(last_week);
+        s_last_week = last_week.toISOString().split('T')[0];
+        //console.log(s_last_week);
+        //calculating previous week's date 2 weeks ago
+        var previous_week = new Date(last_week - 7*24*60*60*1000);
+        //console.log(previous_week);
+        s_previous_week = previous_week.toISOString().split('T')[0];
+        //console.log(s_previous_week);
+                
+        
         function fetch_print(pIndex) {
             var android_version = "";
             if (pIndex < platforms.length) {
@@ -17,8 +34,8 @@
                 var dates = raw.dates;
                 
                 // insert dates
-                document.getElementById('startDate').innerHTML = dates.startDate;
-                document.getElementById('endDate').innerHTML = dates.endDate;
+                document.getElementById('s_last_week').innerHTML = dates.startDate;
+                document.getElementById('s_today').innerHTML = dates.endDate;
 
                 //Storing values of failrates
                 document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
@@ -33,21 +50,7 @@
             fetch_print(pIndex);
             pIndex++;   
         }while (pIndex < platforms.length);
-        //to calculate date
-        var today = new Date(); //to get current day's date
-        var dd = today.getDate();
-        var mm = today.getMonth()+1;//because January is 0!
-        var yyyy = today.getFullYear();
-        
-        if (dd<10) {
-        		dd = '0' + dd	        	
-        }
-        
-        if (mm<10) {
-        		mm= '0' + mm
-        }
-        today = mm +'/'+dd+'/'+yyyy;
-    </script>
+            </script>
 </head>
 <body>
     <div id="pageHeader"></div>
