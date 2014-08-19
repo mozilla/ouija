@@ -49,7 +49,7 @@
 	    //second request which takes the week_before_last_week's date and last week's date  	 
             var request2 = new XMLHttpRequest();
             request2.onload = function2 (e) {
-                var raw = JSON.parse(request.response);
+                var raw = JSON.parse(request2.response);
                 var failRates = raw.failRates;
                 var dates = raw.dates;
                 
