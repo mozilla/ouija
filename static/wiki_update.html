@@ -27,6 +27,7 @@
             if (pIndex < platforms.length) {
                 android_version = platforms[pIndex];
             }
+	    //first request which takes last week's and today's date  	 
             var request = new XMLHttpRequest();
             request.onload = function (e) {
                 var raw = JSON.parse(request.response);
@@ -45,6 +46,26 @@
             request.send();
             document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
             document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
+	    //second request which takes the week_before_last_week's date and last week's date  	 
+            var request2 = new XMLHttpRequest();
+            request2.onload = function2 (e) {
+                var raw = JSON.parse(request.response);
+                var failRates = raw.failRates;
+                var dates = raw.dates;
+                
+                // insert dates
+                document.getElementById('s_previous_week').innerHTML = dates.startDate;
+                document.getElementById('s_last_week').innerHTML = dates.endDate;
+
+                //Storing values of failrates
+                document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
+                document.getElementById('failure_exclude_retry'+android_version).innerHTML = failRates['failRate'];
+            }
+            request2.open('get', '/data/platform?platform='+android_version,true);
+            request2.send();
+            document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
+            document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
+        }
         }
         do{
             fetch_print(pIndex);
