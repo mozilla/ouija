@@ -7,9 +7,9 @@
         
         //to calculate today's date
         var today = new Date(); //to get current day's date
-        //console.log(today);
+        console.log(today);
         var s_today = today.toISOString().split('T')[0];//gives YYYY-MM-DD form
-        //console.log(s_today);
+        console.log(s_today);
         //calculating the last week date 1 week ago
         var last_week = new Date(Date.now() - 7*24*60*60*1000);
         //console.log(last_week);
@@ -19,7 +19,7 @@
         var previous_week = new Date(last_week - 7*24*60*60*1000);
         //console.log(previous_week);
         s_previous_week = previous_week.toISOString().split('T')[0];
-        //console.log(s_previous_week);
+        console.log(s_previous_week);
                 
         
         function fetch_print(pIndex) {
@@ -37,18 +37,22 @@
                 // insert dates
                 document.getElementById('s_last_week').innerHTML = dates.startDate;
                 document.getElementById('s_today').innerHTML = dates.endDate;
+                console.log("First request written in db");
 
                 //Storing values of failrates
                 document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
                 document.getElementById('failure_exclude_retry'+android_version).innerHTML = failRates['failRate'];
+                console.log("First request - Fail rates written in db");
+
             }
             request.open('get', '/data/platform?platform='+android_version,true);
             request.send();
             document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
             document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
+	    
 	    //second request which takes the week_before_last_week's date and last week's date  	 
             var request2 = new XMLHttpRequest();
-            request2.onload = function2 (e) {
+            request2.onload = function (e) {
                 var raw = JSON.parse(request2.response);
                 var failRates = raw.failRates;
                 var dates = raw.dates;
@@ -56,17 +60,19 @@
                 // insert dates
                 document.getElementById('s_previous_week').innerHTML = dates.startDate;
                 document.getElementById('s_last_week').innerHTML = dates.endDate;
+                 console.log("Second request dates written in db");
 
                 //Storing values of failrates
                 document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
                 document.getElementById('failure_exclude_retry'+android_version).innerHTML = failRates['failRate'];
+                 console.log("second request fail rate request written in db");
             }
             request2.open('get', '/data/platform?platform='+android_version,true);
             request2.send();
             document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
             document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
         }
-        }
+        
         do{
             fetch_print(pIndex);
             pIndex++;   
