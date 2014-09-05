@@ -24,7 +24,7 @@
                 var dates = raw.dates;
                 
                 // insert dates
-                document.getElementById('s_last_week').innerHTML = dates.startDate;
+                document.getElementById('startDate').innerHTML = dates.startDate;
                 document.getElementById('s_today').innerHTML = dates.endDate;
                 
                 //Storing values of failrates
@@ -43,12 +43,8 @@
             request2.onload = function (e) {
                 var raw = JSON.parse(request2.response);
                 var failRates = raw.failRates;
-                var dates = raw.dates;
-                
-                // insert dates
-                document.getElementById('s_previous_week').innerHTML = dates.startDate;
-                document.getElementById('s_last_week').innerHTML = dates.endDate;
-                 
+                var dates = raw.dates;             
+                                
 
                 //Storing values of failrates
                 document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
