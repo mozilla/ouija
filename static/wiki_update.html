@@ -25,7 +25,7 @@
                 
                 // insert dates
                 document.getElementById('startDate').innerHTML = dates.startDate;
-                document.getElementById('s_today').innerHTML = dates.endDate;
+                document.getElementById('endDate').innerHTML = dates.endDate;
                 
                 //Storing values of failrates
                 document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
@@ -33,9 +33,9 @@
                 
 
             }
-            request.open('get', '/data/platform?platform='+android_version,true, s_last_week, s_today);
-            request.send();
+            request.open('get', '/data/platform?platform='+android_version+'&startdate='+s_last_week + '&enddate=' + s_today, true);
             document.writeln("* " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
+            document.writeln("** "+android_version+" Total last week's failure rates <span id=\"failure_last_week"+android_version+"\"></span>%]]<br/>");
             document.writeln("** "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
 	    
 	    //second request which takes the week_before_last_week's date and last week's date  	 
@@ -47,21 +47,19 @@
                                 
 
                 //Storing values of failrates
-                document.getElementById('failure_rate'+android_version).innerHTML = failRates['failRateWithRetries'];
-                document.getElementById('failure_exclude_retry'+android_version).innerHTML = failRates['failRate'];
+                document.getElementById('failure_rate_last_week'+android_version).innerHTML = failRates['failRateWithRetries'];
+                
                  
             }
-            request2.open('get', '/data/platform?platform='+android_version,true, s_previous_week,s_last_week);
+            request2.open('get', '/data/platform?platform='+android_version+'&startdate='+s_previous_week + '&enddate=' + s_last_week, true)
             request2.send();
-            document.writeln("** last week " +android_version+" Total failure exclude retry rate: [[http://54.215.155.53/android_failures.html?platform=" +android_version+"  <span id=\"failure_rate"+android_version+"\"></span>%]]<br/>");
-            document.writeln("** last week "+android_version+" Total failure exclude retry <span id=\"failure_exclude_retry"+android_version+"\"></span>%]]<br/>");
         }
         
         do{
             fetch_print(pIndex);
             pIndex++;   
         }while (pIndex < platforms.length);
-            </script>
+    </script>
 </head>
 <body>
     <div id="pageHeader"></div>
