@@ -64,8 +64,8 @@ def clean_date_params(query_dict):
     now = datetime.now()
 
     # get dates params
-    start_date_param = query_dict.get('startDate')
-    end_date_param = query_dict.get('endDate')
+    start_date_param = query_dict.get('startDate') or query_dict.get('startdate')
+    end_date_param = query_dict.get('endDate') or query_dict.get('enddate')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now) + timedelta(days=1)
@@ -314,12 +314,9 @@ def run_platform_query():
     platform = request.args.get("platform")
     start_date, end_date = clean_date_params(request.args)
 
-    log_message = """
-        platform: %s
-        startDate: %s
-        endDate: %s
-        """ % (platform, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-
+    log_message = 'platform: %s startDate: %s endDate: %s' % (platform,
+                    start_date.strftime('%Y-%m-%d'),
+                    end_date.strftime('%Y-%m-%d'))
     app.logger.debug(log_message)
 
     db = create_db_connnection()
@@ -422,4 +419,5 @@ def template(filename):
         return response_body
     abort(404)
 
-if __name__ == "__main__": app.run(host="0.0.0.0", port=8314, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8314, debug=False)
