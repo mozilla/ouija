@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `bugid` varchar(32) NOT NULL,
   `branch` varchar(64) NOT NULL,
   `revision` varchar(32) NOT NULL,
-  `date` datetime NOT NULL
+  `date` datetime NOT NULL,
+  primary key(id)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
