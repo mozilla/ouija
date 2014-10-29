@@ -17,5 +17,6 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `revision` varchar(32) NOT NULL,
   `date` datetime NOT NULL,
   primary key(id),
+  index `revision` (`revision`),
   index `date` (`date`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
