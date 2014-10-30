@@ -14,10 +14,17 @@ branch_paths = {
     'mozilla-central': 'mozilla-central',
     'mozilla-inbound': 'integration/mozilla-inbound',
     'b2g-inbound': 'integration/b2g-inbound',
-    'fx-team': 'integration/fx-team'
+    'fx-team': 'integration/fx-team',
+    'try': 'try',
 }
 
-branches = ['mozilla-central', 'mozilla-inbound', 'b2g-inbound', 'fx-team']
+branches = [
+    'mozilla-central',
+    'mozilla-inbound',
+    'b2g-inbound',
+    'fx-team',
+    'try'
+]
 
 platformXRef = {
     'Linux'                            : 'linux32',
