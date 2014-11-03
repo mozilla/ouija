@@ -68,15 +68,15 @@ def clean_date_params(query_dict):
     end_date_param = query_dict.get('endDate') or query_dict.get('enddate')
 
     # parse dates
-    end_date = (parse_date(end_date_param) or now) + timedelta(days=1)
-    start_date = parse_date(start_date_param) or end_date - timedelta(days=8)
+    end_date = (parse_date(end_date_param) or now)
+    start_date = parse_date(start_date_param) or end_date - timedelta(days=7)
 
     # validate dates
     if start_date > now or start_date.date() >= end_date.date():
         start_date = now - timedelta(days=7)
         end_date = now + timedelta(days=1)
 
-    return start_date, end_date
+    return start_date.date(), end_date.date()
 
 
 def parse_date(date_):
@@ -123,56 +123,6 @@ def binify(bins, data):
     result.append(len(filter(lambda x: x >= bins[-1], data)))
 
     return result
-
-
-@app.route("/data/results/")
-@json_response
-def run_resultstimeseries_query():
-    platform = request.args.get("platform", "android4.0")
-    app.logger.debug("platform: %s" % platform)
-
-    db = create_db_connnection()
-    cursor = db.cursor()
-    cursor.execute("""select result, duration, date from testjobs
-                      where platform="%s" order by duration;""" % platform)
-
-    query_results = cursor.fetchall()
-
-    greens = []
-    oranges = []
-    reds = []
-    blues = []
-    totals = []
-
-    dates = []
-
-    for result, duration, date in query_results:
-        if result == 'success':
-            greens.append(int(duration))
-        elif result == 'testfailed':
-            oranges.append(int(duration))
-        elif result == 'retry':
-            blues.append(int(duration))
-        elif result == 'exception' or result == 'busted':
-            reds.append(int(duration))
-        totals.append(int(duration))
-        dates.append(date)
-
-    cursor.close()
-    db.close()
-
-    bins = map(lambda x: x * 60, [10, 20, 30, 40, 50])  # minutes
-
-    data = {}
-    data['total'] = len(totals)
-    data['labels'] = ["< 10", "10 - 20", "20 - 30", "30 - 40", "40 - 50", "> 50"]
-    data['green'] = binify(bins, greens)
-    data['orange'] = binify(bins, oranges)
-    data['red'] = binify(bins, reds)
-    data['blue'] = binify(bins, blues)
-    data['totals'] = binify(bins, totals)
-
-    return {'data': data, 'dates': get_date_range(dates)}
 
 
 @app.route("/data/results/flot/day/")
