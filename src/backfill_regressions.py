@@ -1,5 +1,8 @@
 import MySQLdb
 
+TEST_FAILURE  = 1
+BUILD_FAILURE = -1
+
 def run_query(query, rows = None):
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -31,12 +34,11 @@ def annotate_jobs_with_bugidrevision():
                and regression!=0 and regression!=NULL
             """
 
-    print query
     results = run_query(query)
     origtotal = 0
     newtotal = 0
     for uniquefailure in results:
-        query = "update testjobs set regression=1 where bugid='%s'" % uniquefailure
+        query = "update testjobs set regression=%s where bugid='%s'" % (TEST_FAILURE, uniquefailure)
         print query
         tests = run_query(query)
 
@@ -59,7 +61,7 @@ def annotate_jobs_that_only_fail_on_build():
         query = "select count(id) from testjobs where bugid='%s' and result='testfailed'" % uniquefailure
         tests = makeint(run_query(query))
         if tests == 0:
-            query = "update testjobs set regression=-1 where bugid='%s'" % uniquefailure
+            query = "update testjobs set regression=%s where bugid='%s'" % (BUILD_FAILURE, uniquefailure)
             print query
             run_query(query)
             print "%s is build only" % uniquefailure
