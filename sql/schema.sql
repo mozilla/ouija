@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `branch` varchar(64) NOT NULL,
   `revision` varchar(32) NOT NULL,
   `date` datetime NOT NULL,
+-- regression: 0: no regression; 1: test failure, -1: build failure, etc.
+  `regression` int(11) NOT NULL,
   primary key(id),
   index `revision` (`revision`),
   index `date` (`date`)
