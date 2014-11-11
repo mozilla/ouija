@@ -2,8 +2,9 @@ import MySQLdb
 
 TEST_FAILURE  = 1
 BUILD_FAILURE = -1
+NO_FAILURE    = 0
 
-def run_query(query, rows = None):
+def run_query(query):
     db = MySQLdb.connect(host="localhost",
                          user="root",
                          passwd="root",
@@ -13,16 +14,9 @@ def run_query(query, rows = None):
     cur.execute(query)
 
     results = []
-    if not rows:
-        rows = "keyrev"
+    # each row is in ('val',) format, we want 'val'
     for rows in cur.fetchall():
-        if len(rows) > 1:
-            temp = []
-            for r in rows:
-                temp.append(r)
-        else:
-            temp = rows[0]
-        results.append(temp)
+        results.append(rows[0])
 
     cur.close()
     return results
@@ -30,17 +24,15 @@ def run_query(query, rows = None):
 def annotate_jobs_with_bugidrevision():
     # this query is 99.x% effective
     query = """select distinct bugid from testjobs where bugid like '____________' 
-               and bugid not like '%bug%' and bugid not like '%trigger%' 
-               and regression!=0 and regression!=NULL
-            """
+               and bugid not like '%%bug%%' and bugid not like '%%trigger%%' 
+               and regression!=%s and regression!=NULL  
+            """ % (NO_FAILURE)
 
     results = run_query(query)
-    origtotal = 0
-    newtotal = 0
     for uniquefailure in results:
         query = "update testjobs set regression=%s where bugid='%s'" % (TEST_FAILURE, uniquefailure)
         print query
-        tests = run_query(query)
+        run_query(query)
 
 def makeint(val):
     if isinstance(val, list):
@@ -50,9 +42,9 @@ def makeint(val):
 
 def annotate_jobs_that_only_fail_on_build():
     query = """select distinct bugid from testjobs where bugid like '____________' 
-               and bugid not like '%bug%' and bugid not like '%trigger%' 
-               and regression!=0 and regression!=NULL
-            """
+               and bugid not like '%%bug%%' and bugid not like '%%trigger%%' 
+               and regression!=%s and regression!=NULL
+            """ % (NO_FAILURE)
 
     results = run_query(query)
     buildonly = 0
