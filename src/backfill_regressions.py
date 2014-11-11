@@ -3,7 +3,7 @@ import MySQLdb
 def run_query(query, rows = None):
     db = MySQLdb.connect(host="localhost",
                          user="root",
-                         passwd="testing",
+                         passwd="root",
                          db="ouija")
 
     cur = db.cursor()
@@ -26,8 +26,12 @@ def run_query(query, rows = None):
 
 def annotate_jobs_with_bugidrevision():
     # this query is 99.x% effective
-    query = "select distinct bugid from testjobs where bugid like '____________' and bugid not like '%bug%' and bugid not like '%trigger%' and regression!=0 and regression!=NULL"
+    query = """select distinct bugid from testjobs where bugid like '____________' 
+               and bugid not like '%bug%' and bugid not like '%trigger%' 
+               and regression!=0 and regression!=NULL
+            """
 
+    print query
     results = run_query(query)
     origtotal = 0
     newtotal = 0
@@ -43,7 +47,10 @@ def makeint(val):
 
 
 def annotate_jobs_that_only_fail_on_build():
-    query = "select distinct bugid from testjobs where bugid like '____________' and bugid not like '%bug%' and bugid not like '%trigger%' and regression!=0 and regression!=NULL"
+    query = """select distinct bugid from testjobs where bugid like '____________' 
+               and bugid not like '%bug%' and bugid not like '%trigger%' 
+               and regression!=0 and regression!=NULL
+            """
 
     results = run_query(query)
     buildonly = 0
