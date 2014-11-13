@@ -260,7 +260,8 @@ def uploadResults(data, branch, revision, date):
             if not platform:
                 continue
 
-            sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date) values ('
+            regression = 0
+            sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
             sql += '%s' % id
             sql += ", '%s'" % log
             sql += ", '%s'" % slave
@@ -273,6 +274,7 @@ def uploadResults(data, branch, revision, date):
             sql += ", '%s'" % branch
             sql += ", '%s'" % revision
             sql += ", '%s'" % date
+            sql += ", %s" % regression
             sql += ')'
             cur.execute(sql)
     cur.close()
