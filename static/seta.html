@@ -1,0 +1,56 @@
+<html>
+<head>
+<title>
+SETA - Search for Extraneous Test Automation
+</title>
+</head>
+<body>
+<div id="overview">
+SETA is a project that takes a look at all the jobs we run in automation and tries to help us find patterns.
+<p>
+The current project which is underway that will look for jobs which have found no failures in the last 6 months and recommend only running those jobs on a much more limited schedule.
+<p>
+The net result of this project is to be able to determine what percentage of failures we want to find (based on history) and give us the minimum set of jobs.
+For example, if we want 100% coverage we might need 75 jobs/push, but 90% might only require 35 jobs/push.
+<p>
+<p>
+To solve this we have a simple API:<br />
+<a href="http://alertmanager.allizom.org/data/seta">http://alertmanager.allizom.org/data/seta/</a><p>
+<ul>
+<li>jobtype [1]: 1: test regressions, -1, build regressions</li>
+<li>platform [linux32]: can be used multiple times, specify which platform(s) to look at, values are: linux32, linux64, osx10.6, osx10.8, winxp, win7, win8</li>
+<li>build [opt, debug]: can be used multiple times, specify the build type, values are: opt, debug, leak, build</li>
+<li>test [mochitest-1]: can be used multiple times, specify which test job(s) to look at, values are: mochitest-[1-5], mochitest-other, xpcshell, reftest, browser-chrome-[1-3]</li>
+<li>startDate [7 days ago]: yyyy-mm-dd format, for start date of data, defaults to 7 days ago</li>
+<li>endDate [today]: yyyy-mm-dd format, specify the end date for the data</li>
+</ul>
+some examples would be (startDate=2014-10-01&endDate=2014-11-15&jobtype=1):<br />
+<a href="http://alertmanager.allizom.org/data/seta?startDate=2014-10-01&endDate=2014-11-15&platform=linux32">http://alertmanager.allizom.org/data/seta/?plaform=linux32</a><p>
+<a href="http://alertmanager.allizom.org/data/seta?startDate=2014-10-01&endDate=2014-11-15&platform=linux32&platform=linux64">http://alertmanager.allizom.org/data/seta/?platform=linux32&platform=linux64</a><p>
+<a href="http://alertmanager.allizom.org/data/seta?startDate=2014-10-01&endDate=2014-11-15&platform=linux32&platform=linux64&test=mochitest-2">http://alertmanager.allizom.org/data/seta/?platform=linux32&platform=linux64&test=mochitest-2</a><p>
+<p>
+<p>
+<h2>Now we can analyze the data:</h2><p>
+Taking a look at:<br />
+<a href="http://alertmanager.allizom.org/data/seta?startDate=2014-10-01&endDate=2014-11-15&platform=linux32&platform=linux64&test=mochitest-2">http://alertmanager.allizom.org/data/seta/?platform=linux32&platform=linux64&test=mochitest-2</a><p>
+We get this in response:<br />
+{"failures": {"946948bfc6a3": [["linux64", "debug", "mochitest-2"]], "ace6aa02d442": [["linux64", "opt", "mochitest-2"]]}}<br />
+<p>
+Lets look at this in more detail, there are 2 revision numbers here:<br>
+<ul>
+<li>"946948bfc6a3": [["linux64", "debug", "mochitest-2"]]</li>
+<li>"ace6aa02d442": [["linux64", "opt", "mochitest-2"]]</li>
+</ul>
+Each revision number is a revision number of the changeset which caused the offending revision (as manually indicated by a sheriff).  Associated with each
+revision is an array of tuples, where each tuple describes a job that ran which failed as a result of this revision.<br />
+<p>
+Looking at the original query, we have all linux32+64 mochitest-2 instances in the last 6 weeks- there have been 2 failures.<br />
+to understand this in more detail we might want to look at all platforms and see if these specific failures occured on other platforms, or if they occured on other tests.<br />
+<p>
+To jump start this I have created a <a href ="https://github.com/dminor/ouija/blob/master/tools/failures.py">python script</a> which you run locally and can hack up to query the data.  Please submit pull requests to Ouija with new scripts, results, etc.
+<p>
+<p>
+</div>
+</body>
+</html>
+
