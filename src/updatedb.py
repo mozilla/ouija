@@ -162,7 +162,8 @@ def getCSetResults(branch, revision):
       no caching as data will change over time.  Some results will be in asap, others will take
       up to 12 hours (usually < 4 hours)
     """
-    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
+#    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" %(branch, revision)
     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
     cdata = response.json()
     return cdata
