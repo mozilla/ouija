@@ -240,9 +240,80 @@ def uploadResults(data, branch, revision, date):
                          db="ouija")
 
     cur = db.cursor()
+    logfile = open("ouija.log", 'a')    
+    logfile.write("[_id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision]" + "\n")
 
+    job_property_names = data["job_property_names"]
+    i = lambda x: job_property_names.index(x)
+
+    for result in data["results"]:
+        for platform in result["platforms"]:
+            for group in platform["groups"]:
+                for job in group["jobs"]:
+                    _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
+                    _id = '%s' % job[i("id")]
+                    cur.execute('select revision from testjobs where id=%s' % _id)
+                    if cur.fetchone():
+                        continue
+
+                    _result = job[i("result")]
+                    if _result == u'unknown':
+                        continue
+                    duration = '%s' % (int(job[i("end_timestamp")]) - int(job[i("start_timestamp")]))
+                    platform = job[i("platform")]
+                    if not platform:
+                        continue
+                    buildtype = job[i("platform_option")]
+                    bugid = ""
+
+                    url = "https://treeherder.mozilla.org" + job[i("resource_uri")]
+                    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+                    data1 = response.json()
+
+                    print "data1: " +  url #DEBUG
+                    data2 = ''
+                    for j in range(len(data1["artifacts"])):
+			if data1["artifacts"][j]["name"] == u"Structured Log":
+                            url = "https://treeherder.mozilla.org" + data1["artifacts"][j]["resource_uri"]
+                            response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+                            data2 = response.json()
+
+                            print "data2: " + url #DEBUG
+
+                            slave = data2["blob"]["header"]["slave"]
+                            break
+
+                    if (len(data1["logs"])):
+                        log = data1["logs"][0]["url"]
+                    elif (data2):
+                        log = data2["blob"]["logurl"] 
+
+                    regression = 0
+                    fields = [_id, log, slave, _result, duration, platform, buildtype, testtype, bugid, branch, revision] 
+                    logfile.write(str(fields) + "\n") #DEBUG
+
+
+                    # Insert into MySQL Database
+                    sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
+                    sql += '%s' % _id
+                    sql += ", '%s'" % log
+                    sql += ", '%s'" % slave
+                    sql += ", '%s'" % _result
+                    sql += ', %s' % duration
+                    sql += ", '%s'" % platform
+                    sql += ", '%s'" % buildtype
+                    sql += ", '%s'" % testtype
+                    sql += ", '%s'" % bugid
+                    sql += ", '%s'" % branch
+                    sql += ", '%s'" % revision
+                    sql += ", '%s'" % date
+                    sql += ", %s" % regression
+                    sql += ')'
+                    cur.execute(sql)
+    cur.close()
+    logfile.close()
+'''
     for item in data:
-
         if 'result' in item:
             id = '%s' % int(item['_id'])
             cur.execute('select revision from testjobs where id=%s' % id)
@@ -278,7 +349,8 @@ def uploadResults(data, branch, revision, date):
             sql += ", %s" % regression
             sql += ')'
             cur.execute(sql)
-    cur.close()
+'''
+   
 
 def parseResults(args):
     db_queue, download_queue = Queue(), Queue()
