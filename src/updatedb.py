@@ -240,8 +240,6 @@ def uploadResults(data, branch, revision, date):
                          db="ouija")
 
     cur = db.cursor()
-    logfile = open("ouija.log", 'a')    
-    logfile.write("[_id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision]" + "\n")
 
     job_property_names = data["job_property_names"]
     i = lambda x: job_property_names.index(x)
@@ -250,12 +248,14 @@ def uploadResults(data, branch, revision, date):
         for platform in result["platforms"]:
             for group in platform["groups"]:
                 for job in group["jobs"]:
+                    # Instantiate all values to an empty string
                     _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
                     _id = '%s' % job[i("id")]
+                    # If job already in database, skip
                     cur.execute('select revision from testjobs where id=%s' % _id)
                     if cur.fetchone():
                         continue
-
+                    # Skip if result = unknown
                     _result = job[i("result")]
                     if _result == u'unknown':
                         continue
@@ -264,21 +264,20 @@ def uploadResults(data, branch, revision, date):
                     if not platform:
                         continue
                     buildtype = job[i("platform_option")]
-                    bugid = ""
+                    
+                    bugid = "" # TODO: Find where to get this
 
+                    # Fetch json object from the resource_uri
                     url = "https://treeherder.mozilla.org" + job[i("resource_uri")]
                     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                     data1 = response.json()
 
-                    print "data1: " +  url #DEBUG
-                    data2 = ''
                     for j in range(len(data1["artifacts"])):
 			if data1["artifacts"][j]["name"] == u"Structured Log":
                             url = "https://treeherder.mozilla.org" + data1["artifacts"][j]["resource_uri"]
                             response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                             data2 = response.json()
 
-                            print "data2: " + url #DEBUG
 
                             slave = data2["blob"]["header"]["slave"]
                             break
@@ -289,9 +288,6 @@ def uploadResults(data, branch, revision, date):
                         log = data2["blob"]["logurl"] 
 
                     regression = 0
-                    fields = [_id, log, slave, _result, duration, platform, buildtype, testtype, bugid, branch, revision] 
-                    logfile.write(str(fields) + "\n") #DEBUG
-
 
                     # Insert into MySQL Database
                     sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
@@ -311,45 +307,6 @@ def uploadResults(data, branch, revision, date):
                     sql += ')'
                     cur.execute(sql)
     cur.close()
-    logfile.close()
-'''
-    for item in data:
-        if 'result' in item:
-            id = '%s' % int(item['_id'])
-            cur.execute('select revision from testjobs where id=%s' % id)
-            if cur.fetchone():
-                continue
-
-            log = item['log']
-            slave = item['slave']
-            result = item['result']
-            duration = '%s' % (int(item['endtime']) - int(item['starttime']))
-            platform, buildtype, testtype = parseBuilder(item['buildername'], branch)
-            bugid = ''
-            if item['notes']:
-                bugid = item['notes'][0]['note'].replace("'", '')
-            fields = [id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision]
-            if not platform:
-                continue
-
-            regression = 0
-            sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
-            sql += '%s' % id
-            sql += ", '%s'" % log
-            sql += ", '%s'" % slave
-            sql += ", '%s'" % result
-            sql += ', %s' % duration
-            sql += ", '%s'" % platform
-            sql += ", '%s'" % buildtype
-            sql += ", '%s'" % testtype
-            sql += ", '%s'" % bugid
-            sql += ", '%s'" % branch
-            sql += ", '%s'" % revision
-            sql += ", '%s'" % date
-            sql += ", %s" % regression
-            sql += ')'
-            cur.execute(sql)
-'''
    
 
 def parseResults(args):
