@@ -188,10 +188,10 @@ def uploadResults(data, branch, revision, date):
     job_property_names = data["job_property_names"]
     i = lambda x: job_property_names.index(x)
 
-    for result in data["results"]:
-        for platform in result["platforms"]:
-            for group in platform["groups"]:
-                for job in group["jobs"]:
+    for result in data.get("results"):
+        for platform in result.get("platforms"):
+            for group in platform.get("groups"):
+                for job in group.get("jobs"):
                     # Instantiate all values to an empty string
                     _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
                     _id = '%s' % job[i("id")]
@@ -219,19 +219,19 @@ def uploadResults(data, branch, revision, date):
                     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                     data1 = response.json()
 
-                    for j in range(len(data1["artifacts"])):
-			if data1["artifacts"][j]["name"] == u"Structured Log":
-                            url = "https://treeherder.mozilla.org" + data1["artifacts"][j]["resource_uri"]
+                    for j in range(len(data1.get("artifacts"))):
+			if data1.get("artifacts")[j].get("name") == u"Structured Log":
+                            url = "https://treeherder.mozilla.org" + data1.get("artifacts")[j].get("resource_uri")
                             response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                             data2 = response.json()
                             
-                            slave = data2["blob"]["header"]["slave"]
+                            slave = data2.get("blob", {}).get("header",{}).get("slave","")
                             break
 
-                    if (len(data1["logs"])):
-                        log = data1["logs"][0]["url"]
+                    if (len(data1.get("logs"))):
+                        log = data1.get("logs", [])[0].get("url", "")
                     elif (data2):
-                        log = data2["blob"]["logurl"] 
+                        log = data2.get("blob", {}).get("logurl", "") 
 
                     regression = 0
 
