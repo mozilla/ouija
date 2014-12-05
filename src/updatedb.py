@@ -26,41 +26,6 @@ branches = [
     'try'
 ]
 
-platformXRef = {
-    'Linux'                            : 'linux32',
-    'Ubuntu HW 12.04'                  : 'linux32',
-    'Ubuntu VM 12.04'                  : 'linux32',
-    'Rev3 Fedora 12'                   : 'linux32',
-    'Linux x86-64'                     : 'linux64',
-    'Rev3 Fedora 12x64'                : 'linux64',
-    'Ubuntu VM 12.04 x64'              : 'linux64',
-    'Ubuntu HW 12.04 x64'              : 'linux64',
-    'Ubuntu ASAN VM 12.04 x64'         : 'linux64',
-    'Rev4 MacOSX Snow Leopard 10.6'    : 'osx10.6',
-    'Rev4 MacOSX Lion 10.7'            : 'osx10.7',
-    'OS X 10.7'                        : 'osx10.7',
-    'Rev5 MacOSX Mountain Lion 10.8'   : 'osx10.8',
-    'WINNT 5.2'                        : 'winxp',
-    'Windows XP 32-bit'                : 'winxp',
-    'Windows 7 32-bit'                 : 'win7',
-    'Windows 7 64-bit'                 : 'win764',
-    'WINNT 6.1 x86-64'                 : 'win764',
-    'WINNT 6.2'                        : 'win8',
-    'Android Armv6'                    : 'android-armv6',
-    'Android 2.2 Armv6'                : 'android-armv6',
-    'Android Armv6 Tegra 250'          : 'android-armv6',
-    'Android X86'                      : 'android-x86',
-    'Android 2.2'                      : 'android2.2',
-    'Android 2.2 Tegra'                : 'android2.2',
-    'Android 2.3 Emulator'             : 'android2.3',
-    'Android no-ionmonkey'             : 'android-no-ion',
-    'Android 4.0 Panda'                : 'android4.0',
-    'b2g_emulator_vm'                  : 'b2g-vm',
-    'b2g_ubuntu64_vm'                  : 'b2g-vm',
-    'b2g_ubuntu32_vm'                  : 'b2g-vm',
-    'b2g_ics_armv7a_gecko_emulator_vm' : 'b2g-vm',
-    'b2g_ics_armv7a_gecko_emulator'    : 'b2g-emulator'
-}
 
 #
 # The following platforms were not added
@@ -198,27 +163,6 @@ def getPushLog(branch, startdate):
             date = None
     return pushes
 
-def parseBuilder(buildername, branch):
-    # Split on " " + branch + " " because the new platforms have the string mozilla-central
-    # in the platform name. Thus, splitting on just the branch would most likely cause
-    # the logic after the splitting work not so well.
-    parts = buildername.split(" " + branch + " ")
-    platform = parts[0]
-    buildtype = branch.join(parts[1:])
-
-    types = buildtype.split('test')
-    buildtype, testtype = types[0].strip(), 'test'.join(types[1:]).strip()
-    buildtype = buildtype.strip()
-
-    if buildtype not in ['opt', 'debug', 'build'] and not testtype:
-        testtype = buildtype
-        buildtype = 'opt'
-
-    for p in platformXRef:
-        if re.match(p, platform.strip()):
-            return platformXRef[p], buildtype, testtype
-    return '','',''
-
 def clearResults(branch, startdate):
 
     date_xx_days_ago = datetime.date.today() - datetime.timedelta(days=180)
@@ -259,13 +203,16 @@ def uploadResults(data, branch, revision, date):
                     _result = job[i("result")]
                     if _result == u'unknown':
                         continue
+
                     duration = '%s' % (int(job[i("end_timestamp")]) - int(job[i("start_timestamp")]))
+
                     platform = job[i("platform")]
                     if not platform:
                         continue
+
                     buildtype = job[i("platform_option")]
-                    
-                    bugid = "" # TODO: Find where to get this
+                   
+                    testtype = job[i("ref_data_name")].split()[-1]
 
                     # Fetch json object from the resource_uri
                     url = "https://treeherder.mozilla.org" + job[i("resource_uri")]
@@ -277,8 +224,7 @@ def uploadResults(data, branch, revision, date):
                             url = "https://treeherder.mozilla.org" + data1["artifacts"][j]["resource_uri"]
                             response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                             data2 = response.json()
-
-
+                            
                             slave = data2["blob"]["header"]["slave"]
                             break
 
