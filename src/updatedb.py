@@ -188,10 +188,10 @@ def uploadResults(data, branch, revision, date):
     job_property_names = data["job_property_names"]
     i = lambda x: job_property_names.index(x)
 
-    for result in data.get("results"):
-        for platform in result.get("platforms"):
-            for group in platform.get("groups"):
-                for job in group.get("jobs"):
+    for result in data.get("results", []):
+        for platform in result.get("platforms", []):
+            for group in platform.get("groups", []):
+                for job in group.get("jobs", []):
                     # Instantiate all values to an empty string
                     _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
                     _id = '%s' % job[i("id")]
@@ -219,9 +219,9 @@ def uploadResults(data, branch, revision, date):
                     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                     data1 = response.json()
 
-                    for j in range(len(data1.get("artifacts"))):
-			if data1.get("artifacts")[j].get("name") == u"Structured Log":
-                            url = "https://treeherder.mozilla.org" + data1.get("artifacts")[j].get("resource_uri")
+                    for j in range(len(data1.get("artifacts", []))):
+			if data1.get("artifacts", [])[j].get("name", "") == u"Structured Log":
+                            url = "https://treeherder.mozilla.org" + data1.get("artifacts", [])[j].get("resource_uri", "")
                             response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
                             data2 = response.json()
                             
