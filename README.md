@@ -1,7 +1,7 @@
 ouija
 =====
 
-Failure rate analysis for tbpl.
+Failure rate analysis for treeherder.
 
 # Installation
 

@@ -26,41 +26,6 @@ branches = [
     'try'
 ]
 
-platformXRef = {
-    'Linux'                            : 'linux32',
-    'Ubuntu HW 12.04'                  : 'linux32',
-    'Ubuntu VM 12.04'                  : 'linux32',
-    'Rev3 Fedora 12'                   : 'linux32',
-    'Linux x86-64'                     : 'linux64',
-    'Rev3 Fedora 12x64'                : 'linux64',
-    'Ubuntu VM 12.04 x64'              : 'linux64',
-    'Ubuntu HW 12.04 x64'              : 'linux64',
-    'Ubuntu ASAN VM 12.04 x64'         : 'linux64',
-    'Rev4 MacOSX Snow Leopard 10.6'    : 'osx10.6',
-    'Rev4 MacOSX Lion 10.7'            : 'osx10.7',
-    'OS X 10.7'                        : 'osx10.7',
-    'Rev5 MacOSX Mountain Lion 10.8'   : 'osx10.8',
-    'WINNT 5.2'                        : 'winxp',
-    'Windows XP 32-bit'                : 'winxp',
-    'Windows 7 32-bit'                 : 'win7',
-    'Windows 7 64-bit'                 : 'win764',
-    'WINNT 6.1 x86-64'                 : 'win764',
-    'WINNT 6.2'                        : 'win8',
-    'Android Armv6'                    : 'android-armv6',
-    'Android 2.2 Armv6'                : 'android-armv6',
-    'Android Armv6 Tegra 250'          : 'android-armv6',
-    'Android X86'                      : 'android-x86',
-    'Android 2.2'                      : 'android2.2',
-    'Android 2.2 Tegra'                : 'android2.2',
-    'Android 2.3 Emulator'             : 'android2.3',
-    'Android no-ionmonkey'             : 'android-no-ion',
-    'Android 4.0 Panda'                : 'android4.0',
-    'b2g_emulator_vm'                  : 'b2g-vm',
-    'b2g_ubuntu64_vm'                  : 'b2g-vm',
-    'b2g_ubuntu32_vm'                  : 'b2g-vm',
-    'b2g_ics_armv7a_gecko_emulator_vm' : 'b2g-vm',
-    'b2g_ics_armv7a_gecko_emulator'    : 'b2g-emulator'
-}
 
 #
 # The following platforms were not added
@@ -162,7 +127,8 @@ def getCSetResults(branch, revision):
       no caching as data will change over time.  Some results will be in asap, others will take
       up to 12 hours (usually < 4 hours)
     """
-    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
+#    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" %(branch, revision)
     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
     cdata = response.json()
     return cdata
@@ -197,27 +163,6 @@ def getPushLog(branch, startdate):
             date = None
     return pushes
 
-def parseBuilder(buildername, branch):
-    # Split on " " + branch + " " because the new platforms have the string mozilla-central
-    # in the platform name. Thus, splitting on just the branch would most likely cause
-    # the logic after the splitting work not so well.
-    parts = buildername.split(" " + branch + " ")
-    platform = parts[0]
-    buildtype = branch.join(parts[1:])
-
-    types = buildtype.split('test')
-    buildtype, testtype = types[0].strip(), 'test'.join(types[1:]).strip()
-    buildtype = buildtype.strip()
-
-    if buildtype not in ['opt', 'debug', 'build'] and not testtype:
-        testtype = buildtype
-        buildtype = 'opt'
-
-    for p in platformXRef:
-        if re.match(p, platform.strip()):
-            return platformXRef[p], buildtype, testtype
-    return '','',''
-
 def clearResults(branch, startdate):
 
     date_xx_days_ago = datetime.date.today() - datetime.timedelta(days=180)
@@ -240,44 +185,75 @@ def uploadResults(data, branch, revision, date):
 
     cur = db.cursor()
 
-    for item in data:
+    job_property_names = data["job_property_names"]
+    i = lambda x: job_property_names.index(x)
 
-        if 'result' in item:
-            id = '%s' % int(item['_id'])
-            cur.execute('select revision from testjobs where id=%s' % id)
-            if cur.fetchone():
-                continue
+    for result in data.get("results", []):
+        for platform in result.get("platforms", []):
+            for group in platform.get("groups", []):
+                for job in group.get("jobs", []):
+                    # Instantiate all values to an empty string
+                    _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
+                    _id = '%s' % job[i("id")]
+                    # If job already in database, skip
+                    cur.execute('select revision from testjobs where id=%s' % _id)
+                    if cur.fetchone():
+                        continue
+                    # Skip if result = unknown
+                    _result = job[i("result")]
+                    if _result == u'unknown':
+                        continue
 
-            log = item['log']
-            slave = item['slave']
-            result = item['result']
-            duration = '%s' % (int(item['endtime']) - int(item['starttime']))
-            platform, buildtype, testtype = parseBuilder(item['buildername'], branch)
-            bugid = ''
-            if item['notes']:
-                bugid = item['notes'][0]['note'].replace("'", '')
-            fields = [id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision]
-            if not platform:
-                continue
+                    duration = '%s' % (int(job[i("end_timestamp")]) - int(job[i("start_timestamp")]))
 
-            regression = 0
-            sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
-            sql += '%s' % id
-            sql += ", '%s'" % log
-            sql += ", '%s'" % slave
-            sql += ", '%s'" % result
-            sql += ', %s' % duration
-            sql += ", '%s'" % platform
-            sql += ", '%s'" % buildtype
-            sql += ", '%s'" % testtype
-            sql += ", '%s'" % bugid
-            sql += ", '%s'" % branch
-            sql += ", '%s'" % revision
-            sql += ", '%s'" % date
-            sql += ", %s" % regression
-            sql += ')'
-            cur.execute(sql)
+                    platform = job[i("platform")]
+                    if not platform:
+                        continue
+
+                    buildtype = job[i("platform_option")]
+                   
+                    testtype = job[i("ref_data_name")].split()[-1]
+
+                    # Fetch json object from the resource_uri
+                    url = "https://treeherder.mozilla.org" + job[i("resource_uri")]
+                    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+                    data1 = response.json()
+
+                    for j in range(len(data1.get("artifacts", []))):
+			if data1.get("artifacts", [])[j].get("name", "") == u"Structured Log":
+                            url = "https://treeherder.mozilla.org" + data1.get("artifacts", [])[j].get("resource_uri", "")
+                            response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+                            data2 = response.json()
+                            
+                            slave = data2.get("blob", {}).get("header",{}).get("slave","")
+                            break
+
+                    if (len(data1.get("logs"))):
+                        log = data1.get("logs", [])[0].get("url", "")
+                    elif (data2):
+                        log = data2.get("blob", {}).get("logurl", "") 
+
+                    regression = 0
+
+                    # Insert into MySQL Database
+                    sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, regression) values ('
+                    sql += '%s' % _id
+                    sql += ", '%s'" % log
+                    sql += ", '%s'" % slave
+                    sql += ", '%s'" % _result
+                    sql += ', %s' % duration
+                    sql += ", '%s'" % platform
+                    sql += ", '%s'" % buildtype
+                    sql += ", '%s'" % testtype
+                    sql += ", '%s'" % bugid
+                    sql += ", '%s'" % branch
+                    sql += ", '%s'" % revision
+                    sql += ", '%s'" % date
+                    sql += ", %s" % regression
+                    sql += ')'
+                    cur.execute(sql)
     cur.close()
+   
 
 def parseResults(args):
     db_queue, download_queue = Queue(), Queue()
