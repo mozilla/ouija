@@ -27,58 +27,6 @@ branches = [
 ]
 
 
-#
-# The following platforms were not added
-# We might want to add them in the future
-#
-'''
-b2g_mozilla-central_macosx64_gecko build opt
-b2g_mozilla-central_macosx64_gecko-debug build opt
-b2g_macosx64 opt gaia-ui-test
-
-linux64-br-haz_mozilla-central_dep opt
-
-Android 4.2 x86 build
-Android 4.2 x86 Emulator opt androidx86-set-4
-
-b2g_mozilla-central_win32_gecko-debug build opt
-b2g_mozilla-central_win32_gecko build opt
-b2g_mozilla-central_linux32_gecko build opt
-b2g_mozilla-central_linux32_gecko-debug build opt
-
-b2g_mozilla-central_emulator-kk_periodic opt
-b2g_mozilla-central_emulator-kk-debug_periodic opt
-b2g_mozilla-central_emulator-kk_nonunified opt
-b2g_mozilla-central_emulator-kk-debug_nonunified opt
-
-b2g_mozilla-central_emulator-jb-debug_dep opt
-b2g_mozilla-central_emulator_dep opt
-b2g_mozilla-central_emulator-debug_dep opt
-b2g_mozilla-central_emulator-jb_dep opt
-b2g_mozilla-central_emulator_nonunified opt
-b2g_mozilla-central_emulator-debug_nonunified opt
-b2g_mozilla-central_emulator-jb-debug_nonunified opt
-b2g_mozilla-central_emulator-jb_nonunified opt
-
-b2g_mozilla-central_nexus-4_periodic opt
-b2g_mozilla-central_nexus-4_eng_periodic opt
-
-b2g_mozilla-central_linux64_gecko build opt
-b2g_mozilla-central_linux64_gecko-debug build opt
-
-b2g_mozilla-central_hamachi_eng_dep opt
-b2g_mozilla-central_hamachi_periodic opt
-
-b2g_mozilla-central_flame_eng_dep opt
-b2g_mozilla-central_flame_periodic opt
-
-b2g_mozilla-central_helix_periodic opt
-
-b2g_mozilla-central_wasabi_periodic opt
-'''
-
-UPLOAD_JOB, CLEAR_JOB = 0, 1
-
 class Worker(Thread):
 
     def __init__(self, queue, **kargs):
@@ -96,29 +44,16 @@ class Worker(Thread):
             finally:
                 self.queue.task_done()
 
-class DBHandler(Worker):
-
-    def do_job(self, job_spec):
-        job_type, job_args = job_spec
-
-        if job_type == UPLOAD_JOB:
-            uploadResults(*job_args)
-        elif job_type == CLEAR_JOB:
-            clearResults(*job_args)
-        else:
-            assert False #Should not happen
-
 class Downloader(Worker):
 
-    def __init__(self, download_queue, db_queue, **kargs):
+    def __init__(self, download_queue, **kargs):
         Worker.__init__(self, download_queue, **kargs)
-        self.db_queue = db_queue
 
     def do_job(self, job_spec):
         branch, revision, date = job_spec
         logging.info("%s: %s - %s", self.name, revision, date)
         data = getCSetResults(branch, revision)
-        self.db_queue.put((UPLOAD_JOB, [data, branch, revision, date]))
+        uploadResults(data, branch, revision, date)
 
 def getCSetResults(branch, revision):
     """
@@ -127,11 +62,13 @@ def getCSetResults(branch, revision):
       no caching as data will change over time.  Some results will be in asap, others will take
       up to 12 hours (usually < 4 hours)
     """
-#    url = "https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=%s&rev=%s&showall=1" % (branch, revision)
     url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" %(branch, revision)
-    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-    cdata = response.json()
-    return cdata
+    try:
+        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+        cdata = response.json()
+        return cdata
+    except SSLError:
+        pass
 
 def getPushLog(branch, startdate):
     """
@@ -195,10 +132,6 @@ def uploadResults(data, branch, revision, date):
                     # Instantiate all values to an empty string
                     _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
                     _id = '%s' % job[i("id")]
-                    # If job already in database, skip
-                    cur.execute('select revision from testjobs where id=%s' % _id)
-                    if cur.fetchone():
-                        continue
                     # Skip if result = unknown
                     _result = job[i("result")]
                     if _result == u'unknown':
@@ -251,17 +184,20 @@ def uploadResults(data, branch, revision, date):
                     sql += ", '%s'" % date
                     sql += ", %s" % regression
                     sql += ')'
-                    cur.execute(sql)
+
+                    try:
+                        cur.execute(sql)
+                    except MySQLdb.IntegrityError:
+                        # we already have this job
+                        pass
     cur.close()
    
 
 def parseResults(args):
-    db_queue, download_queue = Queue(), Queue()
-
-    DBHandler(db_queue, name="DBHandler").start()
+    download_queue = Queue()
 
     for i in range(args.threads):
-        Downloader(download_queue, db_queue, name="Downloader %s" % (i+1)).start()
+        Downloader(download_queue, name="Downloader %s" % (i+1)).start()
 
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
@@ -271,7 +207,7 @@ def parseResults(args):
         result_branches = [args.branch]
 
     for branch in result_branches:
-        db_queue.put((CLEAR_JOB, [branch, startdate]))
+        clearResults(branch, startdate)
 
     for branch in result_branches:
         revisions = getPushLog(branch, startdate)
@@ -280,7 +216,6 @@ def parseResults(args):
 
     download_queue.join()
     logging.info('Downloading completed')
-    db_queue.join()
 
     #Sometimes the parent may exit and the child is not immidiately killed.
     #This may result in the error like the following -
