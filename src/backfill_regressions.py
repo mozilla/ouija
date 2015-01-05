@@ -23,11 +23,7 @@ def run_query(query):
 
 def annotate_jobs_with_bugidrevision():
     # this query is 99.x% effective
-    query = """select distinct bugid from testjobs where bugid like '____________' 
-               and bugid not like '%%bug%%' and bugid not like '%%trigger%%' 
-               and bugid!='intermittent' and bugid not like '%%tbpl%%' and regression=%s""" % (NO_FAILURE)
-
-    print query
+    query = "select distinct bugid from testjobs where bugid like 'fixed%%' and regression=%s" % (NO_FAILURE)
     results = run_query(query)
     print "updating %s regressions" % len(results)
     for uniquefailure in results:
