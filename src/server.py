@@ -365,9 +365,7 @@ def run_seta_query():
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
-        if d[0] not in failures:
-            failures[d[0]] = []
-        failures[d[0]].append([d[1], d[2], d[3], d[4]])
+        failures.setdefault(d[0], []).append(d[1:])
 
     return {'failures': failures}
 
