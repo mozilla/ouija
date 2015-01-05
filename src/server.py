@@ -354,48 +354,20 @@ def run_platform_query():
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
-    platforms = request.values.getlist("platform")
-    testtype = request.values.getlist("test")
-    buildtype = request.values.getlist("build")
-
-    if not platforms:
-        platforms = ["linux32", "linux64", "osx10.6", "osx10.8", "winxp", "win7", "win8"]
-
-    if not buildtype:
-        buildtype = ["opt", "debug"]
-
-    if not testtype:
-        testtype = ["mochitest-1"]
-
-    #force this to an int of either -2, -1, 1, 2
-    jobtype = int(request.args.get("jobtype", 1))
-    start_date, end_date = clean_date_params(request.args)
-
-    log_message = 'platforms: %s, buildtype: %s, testtype: %s, \
-                   jobtype: %s, startDate: %s endDate: %s' % (platforms,
-                    buildtype, testtype, jobtype,
-                    start_date.strftime('%Y-%m-%d'),
-                    end_date.strftime('%Y-%m-%d'))
-    app.logger.debug(log_message)
+    platforms = ["linux32", "linux64", "osx10.6", "osx10.8", "winxp", "win7", "win8"]
+    buildtype = ["opt", "debug"]
+    testtype = ["mochitest-1", "mochitest=2", "mochitest-3", "mochitest-4", "mochitest-5", "mochitest-other", "reftest"
+    jobtype = 1 # force to unittest failures
 
     db = create_db_connnection()
     cursor = db.cursor()
-    all_platforms = ' or '.join(["platform='%s'" % a for a in platforms])
-    all_tests = ' or '.join(["testtype='%s'" % a for a in testtype])
-    all_types = ' or '.join(["buildtype='%s'" % a for a in buildtype])
-    query = """select bugid, platform, buildtype, testtype from testjobs
-                      where regression=%s
-                      and (%s)
-                      and (%s)
-                      and (%s)
-                      and date between '%s' and '%s';""" % \
-            (jobtype, all_platforms, all_tests, all_types, start_date, end_date)
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs where regression=1"
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
         if d[0] not in failures:
             failures[d[0]] = []
-        failures[d[0]].append([d[1], d[2], d[3]])
+        failures[d[0]].append([d[1], d[2], d[3], d[4]])
 
     return {'failures': failures}
 
