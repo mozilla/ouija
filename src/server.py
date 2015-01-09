@@ -356,7 +356,7 @@ def run_platform_query():
 def run_seta_query():
     platforms = ["linux32", "linux64", "osx10.6", "osx10.8", "winxp", "win7", "win8"]
     buildtype = ["opt", "debug"]
-    testtype = ["mochitest-1", "mochitest=2", "mochitest-3", "mochitest-4", "mochitest-5", "mochitest-other", "reftest"
+    testtype = ["mochitest-1", "mochitest=2", "mochitest-3", "mochitest-4", "mochitest-5", "mochitest-other", "reftest"]
     jobtype = 1 # force to unittest failures
 
     db = create_db_connnection()
