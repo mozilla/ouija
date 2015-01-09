@@ -354,14 +354,9 @@ def run_platform_query():
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
-    platforms = ["linux32", "linux64", "osx10.6", "osx10.8", "winxp", "win7", "win8"]
-    buildtype = ["opt", "debug"]
-    testtype = ["mochitest-1", "mochitest=2", "mochitest-3", "mochitest-4", "mochitest-5", "mochitest-other", "reftest"]
-    jobtype = 1 # force to unittest failures
-
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs where regression=1"
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2"
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
