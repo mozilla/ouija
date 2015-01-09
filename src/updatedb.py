@@ -151,7 +151,7 @@ def uploadResults(data, branch, revision, date):
                     try:
                         # https://treeherder.mozilla.org/api/failureclassification/
                         failure_classification = int(job[i("failure_classification_id")])
-                    except:
+                    except ValueError:
                         failure_classification = 0
 
                     # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
@@ -182,21 +182,16 @@ def uploadResults(data, branch, revision, date):
                         log = data2.get("blob", {}).get("logurl", "") 
 
                     # Insert into MySQL Database
-                    sql = 'insert into testjobs (id, log, slave, result, duration, platform, buildtype, testtype, bugid, branch, revision, date, failure_classification) values ('
-                    sql += '%s' % _id
-                    sql += ", '%s'" % log
-                    sql += ", '%s'" % slave
-                    sql += ", '%s'" % _result
-                    sql += ', %s' % duration
-                    sql += ", '%s'" % platform
-                    sql += ", '%s'" % buildtype
-                    sql += ", '%s'" % testtype
-                    sql += ", '%s'" % bugid
-                    sql += ", '%s'" % branch
-                    sql += ", '%s'" % revision
-                    sql += ", '%s'" % date
-                    sql += ", %s" % failure_classification
-                    sql += ')'
+                    sql = """insert into testjobs (id, log, slave, result,
+                                                   duration, platform, buildtype, testtype,
+                                                   bugid, branch, revision, date,
+                                                   failure_classification)
+                                         values ('%s', '%s', '%s', '%s', %s,
+                                                 '%s', '%s', '%s', '%s', '%s',
+                                                 '%s', '%s', %s)""" % \
+                          (_id, log, slave, _result, \
+                           duration, platform, buildtype, testtype, \
+                           bugid, branch, revision, date, failure_classification)
 
                     try:
                         cur.execute(sql)
