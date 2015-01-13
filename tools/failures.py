@@ -3,269 +3,286 @@ import re
 import copy
 import httplib
 import datetime
-
-def removeType(master, targetlist):
-    """
-        Given a master dictionary of:
-           key: failure id (unique bugid comment representing revision)
-           value: array of instance tuples that meet this requirement
-
-        iterate through each key and remove matching targetlist items 
-    """
-    if targetlist == []:
-        return master
-
-    removed = {}
-    for row in master:
-        if targetlist[0] in master[row]:
-            if row not in removed:
-                removed[row] = []
-            removed[row].append(targetlist[0])
-
-
-    for row in removed:
-        for item in removed[row]:
-            master[row].remove(item)
-        if len(master[row]) == 0:
-            del master[row]
-
-    return master, removed
-
-def addType(master, toAdd):
-    for row in toAdd:
-        if row not in master:
-            master[row] = []
-
-        master[row].extend(toAdd[row])
-
-    return master
-
-def bruteForcePercentage(total, scenarios, master, results, levels):
-    """
-        This is one level deep for brute force calculations.
-
-        We take an array of scenarios (in tuple format), and for each one
-        we test a removal of this specific scenario and record the scenario
-        in a dictionary of results with this format:
-           Key: percent match (i.e 99)
-           Value: list of tuple sets which can be removed and allow us to gain [Key] coverage
-    """
-    for scenario in scenarios:
-        temp, removed = removeType(master, scenario)
-
-        p = int((float(len(temp)) / total) * 100)
-        if p not in results:
-            results[p] = []
-        results[p].append(levels + scenario)
-        master = addType(master, removed)
-    return results
-    
-
-def removeBadScenarios(results, threshold):
-    """
-        Given a threshold, remove anything from a results dictionary
-        that is below the threshold.  Results dictionary format is:
-            Key: percent match (i.e 99)
-            Value: list of tuple sets which can be removed and allow us to gain [Key] coverage
-
-        This is used as an optimization, so we focus on important scenarios
-
-        Return value is a Results dictionary
-    """
-    retVal = {}
-    for percent in results:
-        if percent >= threshold:
-            retVal[percent] = results[percent]
-
-    return retVal
-
-def buildScenarios(results):
-    """
-        Given a Results dictionary, build a list of all unique scenarios
-        in a list format
-    """
-    retVal = []
-    for row in results:
-        for item in results[row]:
-            if item not in retVal:
-                retVal.append(item)
-    return retVal
-
-def sortList(input):
-    """
-        Given a list of 3 part tuples, sort them and remove duplicates.
-
-        TODO: this is the ugliest code, there must be a better way to do this.
-        TODO: this is hardcoded for a 3 part tuple
-    """
-    retVal = []
-    for item in input:
-       if isinstance(item[0], list):
-           sorted = sortList(item)
-           if not sorted in retVal:
-               retVal.append(sorted)
-       else:
-           count = 0
-           if item in retVal:
-               continue
-           for iter in retVal:
-               if item[0] < iter[0]:
-                   retVal.insert(count, item)
-                   break
-               elif (item[0] == iter[0]) and \
-                    (item[1] < iter[1]):
-                   retVal.insert(count, item)
-                   break
-               elif (item[0] == iter[0]) and \
-                    (item[1] == iter[1]) and \
-                    (item[2] < iter[2]):
-                   retVal.insert(count, item)
-                   break
-               elif (item[0] == iter[0]) and \
-                    (item[1] == iter[1]) and \
-                    (item[2] == iter[2]):
-                   break
-               count += 1
-           if count >= len(retVal):
-               retVal.append(item)
-
-    return retVal
-
-def mergeResults(original, new):
-    """
-        Given two Results Dictionaries, merge together to a unified dict.
-
-        TODO: there has to be a built in function for this.
-        TODO: do we have duplicates here?
-    """
-    if new == {}:
-        retVal = {}
-    else:
-        retVal = copy.deepcopy(new)
-
-    for item in original:
-        if item in retVal:
-            for tuple in original[item]:
-                if tuple not in retVal[item]:
-                    retVal[item].append(tuple)
-        else:
-            retVal[item] = original[item]
-
-    return retVal
+import os
+import MySQLdb
+import sys
+from argparse import ArgumentParser
 
 def getRawData(jobtype):
-    """
-        This pulls a query from the database and builds up our data dict
-        in this format:
-           Key: unique bugid (revision of bad change)
-           Value: tuple (platform, buildtype, testtype) that is related to key
-
-        We build this up for all platforms that we care about.
-
-        Inputs:
-            jobtype: key for the regression column in the db: -2, -1, 1
-
-    """
-    platforms, buildtypes, testtypes = getDistinctTuples(jobtype)
-
-    # TODO: these dates are hardcoded to 60 days
-    old = datetime.date.today() - datetime.timedelta(days=60)
-    now = datetime.datetime.today()
-    startDate = '%s-%02d-%02d' % (old.year, old.month, old.day)
-    endDate = '%s-%02d-%02d' % (now.year, now.month, now.day)
-
     conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/seta/?jobtype=%s&startDate=%s&endDate=%s" % (jobtype, startDate, endDate)
-    p = '&platform='.join(platforms)
-    b = '&build='.join(buildtypes)
-    t = '&test='.join(testtypes)
-    if p:
-        cset += "&platform=" + p
-    if b:
-        cset += "&build=" + b
-    if t:
-        cset += "&test=" + t
-
-    print cset
+    cset = "/data/seta/"
     conn.request("GET", cset)
     response = conn.getresponse()
 
     data = response.read()
     response.close()
     cdata = json.loads(data)
-
-    print json.dumps(cdata)
     return cdata['failures']
 
-
 def getDistinctTuples(jobtype):
-#    platforms = ['linux32','linux64','winxp','win7','osx10.6']
-    platforms = ['linux32','linux64']
-    testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5']
-    testtypes = ['mochitest-1']
-    buildtypes = ['opt', 'debug']
+    platforms = ['osx10.6', 'winxp', 'osx10.8', 'win7','linux32','linux64']
+    testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 
+                 'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-ipc', 'crashtest-ipc',
+                 'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3',
+                 'mochitest-devtools-chrome-1', 'mochitest-devtools-chrome-2', 'mochitest-devtools-chrome-3', 'mochitest-devtools-chrome']
+    buildtypes = ['debug', 'opt']
 
     return platforms, buildtypes, testtypes
-    
-def buildMasterScenarioList(jobtype):
-    retVal = []
-    platforms, buildtypes, testtypes = getDistinctTuples(jobtype)
 
-    for p in platforms:
-        for b in buildtypes:
-            for t in testtypes:
-                retVal.append([[p, b, t]])
+def is_matched(f, removals):
+    found = False
+    for tuple in removals:
+        matched = 0
+        if f[2] == tuple[2]:
+            matched +=1
+        elif tuple[2] == '':
+            matched +=1
+
+        if f[1] == tuple[1]:
+            matched +=1
+        elif tuple[1] == '':
+            matched +=1
+
+        if f[0] == tuple[0]:
+            matched +=1
+        elif tuple[0] == '':
+            matched +=1
+
+        if matched == 3:
+            found = True
+            break
+
+    return found
+
+def check_removal(master, removals):
+    results = {}
+    total_time = 0.0
+    saved_time = 0.0
+    for failure in master:
+        results[failure] = []
+        for f in master[failure]:
+            total_time += f[3]
+            found = is_matched(f, removals)
+
+            # we will add the test to the resulting structure unless we find a match in the tuple we are trying to ignore.
+            if found:
+                saved_time += f[3]
+            else:
+                results[failure].append(f)
+
+        if len(results[failure]) == 0:
+            del results[failure]
+
+    return results, total_time, saved_time
+
+def remove_bad_combos(master, scenarios, target):
+    retVal = []
+    temp = []
+    for item in scenarios:
+        temp.append(item)
+        if len(check_removal(master, temp)[0]) >= target:
+            retVal.append(item)
+        else:
+            temp.remove(item)
 
     return retVal
 
-def findPercentage(jobtype):
+
+def format_in_table(platforms, buildtypes, testtypes, master):
+    results = {}
+    sum_removed = 0
+    sum_remaining = 0
+
+    for platform in platforms:
+        for buildtype in buildtypes:
+            key = "%s_%s" % (platform, buildtype)
+            if key not in results:
+                results[key] = []
+
+            for item in master:
+                if item[0] == platform and item[1] == buildtype:
+                    results[key].append(item[2])
+
+    tbplnames = {'mochitest-1': 'm1',
+                 'mochitest-2': 'm2',
+                 'mochitest-3': 'm3',
+                 'mochitest-4': 'm4',
+                 'mochitest-5': 'm5',
+                 'mochitest-other': 'mOth',
+                 'xpcshell': 'X',
+                 'crashtest': 'C',
+                 'jsreftest': 'J',
+                 'mochitest-browser-chrome-1': 'bc1',
+                 'mochitest-browser-chrome-2': 'bc2',
+                 'mochitest-browser-chrome-3': 'bc3',
+                 'mochitest-devtools-chrome-1': 'dt1',
+                 'mochitest-devtools-chrome-2': 'dt2',
+                 'mochitest-devtools-chrome-3': 'dt3',
+                 'mochitest-devtools-chrome': 'dt',
+                 'reftest-ipc': 'Ripc',
+                 'crashtest-ipc': 'Cipc',
+                 'reftest': 'R'}
+
+    keys = results.keys()
+    keys.sort()
+    for key in keys:
+        data = results[key]
+        data.sort()
+        output = ""
+        for test in testtypes:
+            output += '\t'
+            if test in data or '' in data:
+                output += tbplnames[test]
+                sum_removed += 1
+            else:
+                output += "--"
+                sum_remaining += 1
+
+        modifier = ""
+        if len(data) == len(testtypes):
+            modifier = "*"
+
+        print "%s%s%s" % (key, modifier, output)
+    print "Total removed %s" % (sum_removed)
+    print "Total remaining %s" % (sum_remaining)
+    print "Total jobs %s" % (sum_removed + sum_remaining)
+
+def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
+    retVal = []
+    for platform in platforms:
+        for buildtype in buildtypes:
+            if [platform, buildtype, ''] in to_remove:
+                retVal.append([platform, buildtype, ''])
+                continue
+
+            for test in testtypes:
+                tuple = [platform, buildtype, test]
+                remaining_failures, total_time, saved_time = check_removal(master, [tuple])
+                if len(remaining_failures) >= target:
+                    retVal.append(tuple)
+    return retVal
+
+def compare_array(master, slave, query):
+    retVal = []
+    for m in master:
+        found = False
+        for tup in slave:
+            if str(m) == str(tup):
+                found = True
+                break
+
+        if not found:
+            retVal.append(m)
+            run_query(query % m)
+    return retVal
+
+def depth_first(jobtype, target):
     failures = getRawData(jobtype)
     total = len(failures)
     print "working with %s failures" % total
+    platforms, buildtypes, testtypes = getDistinctTuples(jobtype)
 
-    scenarios = buildMasterScenarioList(jobtype)
+    target = int(total* (target / 100))
+    to_remove = []
 
-    depth_level = 2
-    depth = 0
-    results = {}
-    filtered_scenarios = [[]]
-    while depth < depth_level:
-        depth += 1
-        tempResults = {}
-        l2scenarios = copy.deepcopy(scenarios)
-        count = 0
-        for scenario in filtered_scenarios:
-            count += 1
-            temp = copy.deepcopy(failures)
-            if scenario == []:
-                filtered_scenarios = copy.deepcopy(scenarios)
-                l2scenarios = copy.deepcopy(scenarios)
+    # check large vectors first - entire platform/buildtypes
+    to_remove = build_removals(platforms, buildtypes, [''], failures, to_remove, target)
+    to_remove = remove_bad_combos(failures, to_remove, target)
 
-            add_to_scenario = []
-            for i in scenario:
-                temp, removed = removeType(temp, [i])
-                if [i] in l2scenarios:
-                    l2scenarios.remove([i])
-                    add_to_scenario.append([i])
+    # now do the remaining details
+    to_remove = build_removals(platforms, buildtypes, testtypes, failures, to_remove, target)
+    to_remove = remove_bad_combos(failures, to_remove, target)
 
-            tempResults = bruteForcePercentage(total, l2scenarios, temp, tempResults, scenario)
+    total_detected, total_time, saved_time = check_removal(failures, to_remove)
+    percent_detected = ((len(total_detected) / (total*1.0)) * 100)
 
-            l2scenarios.extend(add_to_scenario)
+    # we need to find new tests to disable and new tests to enable
+    now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+    run_query('delete from seta where date="%s"' % now)
+    for tuple in to_remove:
+        query = 'insert into seta (date, jobtype) values ("%s", ' % now
+        query += '"%s")' % tuple
+        run_query(query)
 
-        tempResults = removeBadScenarios(tempResults, 99)
-        filtered_scenarios = buildScenarios(tempResults)
-        results = tempResults
-        print "finished round %s with %s(%s) scenarios, %s" % (depth, len(l2scenarios), len(scenarios), len(filtered_scenarios))
-        
+    format_in_table(platforms, buildtypes, testtypes, to_remove)
+    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
 
-    print "\n\nsummary of choices:"
-    for index in sorted(results.iterkeys()):
-        l = sortList(results[index])
-        print "%s%% detection, %s choices- removing any of these configs:" % (index, len(l))
-        for i in l:
-            print "  * %s" % i
+def run_query(query):
+    db = MySQLdb.connect(host="localhost",
+                         user="root",
+                         passwd="root",
+                         db="ouija")
+
+    cur = db.cursor()
+    cur.execute(query)
+
+    results = []
+    # each row is in ('val',) format, we want 'val'
+    for rows in cur.fetchall():
+        results.append(rows[0])
+
+    cur.close()
+    return results
+
+def check_data(query_date):
+    data = run_query('select jobtype from seta where date="%s"' % query_date)
+    if not data:
+        print "The database does not have data for the given %s date." % query_date
+        for date in range(-3, 4):
+            current_date = query_date + datetime.timedelta(date)
+            tuple = run_query('select jobtype from seta where date="%s"' % current_date)
+            if tuple:
+                print "The data is available for date=%s" % current_date
+        return None
+    return data
+
+def print_diff(options):
+    options.end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
+    options.start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
+    start_tuple = check_data(options.start_date)
+    end_tuple = check_data(options.end_date)
+
+    if start_tuple is None or end_tuple is None:
+        return
+    else:
+        print "The tuples present on %s and not present on %s: " % (options.end_date, options.start_date)
+        result = list(set(start_tuple) - set(end_tuple))
+        if len(result) > 20:
+            print "Warning: Too many differences detected, most likely there is data missing or incorrect"
+        else:
+            print result
+
+        print "The tuples not present on %s and present on %s: " % (options.end_date, options.start_date)
+        result = list(set(end_tuple) - set(start_tuple))
+        if len(result) > 20:
+            print "Warning: Too many differences detected, most likely there is data missing or incorrect"
+        else:
+            print result
+
+def parse_args(argv=None):
+    parser = ArgumentParser()
+    parser.add_argument("-s", "--startdate",
+                        metavar="YYYY-MM-DD",
+                        dest="start_date",
+                        help="starting date for comparison."
+                        )
+
+    parser.add_argument("-e", "--enddate",
+                        metavar="YYYY-MM-DD",
+                        dest="end_date",
+                        help="ending date for comparison."
+                        )
+
+    options = parser.parse_args(argv)
+    return options
 
 if __name__ == "__main__":
-    jobtype = 1 # code for build job type
-    findPercentage(jobtype)
+    options = parse_args()
+    if options.start_date and options.end_date:
+        print_diff(options)
+    else:
+        jobtype = 1 # code for test job type
+        targets = [100.0]
+        for target in targets:
+            depth_first(jobtype, target)
 
