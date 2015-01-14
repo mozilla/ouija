@@ -215,7 +215,14 @@ def sanity_check(jobtype, target):
 
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
     yesterday = yesterday.strftime('%Y-%m-%d 00:00:00')
-    to_remove = run_query('select jobtype from seta where date="%s"' % yesterday)
+    output_list = run_query('select jobtype from seta where date="%s"' % yesterday)
+
+    # to convert a list of strings to a list of lists
+    to_remove = []
+    for element in output_list:
+        parts = element.split("'")
+        to_remove.append([parts[1], parts[3], parts[5]])
+
     total_detected, total_time, saved_time = check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (total*1.0)) * 100)
 
