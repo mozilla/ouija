@@ -196,7 +196,12 @@ def depth_first(jobtype, target):
     total_detected, total_time, saved_time = check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (total*1.0)) * 100)
 
-    # we need to find new tests to disable and new tests to enable
+    insert_in_database(to_remove)
+
+    format_in_table(platforms, buildtypes, testtypes, to_remove)
+    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
+
+def insert_in_database(to_remove):
     now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
     run_query('delete from seta where date="%s"' % now)
     for tuple in to_remove:
@@ -204,8 +209,28 @@ def depth_first(jobtype, target):
         query += '"%s")' % tuple
         run_query(query)
 
-    format_in_table(platforms, buildtypes, testtypes, to_remove)
-    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
+def sanity_check(jobtype, target):
+    failures = getRawData(jobtype)
+    total = len(failures)
+
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    yesterday = yesterday.strftime('%Y-%m-%d 00:00:00')
+    output_list = run_query('select jobtype from seta where date="%s"' % yesterday)
+
+    # to convert a list of strings to a list of lists
+    to_remove = []
+    for element in output_list:
+        parts = element.split("'")
+        to_remove.append([parts[1], parts[3], parts[5]])
+
+    total_detected, total_time, saved_time = check_removal(failures, to_remove)
+    percent_detected = ((len(total_detected) / (total*1.0)) * 100)
+
+    if percent_detected >= target:
+        insert_in_database(to_remove)
+        return 0
+    else:
+        return -1
 
 def run_query(query):
     db = MySQLdb.connect(host="localhost",
@@ -273,6 +298,13 @@ def parse_args(argv=None):
                         help="ending date for comparison."
                         )
 
+    parser.add_argument("--quick",
+                        action="store_true",
+                        dest="quick",
+                        help="quick sanity check to compare previous day entries \
+                              and see if still valid."
+                        )
+
     options = parser.parse_args(argv)
     return options
 
@@ -284,5 +316,9 @@ if __name__ == "__main__":
         jobtype = 1 # code for test job type
         targets = [100.0]
         for target in targets:
+            if options.quick:
+                result = sanity_check(jobtype, target)
+                if result == 0:
+                    continue
             depth_first(jobtype, target)
 
