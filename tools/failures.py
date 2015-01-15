@@ -7,6 +7,7 @@ import os
 import MySQLdb
 import sys
 from argparse import ArgumentParser
+from emails import send_email
 
 def getRawData(jobtype):
     conn = httplib.HTTPConnection('alertmanager.allizom.org')
@@ -200,6 +201,13 @@ def depth_first(jobtype, target):
 
     format_in_table(platforms, buildtypes, testtypes, to_remove)
     print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
+    now = datetime.datetime.now()
+    addition, deletion = print_diff(now, now - datetime.timedelta(days=1))
+    total_changes = len(addition) + len(deletion)
+    if total_changes == 0:
+        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=True)
+    else:
+        send_email(len(failure), len(to_remove), total_changes+" changes from previous day", addition, deletion, admin=True, results=True)
 
 def insert_in_database(to_remove):
     now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
@@ -228,6 +236,7 @@ def sanity_check(jobtype, target):
 
     if percent_detected >= target:
         insert_in_database(to_remove)
+        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True)
         return 0
     else:
         return -1
@@ -261,28 +270,30 @@ def check_data(query_date):
         return None
     return data
 
-def print_diff(options):
-    options.end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
-    options.start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
-    start_tuple = check_data(options.start_date)
-    end_tuple = check_data(options.end_date)
+def print_diff(start_date, end_date):
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    start_tuple = check_data(start_date)
+    end_tuple = check_data(end_date)
 
     if start_tuple is None or end_tuple is None:
         return
     else:
-        print "The tuples present on %s and not present on %s: " % (options.end_date, options.start_date)
-        result = list(set(start_tuple) - set(end_tuple))
-        if len(result) > 20:
+        print "The tuples present on %s and not present on %s: " % (end_date, start_date)
+        addition = list(set(end_tuple) - set(start_tuple))
+        if len(addition) > 20:
             print "Warning: Too many differences detected, most likely there is data missing or incorrect"
         else:
-            print result
+            print addition
 
-        print "The tuples not present on %s and present on %s: " % (options.end_date, options.start_date)
-        result = list(set(end_tuple) - set(start_tuple))
-        if len(result) > 20:
+        print "The tuples not present on %s and present on %s: " % (end_date, start_date)
+        deletion = list(set(start_tuple) - set(end_tuple))
+        if len(deletion) > 20:
             print "Warning: Too many differences detected, most likely there is data missing or incorrect"
         else:
-            print result
+            print deletion
+
+        return (addition, deletion)
 
 def parse_args(argv=None):
     parser = ArgumentParser()
@@ -311,7 +322,7 @@ def parse_args(argv=None):
 if __name__ == "__main__":
     options = parse_args()
     if options.start_date and options.end_date:
-        print_diff(options)
+        print_diff(options.start_date, options.end_date)
     else:
         jobtype = 1 # code for test job type
         targets = [100.0]
