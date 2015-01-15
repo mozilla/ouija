@@ -1,5 +1,7 @@
 import smtplib
 import json
+import datetime
+import os
 from email.mime.text import MIMEText
 
 def send_email(regression, jobs, message, addition=None, deletion=None, admin=False, results=False):
@@ -13,10 +15,10 @@ def send_email(regression, jobs, message, addition=None, deletion=None, admin=Fa
         message += "\nThe jobs deleted from the current day compared to previous day are: ", deletion
 
     msg = MIMEText(message)
-    msg['Subject'] = "SETA Results"
+    msg['Subject'] = "SETA Results - Date %s" % datetime.datetime.now().strftime("%Y-%m-%d")
     msg['From'] = "setamozilla@gmail.com"
 
-    json_data = open("seta.cfg", "r").read()
+    json_data = open(os.path.join(os.path.abspath(os.path.realpath(os.path.dirname(__file__))), "seta.cfg"), "r").read()
     data = json.loads(json_data)
     if admin:
         server.sendmail(msg['From'], data['admins'], msg.as_string())
