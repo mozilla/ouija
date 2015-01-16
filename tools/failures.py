@@ -177,7 +177,7 @@ def compare_array(master, slave, query):
             run_query(query % m)
     return retVal
 
-def depth_first(jobtype, target):
+def depth_first(jobtype, target, options):
     failures = getRawData(jobtype)
     total = len(failures)
     print "working with %s failures" % total
@@ -197,17 +197,20 @@ def depth_first(jobtype, target):
     total_detected, total_time, saved_time = check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (total*1.0)) * 100)
 
-    insert_in_database(to_remove)
-
     format_in_table(platforms, buildtypes, testtypes, to_remove)
     print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
-    now = datetime.datetime.now()
-    addition, deletion = print_diff(now, now - datetime.timedelta(days=1))
+
+    if options.testmode:
+        return
+
+    insert_in_database(to_remove)
+    now = datetime.date.today()
+    addition, deletion = print_diff(str(now - datetime.timedelta(days=1)), str(now))
     total_changes = len(addition) + len(deletion)
     if total_changes == 0:
         send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=True)
     else:
-        send_email(len(failure), len(to_remove), total_changes+" changes from previous day", addition, deletion, admin=True, results=True)
+        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", addition, deletion, admin=True, results=True)
 
 def insert_in_database(to_remove):
     now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
@@ -217,7 +220,7 @@ def insert_in_database(to_remove):
         query += '"%s")' % tuple
         run_query(query)
 
-def sanity_check(jobtype, target):
+def sanity_check(jobtype, target, options):
     failures = getRawData(jobtype)
     total = len(failures)
 
@@ -235,6 +238,9 @@ def sanity_check(jobtype, target):
     percent_detected = ((len(total_detected) / (total*1.0)) * 100)
 
     if percent_detected >= target:
+        print "No changes found from previous day"
+        if options.testmode:
+            return
         insert_in_database(to_remove)
         send_email(len(failures), len(to_remove), "no changes from previous day", admin=True)
         return 0
@@ -316,6 +322,13 @@ def parse_args(argv=None):
                               and see if still valid."
                         )
 
+    parser.add_argument("--testmode",
+                        action="store_true",
+                        dest="testmode",
+                        help="This mode is for testing without interaction with \
+                              database and emails."
+                        )
+
     options = parser.parse_args(argv)
     return options
 
@@ -328,8 +341,8 @@ if __name__ == "__main__":
         targets = [100.0]
         for target in targets:
             if options.quick:
-                result = sanity_check(jobtype, target)
+                result = sanity_check(jobtype, target, options)
                 if result == 0:
                     continue
-            depth_first(jobtype, target)
+            depth_first(jobtype, target, options)
 
