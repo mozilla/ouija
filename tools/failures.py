@@ -9,9 +9,11 @@ import sys
 from argparse import ArgumentParser
 from emails import send_email
 
-def getRawData(jobtype):
+import seta
+
+def getRawData():
     conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/seta/"
+    cset = "/data/seta/?startDate=2014-10-16&endDate=2015-01-16"
     conn.request("GET", cset)
     response = conn.getresponse()
 
@@ -20,73 +22,24 @@ def getRawData(jobtype):
     cdata = json.loads(data)
     return cdata['failures']
 
-def getDistinctTuples(jobtype):
-    platforms = ['osx10.6', 'winxp', 'osx10.8', 'win7','linux32','linux64']
-    testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 
-                 'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-ipc', 'crashtest-ipc',
-                 'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3',
-                 'mochitest-devtools-chrome-1', 'mochitest-devtools-chrome-2', 'mochitest-devtools-chrome-3', 'mochitest-devtools-chrome']
-    buildtypes = ['debug', 'opt']
+def communicate(failures, to_remove, total_detected, testmode, results=True):
+    if results:
+        platforms, buildtypes, testtypes = seta.getDistinctTuples()
+        format_in_table(platforms, buildtypes, testtypes, to_remove)
+        percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
+        print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
 
-    return platforms, buildtypes, testtypes
+    if testmode:
+        return
 
-def is_matched(f, removals):
-    found = False
-    for tuple in removals:
-        matched = 0
-        if f[2] == tuple[2]:
-            matched +=1
-        elif tuple[2] == '':
-            matched +=1
-
-        if f[1] == tuple[1]:
-            matched +=1
-        elif tuple[1] == '':
-            matched +=1
-
-        if f[0] == tuple[0]:
-            matched +=1
-        elif tuple[0] == '':
-            matched +=1
-
-        if matched == 3:
-            found = True
-            break
-
-    return found
-
-def check_removal(master, removals):
-    results = {}
-    total_time = 0.0
-    saved_time = 0.0
-    for failure in master:
-        results[failure] = []
-        for f in master[failure]:
-            total_time += f[3]
-            found = is_matched(f, removals)
-
-            # we will add the test to the resulting structure unless we find a match in the tuple we are trying to ignore.
-            if found:
-                saved_time += f[3]
-            else:
-                results[failure].append(f)
-
-        if len(results[failure]) == 0:
-            del results[failure]
-
-    return results, total_time, saved_time
-
-def remove_bad_combos(master, scenarios, target):
-    retVal = []
-    temp = []
-    for item in scenarios:
-        temp.append(item)
-        if len(check_removal(master, temp)[0]) >= target:
-            retVal.append(item)
-        else:
-            temp.remove(item)
-
-    return retVal
+    insert_in_database(to_remove)
+    now = datetime.date.today()
+    addition, deletion = print_diff(str(now - datetime.timedelta(days=1)), str(now))
+    total_changes = len(addition) + len(deletion)
+    if total_changes == 0:
+        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=results)
+    else:
+        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", addition, deletion, admin=True, results=results)
 
 
 def format_in_table(platforms, buildtypes, testtypes, master):
@@ -148,70 +101,6 @@ def format_in_table(platforms, buildtypes, testtypes, master):
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
 
-def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
-    retVal = []
-    for platform in platforms:
-        for buildtype in buildtypes:
-            if [platform, buildtype, ''] in to_remove:
-                retVal.append([platform, buildtype, ''])
-                continue
-
-            for test in testtypes:
-                tuple = [platform, buildtype, test]
-                remaining_failures, total_time, saved_time = check_removal(master, [tuple])
-                if len(remaining_failures) >= target:
-                    retVal.append(tuple)
-    return retVal
-
-def compare_array(master, slave, query):
-    retVal = []
-    for m in master:
-        found = False
-        for tup in slave:
-            if str(m) == str(tup):
-                found = True
-                break
-
-        if not found:
-            retVal.append(m)
-            run_query(query % m)
-    return retVal
-
-def depth_first(jobtype, target, options):
-    failures = getRawData(jobtype)
-    total = len(failures)
-    print "working with %s failures" % total
-    platforms, buildtypes, testtypes = getDistinctTuples(jobtype)
-
-    target = int(total* (target / 100))
-    to_remove = []
-
-    # check large vectors first - entire platform/buildtypes
-    to_remove = build_removals(platforms, buildtypes, [''], failures, to_remove, target)
-    to_remove = remove_bad_combos(failures, to_remove, target)
-
-    # now do the remaining details
-    to_remove = build_removals(platforms, buildtypes, testtypes, failures, to_remove, target)
-    to_remove = remove_bad_combos(failures, to_remove, target)
-
-    total_detected, total_time, saved_time = check_removal(failures, to_remove)
-    percent_detected = ((len(total_detected) / (total*1.0)) * 100)
-
-    format_in_table(platforms, buildtypes, testtypes, to_remove)
-    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), total)
-
-    if options.testmode:
-        return
-
-    insert_in_database(to_remove)
-    now = datetime.date.today()
-    addition, deletion = print_diff(str(now - datetime.timedelta(days=1)), str(now))
-    total_changes = len(addition) + len(deletion)
-    if total_changes == 0:
-        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=True)
-    else:
-        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", addition, deletion, admin=True, results=True)
-
 def insert_in_database(to_remove):
     now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
     run_query('delete from seta where date="%s"' % now)
@@ -220,8 +109,7 @@ def insert_in_database(to_remove):
         query += '"%s")' % tuple
         run_query(query)
 
-def sanity_check(jobtype, target, options):
-    failures = getRawData(jobtype)
+def sanity_check(failures, target):
     total = len(failures)
 
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
@@ -234,23 +122,18 @@ def sanity_check(jobtype, target, options):
         parts = element.split("'")
         to_remove.append([parts[1], parts[3], parts[5]])
 
-    total_detected, total_time, saved_time = check_removal(failures, to_remove)
-    percent_detected = ((len(total_detected) / (total*1.0)) * 100)
+    total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
 
     if percent_detected >= target:
         print "No changes found from previous day"
-        if options.testmode:
-            return
-        insert_in_database(to_remove)
-        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True)
-        return 0
+        return to_remove, percent_detected
     else:
-        return -1
+        return [], total_detected
 
 def run_query(query):
     db = MySQLdb.connect(host="localhost",
                          user="root",
-                         passwd="root",
+                         passwd="testing",
                          db="ouija")
 
     cur = db.cursor()
@@ -334,15 +217,20 @@ def parse_args(argv=None):
 
 if __name__ == "__main__":
     options = parse_args()
+
     if options.start_date and options.end_date:
         print_diff(options.start_date, options.end_date)
     else:
-        jobtype = 1 # code for test job type
+        failures = getRawData()
         targets = [100.0]
         for target in targets:
             if options.quick:
-                result = sanity_check(jobtype, target, options)
-                if result == 0:
+                to_remove, total_detected = sanity_check(failures, target)
+                if len(to_remove) > 0:
+                    communicate(failures, to_remove, total_detected, options.testmode, results=False)
                     continue
-            depth_first(jobtype, target, options)
+
+            # no quick option, or quick failed due to new failures detected
+            to_remove, total_detected = seta.depth_first(failures, target)
+            communicate(failures, to_remove, total_detected, options.testmode)
 
