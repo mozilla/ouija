@@ -11,8 +11,8 @@ def send_email(regression, jobs, message, addition=None, deletion=None, admin=Fa
 
     message = "We analyzed %s regressions and found %s jobs to disable - " % (regression, jobs) + message
     if addition and deletion:
-        message += "\nThe jobs added to the current day compared to previous day are: ", addition
-        message += "\nThe jobs deleted from the current day compared to previous day are: ", deletion
+        message += "\nThe jobs added to the current day compared to previous day are:\n\n %s" % addition
+        message += "\n\nThe jobs deleted from the current day compared to previous day are:\n\n %s" % deletion
 
     msg = MIMEText(message)
     msg['Subject'] = "SETA Results - Date %s" % datetime.datetime.now().strftime("%Y-%m-%d")
