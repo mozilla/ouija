@@ -59,7 +59,7 @@ def get_date_range(dates):
                 'endDate': max(dates).strftime('%Y-%m-%d %H:%M')}
 
 
-def clean_date_params(query_dict):
+def clean_date_params(query_dict, delta=7):
     """Parse request date params"""
     now = datetime.now()
 
@@ -69,7 +69,7 @@ def clean_date_params(query_dict):
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
-    start_date = parse_date(start_date_param) or end_date - timedelta(days=7)
+    start_date = parse_date(start_date_param) or end_date - timedelta(days=delta)
 
     # validate dates
     if start_date > now or start_date.date() >= end_date.date():
@@ -354,9 +354,11 @@ def run_platform_query():
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
+    start_date, end_date = clean_date_params(request.args, delta=180)
+
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2"
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
