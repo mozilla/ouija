@@ -13,7 +13,7 @@ import seta
 
 def getRawData():
     conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/seta/?startDate=2014-10-16&endDate=2015-01-16"
+    cset = "/data/seta/"
     conn.request("GET", cset)
     response = conn.getresponse()
 
@@ -133,7 +133,7 @@ def sanity_check(failures, target):
 def run_query(query):
     db = MySQLdb.connect(host="localhost",
                          user="root",
-                         passwd="testing",
+                         passwd="root",
                          db="ouija")
 
     cur = db.cursor()
