@@ -21,7 +21,7 @@ def getRawData(jobtype):
     return cdata['failures']
 
 def getDistinctTuples(jobtype):
-    platforms = ['osx10.6', 'winxp', 'osx10.8', 'win7','linux32','linux64']
+    platforms = ['osx-10-6', 'osx-10-8', 'windows7-32', 'windowsxp', 'windows8-64', 'linux32','linux64']
     testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 
                  'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-ipc', 'crashtest-ipc',
                  'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3',
