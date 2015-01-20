@@ -365,6 +365,43 @@ def run_seta_query():
     return {'failures': failures}
 
 
+@app.route("/data/setasummary/")
+@json_response
+def run_seta_summary_query():
+    db = create_db_connnection()
+    cursor = db.cursor()
+    query = "select distinct date from seta"
+    cursor.execute(query)
+    retVal = {}
+    dates = []
+    for d in cursor.fetchall():
+        dates.append(d[0])
+
+    for d in dates:
+        query = "select count(id) from seta where date='%s'" % d
+        cursor.execute(query)
+        results = cursor.fetchall()
+        retVal['%s' % d] = "%s" % results[0]
+
+    return {'dates': retVal}
+
+
+@app.route("/data/setadetails/")
+@json_response
+def run_seta_details_query():
+    date = request.args.get("date")
+    db = create_db_connnection()
+    cursor = db.cursor()
+    query = "select jobtype from seta where date='%s'" % date
+    cursor.execute(query)
+    retVal = {}
+    retVal[date] = []
+    for d in cursor.fetchall():
+        retVal[date].append("%s" % d[0])
+
+    return {'jobtypes': retVal}
+
+
 @app.errorhandler(404)
 @json_response
 def handler404(error):
