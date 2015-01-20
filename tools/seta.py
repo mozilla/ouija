@@ -10,21 +10,21 @@ def getDistinctTuples():
 
 def is_matched(f, removals):
     found = False
-    for tuple in removals:
+    for jobtype in removals:
         matched = 0
-        if f[2] == tuple[2]:
+        if f[2] == jobtype[2]:
             matched +=1
-        elif tuple[2] == '':
-            matched +=1
-
-        if f[1] == tuple[1]:
-            matched +=1
-        elif tuple[1] == '':
+        elif jobtype[2] == '':
             matched +=1
 
-        if f[0] == tuple[0]:
+        if f[1] == jobtype[1]:
             matched +=1
-        elif tuple[0] == '':
+        elif jobtype[1] == '':
+            matched +=1
+
+        if f[0] == jobtype[0]:
+            matched +=1
+        elif jobtype[0] == '':
             matched +=1
 
         if matched == 3:
@@ -43,7 +43,7 @@ def check_removal(master, removals):
             total_time += f[3]
             found = is_matched(f, removals)
 
-            # we will add the test to the resulting structure unless we find a match in the tuple we are trying to ignore.
+            # we will add the test to the resulting structure unless we find a match in the jobtype we are trying to ignore.
             if found:
                 saved_time += f[3]
             else:
@@ -75,10 +75,10 @@ def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
                 continue
 
             for test in testtypes:
-                tuple = [platform, buildtype, test]
-                remaining_failures, total_time, saved_time = check_removal(master, [tuple])
+                jobtype = [platform, buildtype, test]
+                remaining_failures, total_time, saved_time = check_removal(master, [jobtype])
                 if len(remaining_failures) >= target:
-                    retVal.append(tuple)
+                    retVal.append(jobtype)
     return retVal
 
 def compare_array(master, slave, query):
