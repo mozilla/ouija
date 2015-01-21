@@ -70,8 +70,7 @@ $(function() {
       }
     }
 
-//    var oslist = ['linux32', 'linux64', 'osx10.6', 'osx10.8', 'winxp', 'win7', 'win8'];
-    var oslist = ['linux32', 'linux64', 'osx10.6', 'osx10.8', 'winxp', 'win7'];
+    var oslist = ['linux32', 'linux64', 'osx-10-6', 'osx-10-8', 'windowsxp', 'windows7-32', 'windows8-64'];
     var buildtypes = ['opt', 'debug'];
     var tests = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3', 'mochitest-other', 'xpcshell', 'crashtest', 'crashtest-ipc', 'reftest', 'jsreftest'];
     var mytable = $('<table></table>').attr({id:'seta'});
@@ -82,7 +81,7 @@ $(function() {
         $('<td></td>').text(key).appendTo(row); 
         for (var t in tests) {
           if (os[key] === undefined) {
-continue;
+            continue;
           }
           var pname = printName(tests[t]);
           if (os[key].indexOf(tests[t]) >= 0) {
