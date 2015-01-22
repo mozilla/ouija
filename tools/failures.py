@@ -26,8 +26,8 @@ def communicate(failures, to_remove, total_detected, testmode, results=True):
     if results:
         platforms, buildtypes, testtypes = seta.getDistinctTuples()
         format_in_table(platforms, buildtypes, testtypes, to_remove)
-        percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
-        print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
+        percent_detected = (total_detected / (len(failures)*1.0) * 100)
+        print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, total_detected, len(failures))
 
     if testmode:
         return
@@ -47,6 +47,24 @@ def format_in_table(platforms, buildtypes, testtypes, master):
     sum_removed = 0
     sum_remaining = 0
 
+    for platform in platforms:
+        for buildtype in buildtypes:
+            if buildtype == 'asan' and platform != 'linux64':
+                continue
+
+            key = "%s_%s" % (platform, buildtype)
+            if key not in results:
+                results[key] = []
+
+            for item in master:
+                if item[0] == platform and item[1] == buildtype:
+                    results[key].append(item[2])
+
+    """
+      NOTE This misses:
+        web-platform-tests do not run on osx*
+        Ru runs on win8, win7
+    """
     tbplnames = {'mochitest-1': {'group': 'M', 'code': '1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
                  'mochitest-2': {'group': 'M', 'code': '2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
                  'mochitest-3': {'group': 'M', 'code': '3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
@@ -90,39 +108,70 @@ def format_in_table(platforms, buildtypes, testtypes, master):
                  'web-platform-tests-reftests': {'group': 'W', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
                  'reftest': {'group': 'R', 'code': 'R', 'debug': True, 'opt': True, 'linux32': False, 'linux64': True, 'default': True}}
 
-    for platform in platforms:
-        for buildtype in buildtypes:
-            if buildtype == 'asan' and platform != 'linux64':
-                continue
-
-            key = "%s_%s" % (platform, buildtype)
-            if key not in results:
-                results[key] = []
-
-            for item in master:
-                if item[0] == platform and item[1] == buildtype:
-                    results[key].append(item[2])
-
     keys = results.keys()
     keys.sort()
     for key in keys:
+        groups = {}
+        for testtype in tbplnames:
+            details = tbplnames[testtype]
+            if not details['group'] in groups.keys():
+                groups[details['group']] = {}
+            groups[details['group']][details['code']] = None
+
         data = results[key]
         data.sort()
         output = ""
         for test in testtypes:
-            output += '\t'
             if test in data or '' in data:
-                output += tbplnames[test]['code']
+                info = tbplnames[test]
+                if not info['debug'] and key.endswith('debug'):
+                    continue
+                if not info['opt'] and key.endswith('opt'):
+                    continue
+   
+                if key.startswith('linux32'):
+                    if not info['linux32']:
+                        continue
+                elif key.startswith('linux64'):
+                    if not info['linux64']:
+                        continue
+                elif not info['default']:
+                    continue
+
+                groups[info['group']][info['code']] = True
                 sum_removed += 1
             else:
-                output += "--"
+                info = tbplnames[test]
+                groups[info['group']][info['code']] = False
                 sum_remaining += 1
+
+        output = ""
+        for group in groups:
+            group_output = "%s(" % group
+            count = 0
+            group_keys = groups[group].keys()
+            group_keys.sort()
+            for item in group_keys:
+                if count > 0:
+                    group_output += " "
+
+                if groups[group][item] == True:
+                    group_output += "%s" % item
+                    count += 1
+                elif groups[group][item] == False:
+                    group_output += "%s" % ('-'*len(item))
+                    count += 1
+                # else == None, then we have it disabled
+
+            group_output += ")\t"
+            if count > 0:
+                output += group_output
 
         modifier = ""
         if len(data) == len(testtypes):
             modifier = "*"
 
-        print "%s%s%s" % (key, modifier, output)
+        print "%s%s\t%s" % (key, modifier, output)
     print "Total removed %s" % (sum_removed)
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
@@ -149,7 +198,6 @@ def sanity_check(failures, target):
         to_remove.append([parts[1], parts[3], parts[5]])
 
     total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
-    percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
 
     if percent_detected >= target:
         print "No changes found from previous day"
@@ -258,6 +306,12 @@ if __name__ == "__main__":
                     continue
 
             # no quick option, or quick failed due to new failures detected
-            to_remove, total_detected = seta.depth_first(failures, target)
+            if os.path.exists('to_remove.json'):
+                with open("to_remove.json", 'r') as fHandle:
+                    data = json.load(fHandle)
+                to_remove = data['jobtypes']
+                total_detected = target
+            else:
+                to_remove, total_detected = seta.depth_first(failures, target)
             communicate(failures, to_remove, total_detected, options.testmode)
 
