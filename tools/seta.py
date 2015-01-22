@@ -1,10 +1,13 @@
 def getDistinctTuples():
     platforms = ['osx10.6', 'winxp', 'osx10.8', 'win7','linux32','linux64']
     testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 
-                 'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-ipc', 'crashtest-ipc',
+                 'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-1', 'reftest-2',
+                 'reftest-e10s', 'crashtest-e10s', 'jittest', 'marionette', 'mochitest-gl', 'cppunit', 'reftest-no-accel',
+                 'web-platform-tests-1', 'web-platform-tests-2', 'web-platform-tests-3', 'web-platform-tests-4', 'web-platform-tests-reftests',
+                 'mochitest-e10s-browser-chrome-1', 'mochitest-e10s-browser-chrome-2', 'mochitest-e10s-browser-chrome-3',
                  'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3',
                  'mochitest-devtools-chrome-1', 'mochitest-devtools-chrome-2', 'mochitest-devtools-chrome-3', 'mochitest-devtools-chrome']
-    buildtypes = ['debug', 'opt']
+    buildtypes = ['debug', 'opt', 'asan']
 
     return platforms, buildtypes, testtypes
 
@@ -70,6 +73,9 @@ def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
     retVal = []
     for platform in platforms:
         for buildtype in buildtypes:
+            if buildtype == 'asan' and platform != 'linux64':
+                continue
+
             if [platform, buildtype, ''] in to_remove:
                 retVal.append([platform, buildtype, ''])
                 continue
