@@ -47,8 +47,54 @@ def format_in_table(platforms, buildtypes, testtypes, master):
     sum_removed = 0
     sum_remaining = 0
 
+    tbplnames = {'mochitest-1': {'group': 'M', 'code': '1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-2': {'group': 'M', 'code': '2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-3': {'group': 'M', 'code': '3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-4': {'group': 'M', 'code': '4', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-5': {'group': 'M', 'code': '5', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-other': {'group': 'M', 'code': 'Oth', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-browser-chrome-1': {'group': 'M', 'code': 'bc1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-browser-chrome-2': {'group': 'M', 'code': 'bc2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-browser-chrome-3': {'group': 'M', 'code': 'bc3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-devtools-chrome-1': {'group': 'M', 'code': 'dt1', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-devtools-chrome-2': {'group': 'M', 'code': 'dt2', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-devtools-chrome-3': {'group': 'M', 'code': 'dt3', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-devtools-chrome': {'group': 'M', 'code': 'dt', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-gl': {'group': 'M', 'code': 'gl', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-e10s-1': {'group': 'M-e10s', 'code': '1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'mochitest-e10s-2': {'group': 'M-e10s', 'code': '2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'mochitest-e10s-3': {'group': 'M-e10s', 'code': '3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'mochitest-e10s-4': {'group': 'M-e10s', 'code': '4', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'mochitest-e10s-5': {'group': 'M-e10s', 'code': '5', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'mochitest-e10s-browser-chrome-1': {'group': 'M-e10s', 'code': 'bc1', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-e10s-browser-chrome-2': {'group': 'M-e10s', 'code': 'bc2', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-e10s-browser-chrome-3': {'group': 'M-e10s', 'code': 'bc3', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'mochitest-e10s-devtools': {'group': 'M-e10s', 'code': 'dt', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'xpcshell': {'group': '', 'code': 'X', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'crashtest': {'group': 'R', 'code': 'C', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'jsreftest': {'group': 'R', 'code': 'J', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'reftest-1': {'group': 'R', 'code': 'R1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
+                 'reftest-2': {'group': 'R', 'code': 'R2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
+                 'reftest-e10s': {'group': 'R-e10s', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'crashtest-e10s': {'group': 'R-e10s', 'code': 'C', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'jittest': {'group': '', 'code': 'Jit', 'debug': True, 'opt': True, 'linux32': False, 'linux64': False, 'default': True},
+                 'jittest-2': {'group': '', 'code': 'Jit2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'jittest-1': {'group': '', 'code': 'Jit1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
+                 'marionette': {'group': '', 'code': 'Mn', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'cppunit': {'group': '', 'code': 'Cpp', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'reftest-no-accel': {'group': '', 'code': 'Cpp', 'debug': False, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
+                 'web-platform-tests-1': {'group': 'W', 'code': '1', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'web-platform-tests-2': {'group': 'W', 'code': '2', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'web-platform-tests-3': {'group': 'W', 'code': '3', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'web-platform-tests-4': {'group': 'W', 'code': '4', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'web-platform-tests-reftests': {'group': 'W', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'reftest': {'group': 'R', 'code': 'R', 'debug': True, 'opt': True, 'linux32': False, 'linux64': True, 'default': True}}
+
     for platform in platforms:
         for buildtype in buildtypes:
+            if buildtype == 'asan' and platform != 'linux64':
+                continue
+
             key = "%s_%s" % (platform, buildtype)
             if key not in results:
                 results[key] = []
@@ -56,26 +102,6 @@ def format_in_table(platforms, buildtypes, testtypes, master):
             for item in master:
                 if item[0] == platform and item[1] == buildtype:
                     results[key].append(item[2])
-
-    tbplnames = {'mochitest-1': 'm1',
-                 'mochitest-2': 'm2',
-                 'mochitest-3': 'm3',
-                 'mochitest-4': 'm4',
-                 'mochitest-5': 'm5',
-                 'mochitest-other': 'mOth',
-                 'xpcshell': 'X',
-                 'crashtest': 'C',
-                 'jsreftest': 'J',
-                 'mochitest-browser-chrome-1': 'bc1',
-                 'mochitest-browser-chrome-2': 'bc2',
-                 'mochitest-browser-chrome-3': 'bc3',
-                 'mochitest-devtools-chrome-1': 'dt1',
-                 'mochitest-devtools-chrome-2': 'dt2',
-                 'mochitest-devtools-chrome-3': 'dt3',
-                 'mochitest-devtools-chrome': 'dt',
-                 'reftest-ipc': 'Ripc',
-                 'crashtest-ipc': 'Cipc',
-                 'reftest': 'R'}
 
     keys = results.keys()
     keys.sort()
@@ -86,7 +112,7 @@ def format_in_table(platforms, buildtypes, testtypes, master):
         for test in testtypes:
             output += '\t'
             if test in data or '' in data:
-                output += tbplnames[test]
+                output += tbplnames[test]['code']
                 sum_removed += 1
             else:
                 output += "--"
@@ -123,6 +149,7 @@ def sanity_check(failures, target):
         to_remove.append([parts[1], parts[3], parts[5]])
 
     total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
+    percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
 
     if percent_detected >= target:
         print "No changes found from previous day"
