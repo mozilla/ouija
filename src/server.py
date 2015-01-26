@@ -351,6 +351,70 @@ def run_platform_query():
             'dates': get_date_range(dates)}
 
 
+@app.route("/data/jobtypes/")
+@json_response
+def run_jobtypes_query():
+    db = create_db_connnection()
+    cursor = db.cursor()
+    query = "select platform, buildtype, testtype from uniquejobs"
+    cursor.execute(query)
+    jobtypes = []
+    for d in cursor.fetchall():
+        jobtypes.append([d[0], d[1], d[2]])
+
+    return {'jobtypes': jobtypes}
+
+
+@app.route("/data/create_jobtypes/")
+@json_response
+def run_create_jobtypes_query():
+    # skipping b2g*, android*, mulet*, osx-10-10
+    platforms = ['osx-10-6', 'osx-10-8', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
+
+    # skipping pgo - We run this infrequent enough that we should have all pgo results tested
+    buildtypes = ['debug', 'asan', 'opt']
+
+    now = datetime.now()
+    twoweeks = now - timedelta(days=14)
+    twoweeks = twoweeks.strftime('%Y-%m-%d')
+
+    jobtypes = []
+    db = create_db_connnection()
+    for platform in platforms:
+        for buildtype in buildtypes:
+            # ignore *build* types
+            query = "select distinct testtype from testjobs where date>'%s'" % (twoweeks)
+            query += " and platform='%s' and buildtype='%s' and testtype not like '%%build%%'" % (platform, buildtype)
+            cursor = db.cursor()
+            cursor.execute(query)
+            types = []
+            for testtype in cursor.fetchall():
+                testtype = testtype[0]
+                # ignore talos, builds, jetpack
+                if testtype in ['svgr', 'svgr-e10s', 'svgr-snow', 'svgr-snow-e10s',
+                                'other', 'other-e10s', 'other-snow', 'other-snow-e10s', 
+                                'chromez', 'chromez-e10s', 'chromez-snow', 'chromez-snow-e10s',
+                                'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
+                                'g1', 'g1-e10s', 'g1-snow', 'g1-snow-e10s', 
+                                'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
+                                'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack']:
+                    continue
+
+                if testtype:
+                    types.append(testtype)
+
+            types.sort()
+            for testtype in types:
+                jobtypes.append([platform, buildtype, testtype])
+
+    cursor.execute("delete from uniquejobs");
+    for j in jobtypes:
+        query = "insert into uniquejobs (platform, buildtype, testtype) values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
+        cursor.execute(query)
+
+    return {'status': 'ok'}
+
+
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
