@@ -87,20 +87,6 @@ def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
                     retVal.append(jobtype)
     return retVal
 
-def compare_array(master, slave, query):
-    retVal = []
-    for m in master:
-        found = False
-        for tup in slave:
-            if str(m) == str(tup):
-                found = True
-                break
-
-        if not found:
-            retVal.append(m)
-            run_query(query % m)
-    return retVal
-
 def depth_first(failures, target):
     total = len(failures)
     print "working with %s failures" % total
