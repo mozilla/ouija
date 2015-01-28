@@ -23,9 +23,10 @@ def getRawData():
     return cdata['failures']
 
 def communicate(failures, to_remove, total_detected, testmode, results=True):
+
     if results:
-        platforms, buildtypes, testtypes = seta.getDistinctTuples()
-        format_in_table(platforms, buildtypes, testtypes, to_remove)
+        active_jobs = seta.getDistinctTuples()
+        format_in_table(active_jobs, to_remove)
         percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
         print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
 
@@ -42,7 +43,7 @@ def communicate(failures, to_remove, total_detected, testmode, results=True):
         send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", addition, deletion, admin=True, results=results)
 
 
-def format_in_table(platforms, buildtypes, testtypes, master):
+def format_in_table(active_jobs, master):
     results = {}
     sum_removed = 0
     sum_remaining = 0
@@ -81,6 +82,7 @@ def format_in_table(platforms, buildtypes, testtypes, master):
                  'jittest-2': {'group': '', 'code': 'Jit2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
                  'jittest-1': {'group': '', 'code': 'Jit1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
                  'marionette': {'group': '', 'code': 'Mn', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
+                 'marionette-e10s': {'group': '', 'code': 'Mn-e10s', 'debug': False, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
                  'cppunit': {'group': '', 'code': 'Cpp', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
                  'reftest-no-accel': {'group': '', 'code': 'Cpp', 'debug': False, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
                  'web-platform-tests-1': {'group': 'W', 'code': '1', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
@@ -90,18 +92,14 @@ def format_in_table(platforms, buildtypes, testtypes, master):
                  'web-platform-tests-reftests': {'group': 'W', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
                  'reftest': {'group': 'R', 'code': 'R', 'debug': True, 'opt': True, 'linux32': False, 'linux64': True, 'default': True}}
 
-    for platform in platforms:
-        for buildtype in buildtypes:
-            if buildtype == 'asan' and platform != 'linux64':
-                continue
+    for jobtype in active_jobs:
+        key = "%s_%s" % (jobtype[0], jobtype[1])
+        if key not in results:
+            results[key] = []
 
-            key = "%s_%s" % (platform, buildtype)
-            if key not in results:
-                results[key] = []
-
-            for item in master:
-                if item[0] == platform and item[1] == buildtype:
-                    results[key].append(item[2])
+        for item in master:
+            if item[0] == jobtype[0] and item[1] == jobtype[1]:
+                results[key].append(item[2])
 
     keys = results.keys()
     keys.sort()
@@ -109,7 +107,10 @@ def format_in_table(platforms, buildtypes, testtypes, master):
         data = results[key]
         data.sort()
         output = ""
-        for test in testtypes:
+        for platform, buildtype, test in active_jobs:
+            if "%s_%s" % (platform, buildtype) != key:
+                continue
+
             output += '\t'
             if test in data or '' in data:
                 output += tbplnames[test]['code']
@@ -118,11 +119,7 @@ def format_in_table(platforms, buildtypes, testtypes, master):
                 output += "--"
                 sum_remaining += 1
 
-        modifier = ""
-        if len(data) == len(testtypes):
-            modifier = "*"
-
-        print "%s%s%s" % (key, modifier, output)
+        print "%s%s" % (key, output)
     print "Total removed %s" % (sum_removed)
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
@@ -139,14 +136,18 @@ def sanity_check(failures, target):
     total = len(failures)
 
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime('%Y-%m-%d 00:00:00')
-    output_list = run_query('select jobtype from seta where date="%s"' % yesterday)
+    yesterday = yesterday.strftime('%Y-%m-%d')
 
-    # to convert a list of strings to a list of lists
-    to_remove = []
-    for element in output_list:
-        parts = element.split("'")
-        to_remove.append([parts[1], parts[3], parts[5]])
+    conn = httplib.HTTPConnection('alertmanager.allizom.org')
+    cset = "/data/setadetails/?date=%s" % yesterday
+    conn.request("GET", cset)
+    response = conn.getresponse()
+
+    data = response.read()
+    response.close()
+    cdata = json.loads(data)
+    cdata = cdata['jobtypes']
+    to_remove = cdata[yesterday]
 
     total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
@@ -164,6 +165,7 @@ def run_query(query):
                          db="ouija")
 
     cur = db.cursor()
+    print query
     cur.execute(query)
 
     results = []

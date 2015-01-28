@@ -1,15 +1,16 @@
-def getDistinctTuples():
-    platforms = ['osx10.6', 'winxp', 'osx10.8', 'win7','linux32','linux64']
-    testtypes = ['mochitest-1', 'mochitest-2', 'mochitest-3', 'mochitest-4', 'mochitest-5', 
-                 'mochitest-other', 'reftest', 'xpcshell', 'crashtest', 'jsreftest', 'reftest-1', 'reftest-2',
-                 'reftest-e10s', 'crashtest-e10s', 'jittest', 'marionette', 'mochitest-gl', 'cppunit', 'reftest-no-accel',
-                 'web-platform-tests-1', 'web-platform-tests-2', 'web-platform-tests-3', 'web-platform-tests-4', 'web-platform-tests-reftests',
-                 'mochitest-e10s-browser-chrome-1', 'mochitest-e10s-browser-chrome-2', 'mochitest-e10s-browser-chrome-3',
-                 'mochitest-browser-chrome-1', 'mochitest-browser-chrome-2', 'mochitest-browser-chrome-3',
-                 'mochitest-devtools-chrome-1', 'mochitest-devtools-chrome-2', 'mochitest-devtools-chrome-3', 'mochitest-devtools-chrome']
-    buildtypes = ['debug', 'opt', 'asan']
+import httplib
+import json
 
-    return platforms, buildtypes, testtypes
+def getDistinctTuples():
+    conn = httplib.HTTPConnection('alertmanager.allizom.org')
+    cset = "/data/jobtypes/"
+    conn.request("GET", cset)
+    response = conn.getresponse()
+
+    data = response.read()
+    response.close()
+    cdata = json.loads(data)
+    return cdata['jobtypes']
 
 def is_matched(f, removals):
     found = False
@@ -69,33 +70,24 @@ def remove_bad_combos(master, scenarios, target):
 
     return retVal
 
-def build_removals(platforms, buildtypes, testtypes, master, to_remove, target):
+def build_removals(active_jobs, master, to_remove, target):
     retVal = []
-    for platform in platforms:
-        for buildtype in buildtypes:
-            if buildtype == 'asan' and platform != 'linux64':
-                continue
+    for jobtype in active_jobs:
+        remaining_failures, total_time, saved_time = check_removal(master, [jobtype])
+        if len(remaining_failures) >= target:
+            retVal.append(jobtype)
 
-            if [platform, buildtype, ''] in to_remove:
-                retVal.append([platform, buildtype, ''])
-                continue
-
-            for test in testtypes:
-                jobtype = [platform, buildtype, test]
-                remaining_failures, total_time, saved_time = check_removal(master, [jobtype])
-                if len(remaining_failures) >= target:
-                    retVal.append(jobtype)
     return retVal
 
 def depth_first(failures, target):
     total = len(failures)
     print "working with %s failures" % total
-    platforms, buildtypes, testtypes = getDistinctTuples()
+    active_jobs = getDistinctTuples()
 
     target = int(total* (target / 100))
     to_remove = []
 
-    to_remove = build_removals(platforms, buildtypes, testtypes, failures, to_remove, target)
+    to_remove = build_removals(active_jobs, failures, to_remove, target)
     to_remove = remove_bad_combos(failures, to_remove, target)
 
     total_detected, total_time, saved_time = check_removal(failures, to_remove)

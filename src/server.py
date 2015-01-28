@@ -384,7 +384,7 @@ def run_create_jobtypes_query():
         for buildtype in buildtypes:
             # ignore *build* types
             query = "select distinct testtype from testjobs where date>'%s'" % (twoweeks)
-            query += " and platform='%s' and buildtype='%s' and testtype not like '%%build%%'" % (platform, buildtype)
+            query += " and platform='%s' and buildtype='%s' and testtype not like '%%build%%' and testtype not like '%%_dep'" % (platform, buildtype)
             cursor = db.cursor()
             cursor.execute(query)
             types = []
@@ -397,7 +397,8 @@ def run_create_jobtypes_query():
                                 'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
                                 'g1', 'g1-e10s', 'g1-snow', 'g1-snow-e10s', 
                                 'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
-                                'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack']:
+                                'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
+                                'non-unified', 'valgrind']:
                     continue
 
                 if testtype:
@@ -458,12 +459,15 @@ def run_seta_details_query():
     date = request.args.get("date")
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select jobtype from seta where date='%s'" % date
+    query = "select jobtype from seta where date='%s 00:00:00'" % date
     cursor.execute(query)
     retVal = {}
     retVal[date] = []
+    jobtype = []
     for d in cursor.fetchall():
-        retVal[date].append("%s" % d[0])
+        parts = d[0].split("'")
+        jobtype.append([parts[1], parts[3], parts[5]])
+    retVal[date] = jobtype
 
     return {'jobtypes': retVal}
 
