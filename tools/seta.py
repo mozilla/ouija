@@ -1,16 +1,12 @@
-import httplib
+import requests
 import json
 
 def getDistinctTuples():
-    conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/jobtypes/"
-    conn.request("GET", cset)
-    response = conn.getresponse()
+    url = "http://alertmanager.allizom.org/data/jobtypes/"
+    response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+    data = json.loads(response.content)
+    return data['jobtypes']
 
-    data = response.read()
-    response.close()
-    cdata = json.loads(data)
-    return cdata['jobtypes']
 
 def is_matched(f, removals):
     found = False

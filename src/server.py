@@ -383,8 +383,9 @@ def run_create_jobtypes_query():
     for platform in platforms:
         for buildtype in buildtypes:
             # ignore *build* types
-            query = "select distinct testtype from testjobs where date>'%s'" % (twoweeks)
-            query += " and platform='%s' and buildtype='%s' and testtype not like '%%build%%' and testtype not like '%%_dep'" % (platform, buildtype)
+            query = """select distinct testtype from testjobs where date>'%s' and platform='%s'
+                       and buildtype='%s' and testtype not like '%%build%%'
+                       and testtype not like '%%_dep'""" % (twoweeks, platform, buildtype)
             cursor = db.cursor()
             cursor.execute(query)
             types = []

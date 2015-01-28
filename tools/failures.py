@@ -1,7 +1,7 @@
 import json
 import re
 import copy
-import httplib
+import requests
 import datetime
 import os
 import MySQLdb
@@ -12,15 +12,11 @@ from emails import send_email
 import seta
 
 def getRawData():
-    conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/seta/"
-    conn.request("GET", cset)
-    response = conn.getresponse()
+    url = "http://alertmanager.allizom.org/data/seta/"
+    response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+    data = json.loads(response.content)
+    return data['failures']
 
-    data = response.read()
-    response.close()
-    cdata = json.loads(data)
-    return cdata['failures']
 
 def communicate(failures, to_remove, total_detected, testmode, results=True):
 
@@ -138,17 +134,12 @@ def sanity_check(failures, target):
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
     yesterday = yesterday.strftime('%Y-%m-%d')
 
-    conn = httplib.HTTPConnection('alertmanager.allizom.org')
-    cset = "/data/setadetails/?date=%s" % yesterday
-    conn.request("GET", cset)
-    response = conn.getresponse()
+    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % yesterday
+    response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+    data = json.loads(response.content)
+    cdata = data['jobtypes']
 
-    data = response.read()
-    response.close()
-    cdata = json.loads(data)
-    cdata = cdata['jobtypes']
     to_remove = cdata[yesterday]
-
     total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
 
@@ -165,7 +156,6 @@ def run_query(query):
                          db="ouija")
 
     cur = db.cursor()
-    print query
     cur.execute(query)
 
     results = []
