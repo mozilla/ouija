@@ -124,7 +124,7 @@ def format_in_table(active_jobs, master):
         print "%s%s" % (key, output)
 
     if missing_jobs:
-        print "** missing jobs: %s" % ','.join(missing_jobs)
+        print "** new jobs which need a code: %s" % ','.join(missing_jobs)
 
     print "Total removed %s" % (sum_removed)
     print "Total remaining %s" % (sum_remaining)
