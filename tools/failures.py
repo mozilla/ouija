@@ -44,49 +44,49 @@ def format_in_table(active_jobs, master):
     sum_removed = 0
     sum_remaining = 0
 
-    tbplnames = {'mochitest-1': {'group': 'M', 'code': '1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-2': {'group': 'M', 'code': '2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-3': {'group': 'M', 'code': '3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-4': {'group': 'M', 'code': '4', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-5': {'group': 'M', 'code': '5', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-other': {'group': 'M', 'code': 'Oth', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-browser-chrome-1': {'group': 'M', 'code': 'bc1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-browser-chrome-2': {'group': 'M', 'code': 'bc2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-browser-chrome-3': {'group': 'M', 'code': 'bc3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-devtools-chrome-1': {'group': 'M', 'code': 'dt1', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-devtools-chrome-2': {'group': 'M', 'code': 'dt2', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-devtools-chrome-3': {'group': 'M', 'code': 'dt3', 'debug': True, 'opt': False, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-devtools-chrome': {'group': 'M', 'code': 'dt', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-gl': {'group': 'M', 'code': 'gl', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-e10s-1': {'group': 'M-e10s', 'code': '1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'mochitest-e10s-2': {'group': 'M-e10s', 'code': '2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'mochitest-e10s-3': {'group': 'M-e10s', 'code': '3', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'mochitest-e10s-4': {'group': 'M-e10s', 'code': '4', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'mochitest-e10s-5': {'group': 'M-e10s', 'code': '5', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'mochitest-e10s-browser-chrome-1': {'group': 'M-e10s', 'code': 'bc1', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-e10s-browser-chrome-2': {'group': 'M-e10s', 'code': 'bc2', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-e10s-browser-chrome-3': {'group': 'M-e10s', 'code': 'bc3', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'mochitest-e10s-devtools': {'group': 'M-e10s', 'code': 'dt', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'xpcshell': {'group': '', 'code': 'X', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'crashtest': {'group': 'R', 'code': 'C', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'jsreftest': {'group': 'R', 'code': 'J', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'reftest-1': {'group': 'R', 'code': 'R1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
-                 'reftest-2': {'group': 'R', 'code': 'R2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
-                 'reftest-e10s': {'group': 'R-e10s', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'crashtest-e10s': {'group': 'R-e10s', 'code': 'C', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'jittest': {'group': '', 'code': 'Jit', 'debug': True, 'opt': True, 'linux32': False, 'linux64': False, 'default': True},
-                 'jittest-2': {'group': '', 'code': 'Jit2', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'jittest-1': {'group': '', 'code': 'Jit1', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': False},
-                 'marionette': {'group': '', 'code': 'Mn', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'marionette-e10s': {'group': '', 'code': 'Mn-e10s', 'debug': False, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
-                 'cppunit': {'group': '', 'code': 'Cpp', 'debug': True, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'reftest-no-accel': {'group': '', 'code': 'Cpp', 'debug': False, 'opt': True, 'linux32': True, 'linux64': False, 'default': False},
-                 'web-platform-tests-1': {'group': 'W', 'code': '1', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'web-platform-tests-2': {'group': 'W', 'code': '2', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'web-platform-tests-3': {'group': 'W', 'code': '3', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'web-platform-tests-4': {'group': 'W', 'code': '4', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'web-platform-tests-reftests': {'group': 'W', 'code': 'R', 'debug': False, 'opt': True, 'linux32': True, 'linux64': True, 'default': True},
-                 'reftest': {'group': 'R', 'code': 'R', 'debug': True, 'opt': True, 'linux32': False, 'linux64': True, 'default': True}}
+    tbplnames = {'mochitest-1': {'group': 'M', 'code': '1'},
+                 'mochitest-2': {'group': 'M', 'code': '2'},
+                 'mochitest-3': {'group': 'M', 'code': '3'},
+                 'mochitest-4': {'group': 'M', 'code': '4'},
+                 'mochitest-5': {'group': 'M', 'code': '5'},
+                 'mochitest-other': {'group': 'M', 'code': 'Oth'},
+                 'mochitest-browser-chrome-1': {'group': 'M', 'code': 'bc1'},
+                 'mochitest-browser-chrome-2': {'group': 'M', 'code': 'bc2'},
+                 'mochitest-browser-chrome-3': {'group': 'M', 'code': 'bc3'},
+                 'mochitest-devtools-chrome-1': {'group': 'M', 'code': 'dt1'},
+                 'mochitest-devtools-chrome-2': {'group': 'M', 'code': 'dt2'},
+                 'mochitest-devtools-chrome-3': {'group': 'M', 'code': 'dt3'},
+                 'mochitest-devtools-chrome': {'group': 'M', 'code': 'dt'},
+                 'mochitest-gl': {'group': 'M', 'code': 'gl'},
+                 'mochitest-e10s-1': {'group': 'M-e10s', 'code': '1'},
+                 'mochitest-e10s-2': {'group': 'M-e10s', 'code': '2'},
+                 'mochitest-e10s-3': {'group': 'M-e10s', 'code': '3'},
+                 'mochitest-e10s-4': {'group': 'M-e10s', 'code': '4'},
+                 'mochitest-e10s-5': {'group': 'M-e10s', 'code': '5'},
+                 'mochitest-e10s-browser-chrome-1': {'group': 'M-e10s', 'code': 'bc1'},
+                 'mochitest-e10s-browser-chrome-2': {'group': 'M-e10s', 'code': 'bc2'},
+                 'mochitest-e10s-browser-chrome-3': {'group': 'M-e10s', 'code': 'bc3'},
+                 'mochitest-e10s-devtools': {'group': 'M-e10s', 'code': 'dt'},
+                 'xpcshell': {'group': '', 'code': 'X'},
+                 'crashtest': {'group': 'R', 'code': 'C'},
+                 'jsreftest': {'group': 'R', 'code': 'J'},
+                 'reftest-1': {'group': 'R', 'code': 'R1'},
+                 'reftest-2': {'group': 'R', 'code': 'R2'},
+                 'reftest-e10s': {'group': 'R-e10s', 'code': 'R'},
+                 'crashtest-e10s': {'group': 'R-e10s', 'code': 'C'},
+                 'jittest': {'group': '', 'code': 'Jit'},
+                 'jittest-2': {'group': '', 'code': 'Jit2'},
+                 'jittest-1': {'group': '', 'code': 'Jit1'},
+                 'marionette': {'group': '', 'code': 'Mn'},
+                 'marionette-e10s': {'group': '', 'code': 'Mn-e10s'},
+                 'cppunit': {'group': '', 'code': 'Cpp'},
+                 'reftest-no-accel': {'group': '', 'code': 'Cpp'},
+                 'web-platform-tests-1': {'group': 'W', 'code': '1'},
+                 'web-platform-tests-2': {'group': 'W', 'code': '2'},
+                 'web-platform-tests-3': {'group': 'W', 'code': '3'},
+                 'web-platform-tests-4': {'group': 'W', 'code': '4'},
+                 'web-platform-tests-reftests': {'group': 'W', 'code': 'R'},
+                 'reftest': {'group': 'R', 'code': 'R'}}
 
     for jobtype in active_jobs:
         key = "%s_%s" % (jobtype[0], jobtype[1])
@@ -99,6 +99,7 @@ def format_in_table(active_jobs, master):
 
     keys = results.keys()
     keys.sort()
+    missing_jobs = []
     for key in keys:
         data = results[key]
         data.sort()
@@ -109,13 +110,22 @@ def format_in_table(active_jobs, master):
 
             output += '\t'
             if test in data or '' in data:
-                output += tbplnames[test]['code']
+                try:
+                    output += tbplnames[test]['code']
+                except KeyError:
+                    output += **
+                    missing_jobs.append(test)
+
                 sum_removed += 1
             else:
                 output += "--"
                 sum_remaining += 1
 
         print "%s%s" % (key, output)
+
+    if missing_jobs:
+        print "** new jobs which need a code: %s" % ','.join(missing_jobs)
+
     print "Total removed %s" % (sum_removed)
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
