@@ -10,19 +10,20 @@ def getDistinctTuples():
 
 def is_matched(f, removals):
     found = False
+    tocheck = [str(f[0]), str(f[1]), str(f[2])]
     for jobtype in removals:
         matched = 0
-        if f[2] == jobtype[2]:
+        if tocheck[2] == jobtype[2]:
             matched +=1
         elif jobtype[2] == '':
             matched +=1
 
-        if f[1] == jobtype[1]:
+        if tocheck[1] == jobtype[1]:
             matched +=1
         elif jobtype[1] == '':
             matched +=1
 
-        if f[0] == jobtype[0]:
+        if tocheck[0] == jobtype[0]:
             matched +=1
         elif jobtype[0] == '':
             matched +=1
