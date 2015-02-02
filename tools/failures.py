@@ -11,11 +11,14 @@ from emails import send_email
 
 import seta
 
-def getRawData(startDate, endDate):
-    if not startDate and not endDate:
-        url = "http://alertmanager.allizom.org/data/seta/"
-    else:
-        url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % (startDate.strftime("%Y-%m-%d"), endDate.strftime("%Y-%m-%d"))
+def getRawData(start_date, end_date):
+    if not end_date:
+        end_date = datetime.datetime.now()
+
+    if not start_date:
+        start_date = end_date - datetime.timedelta(days=180)
+
+    url = "http://alertmanager.allizom.org/data/seta/?start_date=%s&end_date=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
     data = json.loads(response.content)
@@ -153,19 +156,19 @@ def insert_in_database(to_remove, date=None):
         query += '"%s")' % tuple
         run_query(query)
 
-def sanity_check(failures, target, endDate=None):
+def sanity_check(failures, target, end_date=None):
     total = len(failures)
 
-    if not endDate:
-        endDate = datetime.datetime.now()
-    endDate = endDate - datetime.timedelta(days=1)
-    endDate = endDate.strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.datetime.now()
+    end_date = end_date - datetime.timedelta(days=1)
+    end_date = end_date.strftime('%Y-%m-%d')
 
-    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % endDate
+    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % end_date
     response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
     data = json.loads(response.content)
     cdata = data['jobtypes']
-    to_remove = cdata[endDate]
+    to_remove = cdata[end_date]
 
     to_remove = []
     for item in data:
@@ -176,7 +179,7 @@ def sanity_check(failures, target, endDate=None):
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
 
     if percent_detected >= target:
-        print "No changes found from previous day: %s" % endDate
+        print "No changes found from previous day: %s" % end_date
         return to_remove, percent_detected
     else:
         return [], total_detected
@@ -238,13 +241,13 @@ def print_diff(start_date, end_date):
 
 def parse_args(argv=None):
     parser = ArgumentParser()
-    parser.add_argument("-s", "--startdate",
+    parser.add_argument("-s", "--start_date",
                         metavar="YYYY-MM-DD",
                         dest="start_date",
                         help="starting date for comparison."
                         )
 
-    parser.add_argument("-e", "--enddate",
+    parser.add_argument("-e", "--end_date",
                         metavar="YYYY-MM-DD",
                         dest="end_date",
                         help="ending date for comparison."
@@ -264,35 +267,51 @@ def parse_args(argv=None):
                               database and emails."
                         )
 
+    parser.add_argument("--diff",
+                        action="store_true",
+                        dest="diff",
+                        help="This mode is for printing a diff between two dates. \
+                              requires --start_date and --end_date."
+                        )
+
     options = parser.parse_args(argv)
     return options
 
-def analyzeFailures(startDate, endDate, testmode, quick=False):
-    failures = getRawData(startDate, endDate)
-    print "date: %s, failures: %s" % (endDate, len(failures))
+def analyzeFailures(start_date, end_date, testmode, quick=False):
+    failures = getRawData(start_date, end_date)
+    print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100 # 100% detection
 
     if quick:
-        to_remove, total_detected = sanity_check(failures, target, endDate)
+        to_remove, total_detected = sanity_check(failures, target, end_date)
         if len(to_remove) > 0:
-            print "no need for a full run on date: %s, %s, %s" % (endDate, len(to_remove), total_detected)
-            communicate(failures, to_remove, total_detected, testmode, endDate, results=False)
+            print "no need for a full run on date: %s, %s, %s" % (end_date, len(to_remove), total_detected)
+            communicate(failures, to_remove, total_detected, testmode, end_date, results=False)
             return
 
     # no quick option, or quick failed due to new failures detected
-    print "-- need to do a full run on %s" % (endDate)
+    print "-- need to do a full run on %s" % (end_date)
     to_remove, total_detected = seta.depth_first(failures, target)
-    communicate(failures, to_remove, total_detected, testmode, endDate)
+    communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
     options = parse_args()
 
-    if options.start_date and options.end_date:
-        print_diff(options.start_date, options.end_date)
+    if options.diff:
+        if options.start_date and options.end_date:
+            print_diff(options.start_date, options.end_date)
+        else:
+            print "when using --diff please provide a --start_date and an --end_date"
     else:
-        startDate = datetime.datetime(2014,8,13)
-        endDate = datetime.datetime(2014,11,13) # 3 months minimum
-        end = datetime.datetime.now()
-        startDate = end - datetime.timedelta(days=180)
-        analyzeFailures(startDate, end, options.testmode, options.quick)
+        if options.end_date:
+            end_date = datetime.datetime(options.end_date)
+        else:
+            end_date = datetime.datetime.now()
+
+        if options.start_date:
+            start_date = datetime.datetime(options.start_date)
+        else:
+            start_date = end_date - datetime.timedelta(days=180)
+
+        analyzeFailures(start_date, end_date, options.testmode, options.quick)
 
