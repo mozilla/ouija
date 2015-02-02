@@ -11,14 +11,21 @@ from emails import send_email
 
 import seta
 
-def getRawData():
-    url = "http://alertmanager.allizom.org/data/seta/"
+def getRawData(start_date, end_date):
+    if not end_date:
+        end_date = datetime.datetime.now()
+
+    if not start_date:
+        start_date = end_date - datetime.timedelta(days=180)
+
+    url = "http://alertmanager.allizom.org/data/seta/?start_date=%s&end_date=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+
     response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
     data = json.loads(response.content)
     return data['failures']
 
 
-def communicate(failures, to_remove, total_detected, testmode, results=True):
+def communicate(failures, to_remove, total_detected, testmode, date, results=True):
 
     if results:
         active_jobs = seta.getDistinctTuples()
@@ -29,14 +36,21 @@ def communicate(failures, to_remove, total_detected, testmode, results=True):
     if testmode:
         return
 
-    insert_in_database(to_remove)
-    now = datetime.date.today()
-    addition, deletion = print_diff(str(now - datetime.timedelta(days=1)), str(now))
-    total_changes = len(addition) + len(deletion)
+    insert_in_database(to_remove, date)
+
+    if date == None:
+        date = datetime.date.today()
+    date = date.strftime('%Y-%m-%d')
+    change = print_diff(str(date - datetime.timedelta(days=1)), str(date))
+    try:
+        total_changes = len(change)
+    except TypeError:
+        total_changes = 0
+
     if total_changes == 0:
         send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=results)
     else:
-        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", addition, deletion, admin=True, results=results)
+        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", change, admin=True, results=results)
 
 
 def format_in_table(active_jobs, master):
@@ -113,7 +127,7 @@ def format_in_table(active_jobs, master):
                 try:
                     output += tbplnames[test]['code']
                 except KeyError:
-                    output += **
+                    output += '**'
                     missing_jobs.append(test)
 
                 sum_removed += 1
@@ -130,31 +144,42 @@ def format_in_table(active_jobs, master):
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
 
-def insert_in_database(to_remove):
-    now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
-    run_query('delete from seta where date="%s"' % now)
+def insert_in_database(to_remove, date=None):
+    if not date:
+        date = datetime.datetime.now().strftime('%Y-%m-%d')
+    else:
+        date = date.strftime('%Y-%m-%d')
+
+    run_query('delete from seta where date="%s"' % date)
     for tuple in to_remove:
-        query = 'insert into seta (date, jobtype) values ("%s", ' % now
+        query = 'insert into seta (date, jobtype) values ("%s", ' % date
         query += '"%s")' % tuple
         run_query(query)
 
-def sanity_check(failures, target):
+def sanity_check(failures, target, end_date=None):
     total = len(failures)
 
-    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.datetime.now()
+    end_date = end_date - datetime.timedelta(days=1)
+    end_date = end_date.strftime('%Y-%m-%d')
 
-    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % yesterday
+    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % end_date
     response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
     data = json.loads(response.content)
     cdata = data['jobtypes']
+    to_remove = cdata[end_date]
 
-    to_remove = cdata[yesterday]
+    to_remove = []
+    for item in data:
+        parts = item.split("'")
+        to_remove.append([parts[1], parts[3], parts[5]])
+
     total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
 
     if percent_detected >= target:
-        print "No changes found from previous day"
+        print "No changes found from previous day: %s" % end_date
         return to_remove, percent_detected
     else:
         return [], total_detected
@@ -177,6 +202,7 @@ def run_query(query):
     return results
 
 def check_data(query_date):
+    retVal = []
     data = run_query('select jobtype from seta where date="%s"' % query_date)
     if not data:
         print "The database does not have data for the given %s date." % query_date
@@ -185,8 +211,13 @@ def check_data(query_date):
             tuple = run_query('select jobtype from seta where date="%s"' % current_date)
             if tuple:
                 print "The data is available for date=%s" % current_date
-        return None
-    return data
+        return retVal
+
+    for d in data:
+        parts = d.split("'")
+        retVal.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
+
+    return retVal
 
 def print_diff(start_date, end_date):
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
@@ -194,34 +225,29 @@ def print_diff(start_date, end_date):
     start_tuple = check_data(start_date)
     end_tuple = check_data(end_date)
 
+    start_tuple.sort()
+    end_tuple.sort()
+
     if start_tuple is None or end_tuple is None:
-        return
+        print "NO DATA: %s, %s" % (start_date, end_date)
+        return []
     else:
-        print "The tuples present on %s and not present on %s: " % (end_date, start_date)
-        addition = list(set(end_tuple) - set(start_tuple))
-        if len(addition) > 20:
-            print "Warning: Too many differences detected, most likely there is data missing or incorrect"
-        else:
-            print addition
-
-        print "The tuples not present on %s and present on %s: " % (end_date, start_date)
         deletion = list(set(start_tuple) - set(end_tuple))
-        if len(deletion) > 20:
-            print "Warning: Too many differences detected, most likely there is data missing or incorrect"
-        else:
-            print deletion
-
-        return (addition, deletion)
+        deletion.sort()
+        if not deletion:
+            deletion = ''
+        print "%s: These jobs have changed from the previous day: %s" % (end_date.strftime("%Y-%m-%d"), deletion)
+        return deletion
 
 def parse_args(argv=None):
     parser = ArgumentParser()
-    parser.add_argument("-s", "--startdate",
+    parser.add_argument("-s", "--start_date",
                         metavar="YYYY-MM-DD",
                         dest="start_date",
                         help="starting date for comparison."
                         )
 
-    parser.add_argument("-e", "--enddate",
+    parser.add_argument("-e", "--end_date",
                         metavar="YYYY-MM-DD",
                         dest="end_date",
                         help="ending date for comparison."
@@ -241,25 +267,51 @@ def parse_args(argv=None):
                               database and emails."
                         )
 
+    parser.add_argument("--diff",
+                        action="store_true",
+                        dest="diff",
+                        help="This mode is for printing a diff between two dates. \
+                              requires --start_date and --end_date."
+                        )
+
     options = parser.parse_args(argv)
     return options
+
+def analyzeFailures(start_date, end_date, testmode, quick=False):
+    failures = getRawData(start_date, end_date)
+    print "date: %s, failures: %s" % (end_date, len(failures))
+    target = 100 # 100% detection
+
+    if quick:
+        to_remove, total_detected = sanity_check(failures, target, end_date)
+        if len(to_remove) > 0:
+            print "no need for a full run on date: %s, %s, %s" % (end_date, len(to_remove), total_detected)
+            communicate(failures, to_remove, total_detected, testmode, end_date, results=False)
+            return
+
+    # no quick option, or quick failed due to new failures detected
+    print "-- need to do a full run on %s" % (end_date)
+    to_remove, total_detected = seta.depth_first(failures, target)
+    communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
     options = parse_args()
 
-    if options.start_date and options.end_date:
-        print_diff(options.start_date, options.end_date)
+    if options.diff:
+        if options.start_date and options.end_date:
+            print_diff(options.start_date, options.end_date)
+        else:
+            print "when using --diff please provide a --start_date and an --end_date"
     else:
-        failures = getRawData()
-        targets = [100.0]
-        for target in targets:
-            if options.quick:
-                to_remove, total_detected = sanity_check(failures, target)
-                if len(to_remove) > 0:
-                    communicate(failures, to_remove, total_detected, options.testmode, results=False)
-                    continue
+        if options.end_date:
+            end_date = datetime.datetime(options.end_date)
+        else:
+            end_date = datetime.datetime.now()
 
-            # no quick option, or quick failed due to new failures detected
-            to_remove, total_detected = seta.depth_first(failures, target)
-            communicate(failures, to_remove, total_detected, options.testmode)
+        if options.start_date:
+            start_date = datetime.datetime(options.start_date)
+        else:
+            start_date = end_date - datetime.timedelta(days=180)
+
+        analyzeFailures(start_date, end_date, options.testmode, options.quick)
 
