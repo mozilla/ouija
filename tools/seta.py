@@ -1,5 +1,6 @@
 import requests
 import json
+import copy
 
 def getDistinctTuples():
     url = "http://alertmanager.allizom.org/data/jobtypes/"
@@ -55,37 +56,48 @@ def check_removal(master, removals):
 
     return results, total_time, saved_time
 
-def remove_bad_combos(master, scenarios, target):
-    retVal = []
-    temp = []
-    for item in scenarios:
-        temp.append(item)
-        if len(check_removal(master, temp)[0]) >= target:
-            retVal.append(item)
-        else:
-            temp.remove(item)
-
-    return retVal
 
 def build_removals(active_jobs, master, to_remove, target):
     retVal = []
+    master_root_cause = []
     for jobtype in active_jobs:
         remaining_failures, total_time, saved_time = check_removal(master, [jobtype])
         if len(remaining_failures) >= target:
             retVal.append(jobtype)
             master = remaining_failures
+        else:
+            root_cause = []
+            for key in master:
+                if key not in remaining_failures:
+                    root_cause.append(key)
+                    master_root_cause.append(key)
+            print "jobtype: %s, root failure(s): %s" % (jobtype, root_cause)
 
-    return retVal
+    return retVal, remaining_failures, master_root_cause
 
-def depth_first(failures, target):
+def remove_root_cause_failures(failures, master_root_cause):
+    for revision in master_root_cause:
+        del failures[revision]
+    return failures
+
+def depth_first(failures, target, ignore_failure):
     total = len(failures)
+    copy_failures = copy.deepcopy(failures)
     print "working with %s failures" % total
     active_jobs = getDistinctTuples()
 
     target = int(total* (target / 100))
     to_remove = []
 
-    to_remove = build_removals(active_jobs, failures, to_remove, target)
+    to_remove, remaining_failures, master_root_cause = build_removals(active_jobs, failures, to_remove, target)
+
+    while ignore_failure > 0:
+        print "\n--------------new pass----------------\n"
+        copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
+        total = len(copy_failures)
+        to_remove, remaining_failures, master_root_cause = build_removals(active_jobs, copy_failures, [], total)
+        ignore_failure -= 1
+
     total_detected, total_time, saved_time = check_removal(failures, to_remove)
     return to_remove, total_detected
 
