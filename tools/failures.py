@@ -18,7 +18,7 @@ def getRawData(start_date, end_date):
     if not start_date:
         start_date = end_date - datetime.timedelta(days=180)
 
-    url = "http://alertmanager.allizom.org/data/seta/?start_date=%s&end_date=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
     data = json.loads(response.content)
@@ -40,8 +40,7 @@ def communicate(failures, to_remove, total_detected, testmode, date, results=Tru
 
     if date == None:
         date = datetime.date.today()
-    date = date.strftime('%Y-%m-%d')
-    change = print_diff(str(date - datetime.timedelta(days=1)), str(date))
+    change = print_diff("%s" % (date - datetime.timedelta(days=1)).strftime('%Y-%m-%d'), '%s' % date.strftime('%Y-%m-%d'))
     try:
         total_changes = len(change)
     except TypeError:
@@ -80,7 +79,7 @@ def format_in_table(active_jobs, master):
                  'mochitest-e10s-browser-chrome-1': {'group': 'M-e10s', 'code': 'bc1'},
                  'mochitest-e10s-browser-chrome-2': {'group': 'M-e10s', 'code': 'bc2'},
                  'mochitest-e10s-browser-chrome-3': {'group': 'M-e10s', 'code': 'bc3'},
-                 'mochitest-e10s-devtools': {'group': 'M-e10s', 'code': 'dt'},
+                 'mochitest-e10s-devtools-chrome': {'group': 'M-e10s', 'code': 'dt'},
                  'xpcshell': {'group': '', 'code': 'X'},
                  'crashtest': {'group': 'R', 'code': 'C'},
                  'jsreftest': {'group': 'R', 'code': 'J'},
@@ -304,12 +303,12 @@ if __name__ == "__main__":
             print "when using --diff please provide a --start_date and an --end_date"
     else:
         if options.end_date:
-            end_date = datetime.datetime(options.end_date)
+            end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
         else:
             end_date = datetime.datetime.now()
 
         if options.start_date:
-            start_date = datetime.datetime(options.start_date)
+            start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
         else:
             start_date = end_date - datetime.timedelta(days=180)
 

@@ -73,6 +73,7 @@ def build_removals(active_jobs, master, to_remove, target):
         remaining_failures, total_time, saved_time = check_removal(master, [jobtype])
         if len(remaining_failures) >= target:
             retVal.append(jobtype)
+            master = remaining_failures
 
     return retVal
 
@@ -85,8 +86,6 @@ def depth_first(failures, target):
     to_remove = []
 
     to_remove = build_removals(active_jobs, failures, to_remove, target)
-    to_remove = remove_bad_combos(failures, to_remove, target)
-
     total_detected, total_time, saved_time = check_removal(failures, to_remove)
     return to_remove, total_detected
 
