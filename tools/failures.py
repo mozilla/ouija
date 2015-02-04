@@ -46,9 +46,9 @@ def communicate(failures, to_remove, total_detected, testmode, date):
         total_changes = 0
 
     if total_changes == 0:
-        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=results)
+        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=False)
     else:
-        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", change, admin=True, results=results)
+        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", change, admin=True, results=True)
 
 
 def format_in_table(active_jobs, master):
@@ -154,34 +154,6 @@ def insert_in_database(to_remove, date=None):
         query += '"%s")' % tuple
         run_query(query)
 
-def sanity_check(failures, target, end_date=None):
-    total = len(failures)
-
-    if not end_date:
-        end_date = datetime.datetime.now()
-    end_date = end_date - datetime.timedelta(days=1)
-    end_date = end_date.strftime('%Y-%m-%d')
-
-    url = "http://alertmanager.allizom.org/data/setadetails/?date=%s" % end_date
-    response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-    data = json.loads(response.content)
-    cdata = data['jobtypes']
-    to_remove = cdata[end_date]
-
-    to_remove = []
-    for item in data:
-        parts = item.split("'")
-        to_remove.append([parts[1], parts[3], parts[5]])
-
-    total_detected, total_time, saved_time = seta.check_removal(failures, to_remove)
-    percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
-
-    if percent_detected >= target:
-        print "No changes found from previous day: %s" % end_date
-        return to_remove, percent_detected
-    else:
-        return [], total_detected
-
 def run_query(query):
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -265,15 +237,22 @@ def parse_args(argv=None):
                               requires --start_date and --end_date."
                         )
 
+    parser.add_argument("--ignore-failure",
+                        type=int,
+                        dest="ignore_failure",
+                        help="With this option one can ignore root causes of revisions. \
+                              Specify the number of *extra* passes to be done."
+                        )
+
     options = parser.parse_args(argv)
     return options
 
-def analyzeFailures(start_date, end_date, testmode, quick=False):
+def analyzeFailures(start_date, end_date, testmode, ignoreFirstFailure):
     failures = getRawData(start_date, end_date)
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100 # 100% detection
 
-    to_remove, total_detected = seta.depth_first(failures, target)
+    to_remove, total_detected = seta.depth_first(failures, target, ignoreFirstFailure)
     communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
@@ -295,5 +274,5 @@ if __name__ == "__main__":
         else:
             start_date = end_date - datetime.timedelta(days=180)
 
-        analyzeFailures(start_date, end_date, options.testmode, options.quick)
+        analyzeFailures(start_date, end_date, options.testmode, options.ignore_failure)
 
