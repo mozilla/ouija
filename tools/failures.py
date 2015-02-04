@@ -25,13 +25,12 @@ def getRawData(start_date, end_date):
     return data['failures']
 
 
-def communicate(failures, to_remove, total_detected, testmode, date, results=True):
+def communicate(failures, to_remove, total_detected, testmode, date):
 
-    if results:
-        active_jobs = seta.getDistinctTuples()
-        format_in_table(active_jobs, to_remove)
-        percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
-        print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
+    active_jobs = seta.getDistinctTuples()
+    format_in_table(active_jobs, to_remove)
+    percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
+    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
 
     if testmode:
         return
@@ -252,13 +251,6 @@ def parse_args(argv=None):
                         help="ending date for comparison."
                         )
 
-    parser.add_argument("--quick",
-                        action="store_true",
-                        dest="quick",
-                        help="quick sanity check to compare previous day entries \
-                              and see if still valid."
-                        )
-
     parser.add_argument("--testmode",
                         action="store_true",
                         dest="testmode",
@@ -281,15 +273,6 @@ def analyzeFailures(start_date, end_date, testmode, quick=False):
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100 # 100% detection
 
-    if quick:
-        to_remove, total_detected = sanity_check(failures, target, end_date)
-        if len(to_remove) > 0:
-            print "no need for a full run on date: %s, %s, %s" % (end_date, len(to_remove), total_detected)
-            communicate(failures, to_remove, total_detected, testmode, end_date, results=False)
-            return
-
-    # no quick option, or quick failed due to new failures detected
-    print "-- need to do a full run on %s" % (end_date)
     to_remove, total_detected = seta.depth_first(failures, target)
     communicate(failures, to_remove, total_detected, testmode, end_date)
 
