@@ -11,6 +11,7 @@ from emails import send_email
 
 import seta
 
+
 def getRawData(start_date, end_date):
     if not end_date:
         end_date = datetime.datetime.now()
@@ -20,7 +21,7 @@ def getRawData(start_date, end_date):
 
     url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
-    response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+    response = requests.get(url, headers={'accept-encoding': 'json'}, verify=True)
     data = json.loads(response.content)
     return data['failures']
 
@@ -37,7 +38,7 @@ def communicate(failures, to_remove, total_detected, testmode, date):
 
     insert_in_database(to_remove, date)
 
-    if date == None:
+    if date is None:
         date = datetime.date.today()
     change = print_diff("%s" % (date - datetime.timedelta(days=1)).strftime('%Y-%m-%d'), '%s' % date.strftime('%Y-%m-%d'))
     try:
@@ -142,6 +143,7 @@ def format_in_table(active_jobs, master):
     print "Total remaining %s" % (sum_remaining)
     print "Total jobs %s" % (sum_removed + sum_remaining)
 
+
 def insert_in_database(to_remove, date=None):
     if not date:
         date = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -153,6 +155,7 @@ def insert_in_database(to_remove, date=None):
         query = 'insert into seta (date, jobtype) values ("%s", ' % date
         query += '"%s")' % tuple
         run_query(query)
+
 
 def run_query(query):
     db = MySQLdb.connect(host="localhost",
@@ -171,6 +174,7 @@ def run_query(query):
     cur.close()
     return results
 
+
 def check_data(query_date):
     retVal = []
     data = run_query('select jobtype from seta where date="%s"' % query_date)
@@ -188,6 +192,7 @@ def check_data(query_date):
         retVal.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
 
     return retVal
+
 
 def print_diff(start_date, end_date):
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
@@ -208,6 +213,7 @@ def print_diff(start_date, end_date):
             deletion = ''
         print "%s: These jobs have changed from the previous day: %s" % (end_date.strftime("%Y-%m-%d"), deletion)
         return deletion
+
 
 def parse_args(argv=None):
     parser = ArgumentParser()
@@ -247,6 +253,7 @@ def parse_args(argv=None):
     options = parser.parse_args(argv)
     return options
 
+
 def analyzeFailures(start_date, end_date, testmode, ignoreFirstFailure):
     failures = getRawData(start_date, end_date)
     print "date: %s, failures: %s" % (end_date, len(failures))
@@ -275,4 +282,3 @@ if __name__ == "__main__":
             start_date = end_date - datetime.timedelta(days=180)
 
         analyzeFailures(start_date, end_date, options.testmode, options.ignore_failure)
-
