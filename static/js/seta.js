@@ -106,10 +106,8 @@ $(function() {
 
   function outputTable(active_jobs, details, date) {
 
-    // For some reason we don't have windows8 bits in the list and need it
+    // Get the list of jobs per platform that we don't need to run
     var optional_jobs = buildOSJobMap(details['jobtypes'][date]);
-    optional_jobs['windows8-64 debug'] = []
-    optional_jobs['windows8-64 opt'] = []
 
     // Get a list of all the active jobs on the tree
     var active_osjobs = buildOSJobMap(active_jobs['jobtypes']);
