@@ -1,18 +1,14 @@
 import json
-import re
-import copy
 import requests
 import datetime
-import os
 import MySQLdb
-import sys
 from argparse import ArgumentParser
 from emails import send_email
 
 import seta
 
 
-def getRawData(start_date, end_date):
+def get_raw_data(start_date, end_date):
     if not end_date:
         end_date = datetime.datetime.now()
 
@@ -28,7 +24,7 @@ def getRawData(start_date, end_date):
 
 def communicate(failures, to_remove, total_detected, testmode, date):
 
-    active_jobs = seta.getDistinctTuples()
+    active_jobs = seta.get_distinct_tuples()
     format_in_table(active_jobs, to_remove)
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
     print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
@@ -151,19 +147,19 @@ def insert_in_database(to_remove, date=None):
         date = date.strftime('%Y-%m-%d')
 
     run_query('delete from seta where date="%s"' % date)
-    for tuple in to_remove:
+    for jobtype in to_remove:
         query = 'insert into seta (date, jobtype) values ("%s", ' % date
-        query += '"%s")' % tuple
+        query += '"%s")' % jobtype
         run_query(query)
 
 
 def run_query(query):
-    db = MySQLdb.connect(host="localhost",
+    database = MySQLdb.connect(host="localhost",
                          user="root",
                          passwd="root",
                          db="ouija")
 
-    cur = db.cursor()
+    cur = database.cursor()
     cur.execute(query)
 
     results = []
@@ -176,22 +172,22 @@ def run_query(query):
 
 
 def check_data(query_date):
-    retVal = []
+    ret_val = []
     data = run_query('select jobtype from seta where date="%s"' % query_date)
     if not data:
         print "The database does not have data for the given %s date." % query_date
         for date in range(-3, 4):
             current_date = query_date + datetime.timedelta(date)
-            tuple = run_query('select jobtype from seta where date="%s"' % current_date)
-            if tuple:
+            jobtype = run_query('select jobtype from seta where date="%s"' % current_date)
+            if jobtype:
                 print "The data is available for date=%s" % current_date
-        return retVal
+        return ret_val
 
-    for d in data:
-        parts = d.split("'")
-        retVal.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
+    for job in data:
+        parts = job.split("'")
+        ret_val.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
 
-    return retVal
+    return ret_val
 
 
 def print_diff(start_date, end_date):
@@ -254,12 +250,12 @@ def parse_args(argv=None):
     return options
 
 
-def analyzeFailures(start_date, end_date, testmode, ignoreFirstFailure):
-    failures = getRawData(start_date, end_date)
+def analyze_failures(start_date, end_date, testmode, ignore_failure):
+    failures = get_raw_data(start_date, end_date)
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100 # 100% detection
 
-    to_remove, total_detected = seta.depth_first(failures, target, ignoreFirstFailure)
+    to_remove, total_detected = seta.depth_first(failures, target, ignore_failure)
     communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
@@ -281,4 +277,4 @@ if __name__ == "__main__":
         else:
             start_date = end_date - datetime.timedelta(days=180)
 
-        analyzeFailures(start_date, end_date, options.testmode, options.ignore_failure)
+        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure)

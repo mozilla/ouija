@@ -4,10 +4,11 @@ import datetime
 import os
 from email.mime.text import MIMEText
 
+
 def send_email(regression, jobs, message, addition=None, deletion=None, admin=False, results=False):
     server = smtplib.SMTP('smtp.gmail.com:587')
     server.starttls()
-    server.login("setamozilla","seta_mozilla")
+    server.login("setamozilla", "seta_mozilla")
 
     message = "We analyzed %s regressions and found %s jobs to disable - " % (regression, jobs) + message
     if addition and deletion:
