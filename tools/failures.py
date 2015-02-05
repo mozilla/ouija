@@ -28,7 +28,7 @@ def getRawData(start_date, end_date):
 
 def communicate(failures, to_remove, total_detected, testmode, date):
 
-    active_jobs = seta.getDistinctTuples()
+    active_jobs = seta.get_distinct_tuples()
     format_in_table(active_jobs, to_remove)
     percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
     print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
