@@ -2,7 +2,7 @@ $(function() {
   $error = $("#error"),
   $body = $("body");
 
-  //TODO: consider revisiting this
+  //TODO: consider revisiting this to ensure we have accurate data and the right format/presentations
   function createDates(data) {
     var s = $('<select />');
 
