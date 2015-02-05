@@ -49,16 +49,13 @@ $(function() {
 
   // Simple text replace of full names -> Group-Code format
   function printName(testname) {
-    var retVal = testname.replace('M-browser-chrome-', 'M-bc');
-    retVal = retVal.replace('M-browser-chrome', 'M-bc');
-    retVal = retVal.replace('Me10s-browser-chrome-', 'Me10s-bc');
-    retVal = retVal.replace('Me10s-browser-chrome', 'Me10s-bc');
-    retVal = retVal.replace('Me10s-devtools-chrome-', 'M-dt');
-    retVal = retVal.replace('Me10s-devtools-chrome', 'M-dt');
-    retVal = retVal.replace('M-e10s', 'Me10s');
-    retVal = retVal.replace('M-devtools-chrome-', 'M-dt');
-    retVal = retVal.replace('M-devtools-chrome', 'M-dt');
-    retVal = retVal.replace('M-other', 'M-oth');
+    var retVal = testname.replace(/mochitest-browser-chrome[-]?/, 'M-bc');
+    retVal = retVal.replace(/mochitest-e10s-browser-chrome[-]?/, 'Me10s-bc');
+    retVal = retVal.replace(/mochitest-e10s-devtools-chrome[-]?/, 'M-dt');
+    retVal = retVal.replace('mochitest-e10s', 'Me10s');
+    retVal = retVal.replace(/mochitest-devtools-chrome[-]?/, 'M-dt');
+    retVal = retVal.replace('mochitest-other', 'M-oth');
+    retVal = retVal.replace('mochitest', 'M');
     retVal = retVal.replace('crashtest-ipc', 'R-C-ipc');
     retVal = retVal.replace('crashtest', 'R-C');
     retVal = retVal.replace('jsreftest', 'R-J');
@@ -68,8 +65,7 @@ $(function() {
     retVal = retVal.replace('xpcshell', 'O-X');
     retVal = retVal.replace('marionette', 'O-Mn');
     retVal = retVal.replace('cppunit', 'O-Cpp');
-    retVal = retVal.replace('jittest-', 'O-Jit');
-    retVal = retVal.replace('jittest', 'O-Jit');
+    retVal = retVal.replace(/jittest[-]?/, 'O-Jit');
     retVal = retVal.replace('web-platform-tests', 'WPT');
     return retVal;
   }
@@ -103,7 +99,7 @@ $(function() {
       if (map[key] === undefined) {
           map[key] = [];
       }
-      map[key].push(job[2].replace('mochitest-e10s', 'Me10s').replace('mochitest', 'M'));
+      map[key].push(job[2]);
     }
     return map;
   }
@@ -160,7 +156,7 @@ $(function() {
         }
       }
 
-      // remove emtpy groups, add group letter and () for visual grouping
+      // remove empty groups, add group letter and () for visual grouping
       for (var type in types) {
         var leftover = types[type]['div'].html().replace(/\<\/span\>/g, '');
         leftover = leftover.replace(/\<span\>/g, '');
