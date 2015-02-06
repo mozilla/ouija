@@ -118,11 +118,11 @@ $(function() {
     // when item.value == "Hide Optional Jobs", its true value is to "show".
     if (item.value == "Hide Optional Jobs") {
       if (osMap.indexOf(rawName) >= 0) {
-        return "<span style='color: grey'>" + partName + " </span>";
+        return "<span style='background: white; color: #444039;'>" + partName + " </span>";
       }
     }
     if (!(osMap.indexOf(rawName) >= 0)) {
-      return "<span style='color: green'><b>" + partName + " </b></span>";
+      return "<span style='background: white; color: black; font-weight: 14px;'><b>" + partName + " </b></span>";
     }
   }
 
@@ -144,6 +144,16 @@ $(function() {
     // Get the list of jobs per platform that we don't need to run
     var optional_jobs = buildOSJobMap(details['jobtypes'][date]);
 
+    var keys = []
+    for (var key in optional_jobs) {
+      keys.push(key);
+    }
+    if (keys.length == 0) {
+      $('#datedesc').replaceWith('<div id="datedesc"><p><h3>Sorry, there is no data for the day ' + date + "</h3></div>");
+      $('#seta').html('<table id="seta" border=0></table>');
+      return;
+    }
+
     // Get a list of all the active jobs on the tree
     var active_osjobs = buildOSJobMap(active_jobs['jobtypes']);
 
@@ -156,12 +166,13 @@ $(function() {
                          'windows8-64 opt', 'windows8-64 debug'];
 
     var mytable = $('#seta');
+    var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 6 months";
     if (mytable.html() === undefined) {
-      mytable = $('<table></table>').attr({id:'seta', border: 0});
+      mytable = $('#seta');
     } else {
       mytable.html('<table id="seta" border=0></table>');
     }
-    $('<tr><td></td></tr>').text(date).appendTo(mytable);
+    $('#datedesc').replaceWith('<div id="datedesc">' + date + " - " + desc + "</div>");
 
     // Iterate through each OS, add a row and colums
     for (var i = 0; i < active_oslist.length; i++) {
