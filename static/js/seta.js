@@ -122,7 +122,7 @@ $(function() {
       }
     }
     if (!(osMap.indexOf(rawName) >= 0)) {
-      return "<span style='background: whilte; color: black; font-weight: 14px;'><b>" + partName + " </b></span>";
+      return "<span style='background: white; color: black; font-weight: 14px;'><b>" + partName + " </b></span>";
     }
   }
 
