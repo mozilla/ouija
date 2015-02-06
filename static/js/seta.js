@@ -39,7 +39,6 @@ $(function() {
         showOtherMonths: true,
         selectOtherMonths: true,
         onSelect: loadDate,
-        //showCurrentAtPos: 2,
         beforeShowDay: function(date) {
           var annotated = dates[date];
           if (annotated) {
@@ -52,6 +51,8 @@ $(function() {
     });
 
     $("#datepicker").datepicker("setDate", "-2m");
+
+    document.getElementById("toggle").addEventListener("click", toggleState);
 
     if (input_date === undefined || input_date === '') {
       printTable(last_date);
@@ -101,13 +102,28 @@ $(function() {
     return retVal
   }
 
-  // determine if we need a strike through or not
-  // TODO: add features to toggle on off
-  function printableJobCode(rawName, partName, osMap) {
-    if (osMap.indexOf(rawName) >= 0) {
-        return "<span style='color: grey'>" + partName + " </span>";
+  function toggleState() {
+    item = document.getElementById("toggle");
+    if (item.value == "Show Optional Jobs") {
+      fetchData();
+      item.value = "Hide Optional Jobs";
     } else {
-        return "<span style='color: green'><b>" + partName + " </b></span>";
+      fetchData();
+      item.value = "Show Optional Jobs";
+    }
+  }
+
+  // determine if we need a strike through or not
+  function printableJobCode(rawName, partName, osMap) {
+    item = document.getElementById("toggle");
+    // Hack: item.value == "Hide Optional Jobs" because of asynchronous behaviour of toggleState(), it should be actually "Show Optional Jobs".
+    if (item.value == "Hide Optional Jobs") {
+      if (osMap.indexOf(rawName) >= 0) {
+        return "<span style='color: grey'>" + partName + " </span>";
+      }
+    }
+    if (!(osMap.indexOf(rawName) >= 0)) {
+      return "<span style='color: green'><b>" + partName + " </b></span>";
     }
   }
 
@@ -192,7 +208,11 @@ $(function() {
       }
 
     }
-    mytable.appendTo('body');
+    if (!($('table').length)) {
+      mytable.appendTo('body');
+    } else {
+      $('table').replaceWith(mytable);
+    }
   }
 
   function gotsummary(data) {
