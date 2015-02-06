@@ -3,11 +3,32 @@
 <title>
 SETA - Search for Extraneous Test Automation
 </title>
+<style>
+.annotated a{
+background-color: Orange !important;
+background-image: none !important;
+color: White !important;
+font-weight: bold !important;
+font-size: 12pt;
+}
+</style>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
+
 <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+<script src="http://code.jquery.com/ui/1.11.2/jquery-ui.js"></script>
 <script src="js/seta.js"></script>
 </head>
 <body>
 <a href="http://alertmanager.allizom.org/data/seta/">Raw Data</a><br />
-
+<a href="https://github.com/dminor/ouija">Source Code</a><br />
+<p></p>
+<p>Please select a date below to view the jobs which are needed and optional.<br />
+If a day is highlighted in orange, that means we have new jobs which would be required to catch all regressions</p>
+<div><p>&nbsp</p></div>
+<div id="datepicker"></div>
+<div><p>&nbsp</p></div>
+<div id="New Jobs"></div>
+<div><p>&nbsp</p></div>
 </body>
 </html>
