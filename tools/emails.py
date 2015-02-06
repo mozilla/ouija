@@ -6,9 +6,11 @@ from email.mime.text import MIMEText
 
 
 def send_email(regression, jobs, date, message, change=None, admin=False, results=False):
-    server = smtplib.SMTP('smtp.gmail.com:587')
+    json_data = open(os.path.join(os.path.abspath(os.path.realpath(os.path.dirname(__file__))), "seta.cfg"), "r").read()
+    data = json.loads(json_data)
+    server = smtplib.SMTP(data['hostname'])
     server.starttls()
-    server.login("setamozilla", "seta_mozilla")
+    server.login(data['username'], data['password'])
 
     message = "We analyzed %s regressions and found %s jobs to disable: " % (regression, jobs) + message
     if change:
@@ -17,10 +19,8 @@ def send_email(regression, jobs, date, message, change=None, admin=False, result
 
     msg = MIMEText(message)
     msg['Subject'] = "SETA Results - Date %s" % date.strftime("%Y-%m-%d")
-    msg['From'] = "setamozilla@gmail.com"
+    msg['From'] = data['username']
 
-    json_data = open(os.path.join(os.path.abspath(os.path.realpath(os.path.dirname(__file__))), "seta.cfg"), "r").read()
-    data = json.loads(json_data)
     if admin:
         server.sendmail(msg['From'], data['admins'], msg.as_string())
     if results:
