@@ -104,11 +104,10 @@ $(function() {
 
   function toggleState() {
     item = document.getElementById("toggle");
+    fetchData();
     if (item.value == "Show Optional Jobs") {
-      fetchData();
       item.value = "Hide Optional Jobs";
     } else {
-      fetchData();
       item.value = "Show Optional Jobs";
     }
   }
@@ -116,7 +115,7 @@ $(function() {
   // determine if we need a strike through or not
   function printableJobCode(rawName, partName, osMap) {
     item = document.getElementById("toggle");
-    // Hack: item.value == "Hide Optional Jobs" because of asynchronous behaviour of toggleState(), it should be actually "Show Optional Jobs".
+    // when item.value == "Hide Optional Jobs", its true value is to "show".
     if (item.value == "Hide Optional Jobs") {
       if (osMap.indexOf(rawName) >= 0) {
         return "<span style='color: grey'>" + partName + " </span>";
