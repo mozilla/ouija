@@ -173,6 +173,8 @@ $(function() {
       mytable.html('<table id="seta" border=0></table>');
     }
     $('#datedesc').replaceWith('<div id="datedesc">' + date + " - " + desc + "</div>");
+    total_jobs = 0;
+    ignore_jobs = 0;
 
     // Iterate through each OS, add a row and colums
     for (var i = 0; i < active_oslist.length; i++) {
@@ -193,6 +195,8 @@ $(function() {
 
       // Iterate through all jobs for the given OS, find a group and code
       active_osjobs[os].sort();
+      total_jobs += active_osjobs[os].length;
+      ignore_jobs += optional_jobs[os].length;
       for (var j = 0; j < active_osjobs[os].length; j++) {
         var jobparts = printName(active_osjobs[os][j]).split('-', 2);
         var group = jobparts[0];
@@ -218,6 +222,11 @@ $(function() {
       }
 
     }
+
+    var ignore = "Jobs to ignore: " + ignore_jobs
+    var remaining = "Jobs to run: " + (total_jobs - ignore_jobs);
+    var total = "Total number of jobs: " + total_jobs;
+    $('#jobs_number').replaceWith('<div id="jobs_number">'+ignore+"<br>"+remaining+"<br>"+total+"<div>");
 
     if (!($('#seta').length)) {
       mytable.appendTo('body');
