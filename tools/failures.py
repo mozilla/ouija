@@ -43,9 +43,9 @@ def communicate(failures, to_remove, total_detected, testmode, date):
         total_changes = 0
 
     if total_changes == 0:
-        send_email(len(failures), len(to_remove), "no changes from previous day", admin=True, results=False)
+        send_email(len(failures), len(to_remove), date, "no changes from previous day", admin=True, results=False)
     else:
-        send_email(len(failures), len(to_remove), str(total_changes)+" changes from previous day", change, admin=True, results=True)
+        send_email(len(failures), len(to_remove), date, str(total_changes) + " changes from previous day", change, admin=True, results=True)
 
 
 def format_in_table(active_jobs, master):
