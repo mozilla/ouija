@@ -32,7 +32,14 @@ $(function() {
           $('<option />', {value: val, text:text}).appendTo(s);
       }
     }
-    s.appendTo('body');
+    toggle = $('<input type="submit" value="Show Optional Jobs" id="toggle" />');
+    if (!($('select').length)) {
+      s.appendTo('body');
+      toggle.appendTo('body');
+      document.getElementById("toggle").addEventListener("click", toggleState);
+    } else {
+      $('select').replaceWith(s);
+    }
 
     printTable(lastDate);
   }
@@ -80,13 +87,29 @@ $(function() {
     return retVal
   }
 
+  function toggleState() {
+    item = document.getElementById("toggle");
+    if (item.value == "Show Optional Jobs") {
+      fetchData();
+      item.value = "Hide Optional Jobs";
+    } else {
+      fetchData();
+      item.value = "Show Optional Jobs";
+    }
+  }
+
   // determine if we need a strike through or not
   // TODO: add features to toggle on off
   function jobCode(rawName, partName, osMap) {
-    if (osMap.indexOf(rawName) >= 0) {
+    item = document.getElementById("toggle");
+    // Hack: item.value == "Hide Optional Jobs" because of asynchronous behaviour of toggleState(), it should be actually "Show Optional Jobs".
+    if (item.value == "Hide Optional Jobs") {
+      if (osMap.indexOf(rawName) >= 0) {
         return "<span style='color: grey'>" + partName + " </span>";
-    } else {
-        return "<span style='color: green'><b>" + partName + " </b></span>";
+      }
+    }
+    if (!(osMap.indexOf(rawName) >= 0)) {
+      return "<span style='color: green'><b>" + partName + " </b></span>";
     }
   }
 
@@ -167,7 +190,11 @@ $(function() {
       }
 
     }
-    mytable.appendTo('body');
+    if (!($('table').length)) {
+      mytable.appendTo('body');
+    } else {
+      $('table').replaceWith(mytable);
+    }
   }
 
   function gotsummary(data) {
