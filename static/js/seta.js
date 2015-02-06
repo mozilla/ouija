@@ -208,11 +208,13 @@ $(function() {
       }
 
     }
-    if (!($('table').length)) {
+
+    if (!($('#seta').length)) {
       mytable.appendTo('body');
     } else {
-      $('table').replaceWith(mytable);
+      $('#seta').replaceWith(mytable);
     }
+
   }
 
   function gotsummary(data) {
