@@ -51,7 +51,9 @@ $(function() {
       });
     });
 
-    if (input_date === undefined || input_date == '') {
+    $("#datepicker").datepicker("setDate", "-2m");
+
+    if (input_date === undefined || input_date === '') {
       printTable(last_date);
     } else {
       printTable(input_date);
