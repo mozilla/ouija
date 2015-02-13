@@ -460,10 +460,14 @@ def run_seta_summary_query():
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    date = request.args.get("date")
+    date = request.args.get("date", "")
     active = request.args.get("active", 0)
     buildbot = request.args.get("buildbot", 0)
     branch = request.args.get("branch", '')
+
+    if date == "" or date == "latest":
+        today = datetime.now()
+        date = today.strftime("%Y-%m-%d")
 
     db = create_db_connnection()
     cursor = db.cursor()
