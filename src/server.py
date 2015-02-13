@@ -351,9 +351,7 @@ def run_platform_query():
             'dates': get_date_range(dates)}
 
 
-@app.route("/data/jobtypes/")
-@json_response
-def run_jobtypes_query():
+def jobtype_query():
     db = create_db_connnection()
     cursor = db.cursor()
     query = "select platform, buildtype, testtype from uniquejobs"
@@ -362,7 +360,12 @@ def run_jobtypes_query():
     for d in cursor.fetchall():
         jobtypes.append([d[0], d[1], d[2]])
 
-    return {'jobtypes': jobtypes}
+    return jobtypes
+
+@app.route("/data/jobtypes/")
+@json_response
+def run_jobtypes_query():
+    return {'jobtypes': jobtype_query()}
 
 
 @app.route("/data/create_jobtypes/")
@@ -457,7 +460,15 @@ def run_seta_summary_query():
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    date = request.args.get("date")
+    date = request.args.get("date", "")
+    active = request.args.get("active", 0)
+    buildbot = request.args.get("buildbot", 0)
+    branch = request.args.get("branch", '')
+
+    if date == "" or date == "latest":
+        today = datetime.now()
+        date = today.strftime("%Y-%m-%d")
+
     db = create_db_connnection()
     cursor = db.cursor()
     query = "select jobtype from seta where date='%s 00:00:00'" % date
@@ -468,10 +479,54 @@ def run_seta_details_query():
     for d in cursor.fetchall():
         parts = d[0].split("'")
         jobtype.append([parts[1], parts[3], parts[5]])
-    retVal[date] = jobtype
 
+    if active:
+        alljobs = jobtype_query()
+        active_jobs = []
+        for job in alljobs:
+            found = False
+            for j in jobtype:
+                if j[0] == job[0] and j[1] == job[1] and j[2] == job[2]:
+                    found = True
+                    break
+            if not found:
+                active_jobs.append(job)
+        jobtype = active_jobs
+
+    if buildbot:
+        active_jobs = []
+        for job in jobtype:
+            active_jobs.append(buildbot_name(job[0], job[1], job[2], branch))
+        jobtype = active_jobs
+
+    retVal[date] = jobtype
     return {'jobtypes': retVal}
 
+
+def buildbot_name(platform, buildtype, jobname, branch):
+    platform_map = {}
+    platform_map['osx-10-8'] = "Rev5 MacOSx Mountain Lion 10.8"
+    platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
+    platform_map['linux32'] = "Ubuntu VM 12.04"
+    platform_map['linux64'] = "Ubuntu VM 12.04 x64"
+    platform_map['linux64asan'] = "Ubuntu ASAN VM 12.04 x64"
+    platform_map['windowsxp'] = "Windows XP 32-bit"
+    platform_map['windows7-32'] = "Windows 7 32-bit"
+    platform_map['windows8-64'] = "Windows 8 64-bit"
+
+    buildtype_map = {}
+    buildtype_map["opt"] = "opt"
+    buildtype_map["debug"] = "debug"
+    buildtype_map["asan"] = "opt"
+
+    if buildtype == 'asan':
+        platform = 'linux64asan'
+
+    if not branch:
+        branch = "%s"
+
+    # TODO: do we need to do a jobname conversion?  I don't see a need yet
+    return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
 @app.errorhandler(404)
 @json_response
