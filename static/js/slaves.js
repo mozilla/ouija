@@ -93,7 +93,7 @@ $(function() {
           cell.append(link);
         }
 
-        else if (v == "sfr" || v == "pfr") {
+        else if (v == "sfr") {
           cell.attr("data-no-retries", stats[v]["failRate"]);
           cell.attr("data-with-retries", stats[v]["failRateWithRetries"]);
         }
