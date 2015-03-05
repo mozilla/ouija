@@ -55,6 +55,16 @@ class Downloader(Worker):
         data = getCSetResults(branch, revision)
         uploadResults(data, branch, revision, date)
 
+
+def getResultSetID(branch, revision):
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" % (branch, revision)
+    try:
+        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+        cdata = response.json()
+        return cdata
+    except SSLError:
+        pass
+
 def getCSetResults(branch, revision):
     """
       https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34
@@ -62,7 +72,10 @@ def getCSetResults(branch, revision):
       no caching as data will change over time.  Some results will be in asap, others will take
       up to 12 hours (usually < 4 hours)
     """
-    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" %(branch, revision)
+
+    rs_data = getResultSetID(branch, revision)
+    results_set_id = rs_data['results'][0]['id']
+    url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
     try:
         response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
         cdata = response.json()
@@ -125,79 +138,70 @@ def uploadResults(data, branch, revision, date):
     job_property_names = data["job_property_names"]
     i = lambda x: job_property_names.index(x)
 
-    for result in data.get("results", []):
-        for platform in result.get("platforms", []):
-            for group in platform.get("groups", []):
-                for job in group.get("jobs", []):
-                    # Instantiate all values to an empty string
-                    _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
-                    _id = '%s' % job[i("id")]
-                    # Skip if result = unknown
-                    _result = job[i("result")]
-                    if _result == u'unknown':
-                        continue
+    results = data['results']
+    for r in results:
+        _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
+        _id = r[i("id")]
 
-                    duration = '%s' % (int(job[i("end_timestamp")]) - int(job[i("start_timestamp")]))
+        # Skip if result = unknown
+        _result = r[i("result")]
+        if _result == u'unknown':
+            continue
 
-                    platform = job[i("platform")]
-                    if not platform:
-                        continue
+        duration = '%s' % (int(r[i("end_timestamp")]) - int(r[i("start_timestamp")]))
 
-                    buildtype = job[i("platform_option")]
+        platform = r[i("platform")]
+        if not platform:
+            continue
+
+        buildtype = r[i("platform_option")]
                    
-                    testtype = job[i("ref_data_name")].split()[-1]
+        testtype = r[i("ref_data_name")].split()[-1]
 
-                    failure_classification = 0
-                    try:
-                        # https://treeherder.mozilla.org/api/failureclassification/
-                        failure_classification = int(job[i("failure_classification_id")])
-                    except ValueError:
-                        failure_classification = 0
+        failure_classification = 0
+        try:
+            # https://treeherder.mozilla.org/api/failureclassification/
+            failure_classification = int(r[i("failure_classification_id")])
+        except ValueError:
+            failure_classification = 0
 
-                    # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
-                    if _result != u'success':
-                        url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
-                        response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-                        notes = response.json()
-                        if notes:
-                            bugid = notes[-1]['note']
+        # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
+        if _result != u'success':
+            url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
+            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+            notes = response.json()
+            if notes:
+                bugid = notes[-1]['note']
 
-                    # Fetch json object from the resource_uri
-                    url = "https://treeherder.mozilla.org" + job[i("resource_uri")]
-                    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-                    data1 = response.json()
+        # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
+        url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
+        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+        data1 = response.json()
 
-                    for j in range(len(data1.get("artifacts", []))):
-			if data1.get("artifacts", [])[j].get("name", "") == u"Structured Log":
-                            url = "https://treeherder.mozilla.org" + data1.get("artifacts", [])[j].get("resource_uri", "")
-                            response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-                            data2 = response.json()
-                            
-                            slave = data2.get("blob", {}).get("header",{}).get("slave","")
-                            break
+        slave = data1['machine_name']
 
-                    if (len(data1.get("logs"))):
-                        log = data1.get("logs", [])[0].get("url", "")
-                    elif (data2):
-                        log = data2.get("blob", {}).get("logurl", "") 
+        if (len(data1.get("logs"))):
+            log = data1.get("logs", [])[0].get("url", "")
+        elif (data2):
+            log = data2.get("blob", {}).get("logurl", "")
 
-                    # Insert into MySQL Database
-                    sql = """insert into testjobs (id, log, slave, result,
-                                                   duration, platform, buildtype, testtype,
-                                                   bugid, branch, revision, date,
-                                                   failure_classification)
-                                         values ('%s', '%s', '%s', '%s', %s,
-                                                 '%s', '%s', '%s', '%s', '%s',
-                                                 '%s', '%s', %s)""" % \
-                          (_id, log, slave, _result, \
-                           duration, platform, buildtype, testtype, \
-                           bugid, branch, revision, date, failure_classification)
+        # Insert into MySQL Database
+        sql = """insert into testjobs (id, log, slave, result,
+                                       duration, platform, buildtype, testtype,
+                                       bugid, branch, revision, date,
+                                       failure_classification)
+                             values ('%s', '%s', '%s', '%s', %s,
+                                     '%s', '%s', '%s', '%s', '%s',
+                                     '%s', '%s', %s)""" % \
+              (_id, log, slave, _result, \
+               duration, platform, buildtype, testtype, \
+               bugid, branch, revision, date, failure_classification)
 
-                    try:
-                        cur.execute(sql)
-                    except MySQLdb.IntegrityError:
-                        # we already have this job
-                        pass
+        try:
+            cur.execute(sql)
+        except MySQLdb.IntegrityError:
+            # we already have this job
+            pass
     cur.close()
    
 
