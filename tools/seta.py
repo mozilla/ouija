@@ -78,8 +78,56 @@ def remove_root_cause_failures(failures, master_root_cause):
         del failures[revision]
     return failures
 
+def invert_index(failures, active_jobs):
+    inv_map = {}
 
-def depth_first(failures, target, ignore_failure):
+    for revision, jobtypes in failures.iteritems():
+        for job in active_jobs:
+            found = is_matched(job, jobtypes)
+            if found:
+                inv_map[str(job)] = inv_map.get(str(job), [])
+                inv_map[str(job)].append(revision)
+
+    maximum = 1
+    for jobtype in sorted(inv_map):
+        if len(inv_map[jobtype]) > maximum:
+            maximum = len(inv_map[jobtype])
+            max_job = jobtype
+            revision_list = inv_map[jobtype]
+
+    if maximum == 1:
+        return failures, None
+
+    for revision in inv_map[max_job]:
+        del failures[revision]
+
+    return failures, max_job
+
+def failures_by_jobtype(failures, target, ignore_failure):
+    total = len(failures)
+    copy_failures = copy.deepcopy(failures)
+    active_jobs = get_distinct_tuples()
+    target = int(total* (target / 100))
+
+    job_needed = ""
+    remaining_jobs = []
+    while job_needed is not None:
+        copy_failures, job_needed = invert_index(copy_failures, active_jobs)
+        if job_needed is not None:
+            remaining_jobs.append(job_needed)
+
+    to_remove = [x for x in active_jobs if str(x) not in remaining_jobs]
+
+     while ignore_failure > 0:
+        copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
+        total = len(copy_failures)
+        to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)
+        ignore_failure -= 1
+
+    total_detected = check_removal(failures, to_remove)
+    return to_remove, total_detected
+
+def weighted_by_jobtype(failures, target, ignore_failure):
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
     print "working with %s failures" % total

@@ -246,16 +246,27 @@ def parse_args(argv=None):
                               Specify the number of *extra* passes to be done."
                         )
 
+    parser.add_argument("--method",
+                        metavar="[failures|weighted]",
+                        dest="method",
+                        default="weighted",
+                        help="This is for deciding the algorithm to run. \
+                              Two algorithms to run currently: [failures|weighted]."
+                        )
+
     options = parser.parse_args(argv)
     return options
 
 
-def analyze_failures(start_date, end_date, testmode, ignore_failure):
+def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     failures = get_raw_data(start_date, end_date)
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100 # 100% detection
 
-    to_remove, total_detected = seta.depth_first(failures, target, ignore_failure)
+    if method == "failures":
+        to_remove, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
+    else:
+        to_remove, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
     communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
@@ -277,4 +288,5 @@ if __name__ == "__main__":
         else:
             start_date = end_date - datetime.timedelta(days=180)
 
-        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure)
+        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
+                        options.method)
