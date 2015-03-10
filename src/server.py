@@ -449,7 +449,7 @@ def run_seta_summary_query():
         dates.append(d[0])
 
     for d in dates:
-        query = "select count(duration) from seta where date='%s'" % d
+        query = "select count(id) from seta where date='%s'" % d
         cursor.execute(query)
         results = cursor.fetchall()
         retVal['%s' % d] = "%s" % results[0]
