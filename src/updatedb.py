@@ -88,7 +88,7 @@ def getPushLog(branch, startdate):
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
 
-    url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
+    url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
     response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
     data = response.content
     pushes = []
@@ -135,12 +135,16 @@ def uploadResults(data, branch, revision, date):
 
     cur = db.cursor()
 
+    if "job_property_names" not in data:
+        return
+
     job_property_names = data["job_property_names"]
     i = lambda x: job_property_names.index(x)
 
     results = data['results']
+    count = 0
     for r in results:
-        _id, log, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
+        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
         _id = r[i("id")]
 
         # Skip if result = unknown
@@ -164,6 +168,9 @@ def uploadResults(data, branch, revision, date):
             failure_classification = int(r[i("failure_classification_id")])
         except ValueError:
             failure_classification = 0
+        except TypeError:
+            logging.warning("Error, failure classification id: expecting an int, but recieved %s instead" % r[i("failure_classification_id")])
+            failure_classification = 0
 
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
         if _result != u'success':
@@ -181,29 +188,30 @@ def uploadResults(data, branch, revision, date):
         slave = data1['machine_name']
 
         if (len(data1.get("logs"))):
-            log = data1.get("logs", [])[0].get("url", "")
-        elif (data2):
-            log = data2.get("blob", {}).get("logurl", "")
+            logfile = data1.get("logs", [])[0].get("url", "")
 
         # Insert into MySQL Database
-        sql = """insert into testjobs (id, log, slave, result,
+        sql = """insert into testjobs (log, slave, result,
                                        duration, platform, buildtype, testtype,
                                        bugid, branch, revision, date,
                                        failure_classification)
-                             values ('%s', '%s', '%s', '%s', %s,
+                             values ('%s', '%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
                                      '%s', '%s', %s)""" % \
-              (_id, log, slave, _result, \
+              (logfile, slave, _result, \
                duration, platform, buildtype, testtype, \
                bugid, branch, revision, date, failure_classification)
 
         try:
             cur.execute(sql)
+            count += 1
         except MySQLdb.IntegrityError:
             # we already have this job
+            logging.warning("sql failed to insert, we probably have this job: %s" % sql)
             pass
     cur.close()
-   
+    logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" % (count, len(results), revision, branch, date))
+
 
 def parseResults(args):
     download_queue = Queue()
@@ -258,4 +266,5 @@ if __name__ == '__main__':
         print('error: unknown branch: ' + args.branch)
         sys.exit(1)
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger("requests").setLevel(logging.WARNING)
     parseResults(args)
