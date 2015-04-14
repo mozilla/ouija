@@ -118,7 +118,7 @@ def failures_by_jobtype(failures, target, ignore_failure):
 
     to_remove = [x for x in active_jobs if str(x) not in remaining_jobs]
 
-     while ignore_failure > 0:
+    while ignore_failure > 0:
         copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
         total = len(copy_failures)
         to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)

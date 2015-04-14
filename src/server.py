@@ -396,10 +396,10 @@ def run_create_jobtypes_query():
                 testtype = testtype[0]
                 # ignore talos, builds, jetpack
                 if testtype in ['svgr', 'svgr-e10s', 'svgr-snow', 'svgr-snow-e10s',
-                                'other', 'other-e10s', 'other-snow', 'other-snow-e10s', 
+                                'other', 'other-e10s', 'other-snow', 'other-snow-e10s',
                                 'chromez', 'chromez-e10s', 'chromez-snow', 'chromez-snow-e10s',
                                 'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
-                                'g1', 'g1-e10s', 'g1-snow', 'g1-snow-e10s', 
+                                'g1', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
                                 'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
                                 'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
                                 'non-unified', 'valgrind']:
@@ -427,7 +427,9 @@ def run_seta_query():
 
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs \
+             where failure_classification=2 and date>='%s' and date<='%s'" \
+             % (start_date, end_date)
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
@@ -527,6 +529,33 @@ def buildbot_name(platform, buildtype, jobname, branch):
 
     # TODO: do we need to do a jobname conversion?  I don't see a need yet
     return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
+
+
+@app.route("/data/dailyjobs/")
+@json_response
+def run_dailyjob_query():
+    start_date, end_date = clean_date_params(request.args)
+    db = create_db_connnection()
+    cursor = db.cursor()
+    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs where date>='%s' and date <='%s'" % (start_date, end_date)
+    cursor.execute(query)
+    output = {}
+    for rows in cursor.fetchall():
+        date = str(rows[0])
+        platform = rows[1]
+        branch = rows[2]
+        numpushes = int(rows[3])
+        numjobs = int(rows[4])
+        sumduration = int(rows[5])
+
+        if date not in output:
+            output[date] = {'mozilla-inbound': [], 'fx-team': []}
+        if 'mozilla-inbound' in branch:
+            output[date]['mozilla-inbound'].append([platform, numpushes, numjobs, sumduration])
+        elif 'fx-team' in branch:
+            output[date]['fx-team'].append([platform, numpushes, numjobs, sumduration])
+    return {'dailyjobs': output}
+
 
 @app.errorhandler(404)
 @json_response
