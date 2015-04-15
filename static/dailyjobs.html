@@ -1,0 +1,161 @@
+<html>
+<head>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+  <script src="js/flot/jquery.flot.min.js"></script>
+  <script src="js/flot/jquery.flot.time.min.js"></script>
+  <script src="js/flot/jquery.flot.selection.min.js"></script>
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+  <title>
+    Tracking SETA
+  </title>
+</head>
+<body>
+  <h1>Tracking SETA</h1>
+  <p>
+    <a href="http://alertmanager.allizom.org/data/dailyjobs/">Raw Data</a><br />
+    <p>
+      Start Date: <input type="text" id="datepicker1">
+      End Date: <input type="text" id="datepicker2">
+      Branch: <select id="branch" onchange="changeBranch();">
+                <option id="mozilla-inbound"> mozilla-inbound </option>
+                <option id="fx-team"> fx-team </option>
+              </select>
+      Platform: <select id="platform" onchange="changePlatform();">
+                <option id="all"> All </option>
+                <option id="linux"> Linux </option>
+                <option id="osx"> OSX </option>
+                <option id="windows"> Windows </option>
+                <option id="windows"> Android </option>
+                </select>
+    </p>
+  <div id="placeholder" style="width:1200px;height:600px"></div>
+  <span id="hoverdata"></span>
+  <span id="clickdata"></span>
+  <script>
+    $(function() {
+      $( "#datepicker1" ).datepicker({
+        dateFormat: 'yy-mm-dd',
+        onSelect: function(selected, event){
+          callStartDate(selected);
+          }
+        });
+    });
+
+    $(function() {
+      $( "#datepicker2" ).datepicker({
+        dateFormat: 'yy-mm-dd',
+        onSelect: function(selected, event){
+          callEndDate(selected);
+        }
+      });
+    });
+
+    var start_date;
+    var end_date;
+    var branch = document.getElementById("branch").value;
+    var platform = document.getElementById("platform").value;
+
+    function changeBranch(){
+      branch = document.getElementById("branch").value;
+      getDailyJobsByDate(start_date, end_date);
+    }
+
+    function changePlatform(){
+      platform = document.getElementById("platform").value;
+      getDailyJobsByDate(start_date, end_date);
+    }
+
+    function callStartDate(date){
+      start_date = date;
+      getDailyJobsByDate(start_date, end_date);
+    }
+
+    function callEndDate(date){
+      end_date = date;
+      getDailyJobsByDate(start_date, end_date);
+    }
+
+    function getDailyJobsByDate(start_date, end_date){
+      var url = "http://alertmanager.allizom.org/data/dailyjobs/?";
+      if (typeof start_date !== 'undefined' || typeof end_date !== 'undefined'){
+        url += "startDate="+start_date+"&endDate="+end_date;
+      }
+      $.getJSON(url, function(data){
+          var dictionary = data["dailyjobs"];
+          var plot_data = [];
+          var ticks = [];
+
+          for (var key in data["dailyjobs"]){
+            if (platform == "All"){
+              array = dictionary[key][branch].slice(0, 3);
+            }
+            else if (platform == "Linux"){
+              array = [dictionary[key][branch][0]];
+            }
+            else if (platform == "OSX"){
+              array = [dictionary[key][branch][1]];
+            }
+            else if (platform == "Windows"){
+              array = [dictionary[key][branch][2]];
+            }
+            else if (platform == "Android"){
+              array = [dictionary[key][branch][3]];
+            }
+            var date = key.replace("00:00:00", "");
+            var parts = date.split('-');
+            date = new Date(parts[0], parts[1] - 1, parts[2]);
+            var jobs = 0;
+            var pushes = 0;
+            for (var list in array){
+              pushes = array[list][1];
+              jobs += array[list][2];
+            }
+            var plot = jobs/pushes;
+            plot_data.push([date, plot]);
+          }
+
+          var dataset = [{
+            label: "jobs/pushes vs dates for seta",
+            data: plot_data
+            }];
+          var options = {
+            grid: {
+              hoverable: true,
+              clickable: true
+            },
+            xaxis: {
+              mode: "time"
+            }
+          };
+          $.plot($("#placeholder"), dataset, options);
+
+
+          $("<div id='tooltip'></div>").css({
+            position: "absolute",
+            display: "none",
+            border: "1px solid #fdd",
+            padding: "2px",
+            "background-color": "#fee",
+            opacity: 0.80
+            }).appendTo("body");
+
+          $("#placeholder").bind("plothover", function (event, pos, item) {
+          if (item) {
+            var x = item.datapoint[0].toFixed(2),
+            y = item.datapoint[1].toFixed(2);
+            x = new Date(parseInt(x));
+            $("#tooltip").html(x + "<br />" + y)
+              .css({top: item.pageY+5, left: item.pageX+5})
+              .fadeIn(200);
+          } else {
+            $("#tooltip").hide();
+          }
+        });
+      });
+    }
+
+    getDailyJobsByDate();
+    </script>
+</body>
+</html>
