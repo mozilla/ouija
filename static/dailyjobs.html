@@ -30,8 +30,6 @@
                 </select>
     </p>
   <div id="placeholder" style="width:1200px;height:600px"></div>
-  <span id="hoverdata"></span>
-  <span id="clickdata"></span>
   <script>
     $(function() {
       $( "#datepicker1" ).datepicker({
@@ -84,7 +82,6 @@
       $.getJSON(url, function(data){
           var dictionary = data["dailyjobs"];
           var plot_data = [];
-          var ticks = [];
 
           for (var key in data["dailyjobs"]){
             if (platform == "All"){
@@ -115,6 +112,10 @@
             plot_data.push([date, plot]);
           }
 
+          var events = [{
+                          'date': new Date("04/10/2015").getTime(),
+                          'title': "SETA Starts"
+                        }];
           var dataset = [{
             label: "jobs/pushes vs dates for seta",
             data: plot_data
@@ -122,14 +123,42 @@
           var options = {
             grid: {
               hoverable: true,
-              clickable: true
+              clickable: true,
+              // Add a vertical line on the graph when SETA starts
+              markings: [{
+                color: "#000",
+                lineWidth: 1,
+                xaxis: { from: events[0]['date'], to: events[0]['date'] }
+              }]
             },
             xaxis: {
               mode: "time"
+            },
+            yaxis:{
+              min: 0,
+              max: 800
             }
           };
-          $.plot($("#placeholder"), dataset, options);
 
+          var plot = $.plot($("#placeholder"), dataset, options);
+
+          for(var i in events){
+            // Add the event title
+            var o = plot.pointOffset({ x: events[i]["date"], y: 100});
+            $("#placeholder").append("<div style='position:absolute;left:" + (o.left + 4) +
+            "px;top:" + o.top + "px;font-size:smaller'>"+events[i]["title"]+"</div>");
+
+            // Add a small arrow beside the text in the graph
+            var ctx = plot.getCanvas().getContext("2d");
+            ctx.beginPath();
+            o.left += 4;
+            ctx.moveTo(o.left, o.top);
+            ctx.lineTo(o.left, o.top - 10);
+            ctx.lineTo(o.left + 10, o.top - 5);
+            ctx.lineTo(o.left, o.top);
+            ctx.fillStyle = "#000";
+            ctx.fill();
+          }
 
           $("<div id='tooltip'></div>").css({
             position: "absolute",
