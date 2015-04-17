@@ -371,8 +371,8 @@ def run_jobtypes_query():
 @app.route("/data/create_jobtypes/")
 @json_response
 def run_create_jobtypes_query():
-    # skipping b2g*, android*, mulet*, osx-10-10
-    platforms = ['osx-10-6', 'osx-10-8', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
+    # skipping b2g*, android*, mulet*
+    platforms = ['android-2-3-armv7-api9', 'android-4-2-x86', 'osx-10-6', 'osx-10-10', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
 
     # skipping pgo - We run this infrequent enough that we should have all pgo results tested
     buildtypes = ['debug', 'asan', 'opt']
@@ -427,9 +427,7 @@ def run_seta_query():
 
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs \
-             where failure_classification=2 and date>='%s' and date<='%s'" \
-             % (start_date, end_date)
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
@@ -507,7 +505,10 @@ def run_seta_details_query():
 
 def buildbot_name(platform, buildtype, jobname, branch):
     platform_map = {}
-    platform_map['osx-10-8'] = "Rev5 MacOSx Mountain Lion 10.8"
+    platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
+    platform_map['android-4-2-x86'] = "android-4-2-x86"
+    platform_map['osx-10-10'] = "Rev5 MacOSX Yosemite 10.10"
+    platform_map['osx-10-8'] = "Rev5 MacOSX Mountain Lion 10.8"
     platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
     platform_map['linux32'] = "Ubuntu VM 12.04"
     platform_map['linux64'] = "Ubuntu VM 12.04 x64"
@@ -537,7 +538,7 @@ def run_dailyjob_query():
     start_date, end_date = clean_date_params(request.args)
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs where date>='%s' and date <='%s'" % (start_date, end_date)
+    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs where date>='%s' and date <='%s';" % (start_date, end_date)
     cursor.execute(query)
     output = {}
     for rows in cursor.fetchall():
