@@ -17,6 +17,10 @@
     <p>
       Start Date: <input type="text" id="datepicker1">
       End Date: <input type="text" id="datepicker2">
+      Range: <select id="range" onchange="changeRange();">
+                <option id="days"> days </option>
+                <option id="weeks"> weeks </option>
+              </select>
       Branch: <select id="branch" onchange="changeBranch();">
                 <option id="mozilla-inbound"> mozilla-inbound </option>
                 <option id="fx-team"> fx-team </option>
@@ -31,6 +35,25 @@
     </p>
   <div id="placeholder" style="width:1200px;height:600px"></div>
   <script>
+    /*
+    Algorithm is to find nearest thursday, it's year
+    is the year of the week number. Then get weeks
+    between that date and the first day of that year.
+    */
+    Date.prototype.getWeekNumber = function(){
+      var d = new Date(+this);
+      d.setHours(0,0,0);
+      d.setDate(d.getDate()+4-(d.getDay()||7));
+      return Math.ceil((((d-new Date(d.getFullYear(),0,1))/8.64e7)+1)/7);
+    };
+
+    function getDateOfWeek(week, year) {
+      var d = (1 + (week - 1) * 7); // 1st of January + 7 days for each week
+      var dt = new Date(year, 0, d);
+      var date = dt.getFullYear() + "-" + (dt.getMonth() + 1) + "-" + dt.getDate();
+      return date;
+    }
+
     $(function() {
       $( "#datepicker1" ).datepicker({
         dateFormat: 'yy-mm-dd',
@@ -64,6 +87,10 @@
       getDailyJobsByDate(start_date, end_date);
     }
 
+    function changeRange(){
+      getDailyJobsByDate(start_date, end_date);
+    }
+
     function callStartDate(date){
       start_date = date;
       getDailyJobsByDate(start_date, end_date);
@@ -74,16 +101,54 @@
       getDailyJobsByDate(start_date, end_date);
     }
 
+    function getRange(dict){
+      dictionary = {};
+
+      for (var key in dict){
+        // Calculating the week_number from key, and then converting it to date
+        var date = key.replace(" 00:00:00", "");
+        var parts = date.split('-');
+        var week_number = new Date(date).getWeekNumber();
+        var year = parts[0];
+        var date = getDateOfWeek(week_number, year);
+
+        if ( !(date in dictionary) ){
+            dictionary[date] = {
+              "fx-team": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]],
+              "mozilla-inbound": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]]
+            };
+        }
+
+        var branches = ["fx-team", "mozilla-inbound"];
+        for (var i=0; i<branches.length; i++){
+          var weeks_array = dictionary[date][branches[i]];
+          var days_array = dict[key][branches[i]];
+
+          for (var j=0; j<days_array.length; j++){
+            weeks_array[j][1] += days_array[j][1];
+            weeks_array[j][2] += days_array[j][2];
+            weeks_array[j][3] += days_array[j][3];
+          }
+        }
+      }
+      return dictionary;
+    }
+
     function getDailyJobsByDate(start_date, end_date){
       var url = "http://alertmanager.allizom.org/data/dailyjobs/?";
       if (typeof start_date !== 'undefined' || typeof end_date !== 'undefined'){
         url += "startDate="+start_date+"&endDate="+end_date;
       }
       $.getJSON(url, function(data){
+          var range = document.getElementById("range").value;
+          if (range == "weeks"){
+            data["dailyjobs"] = getRange(data["dailyjobs"]);
+          }
           var dictionary = data["dailyjobs"];
           var plot_data = [];
 
           for (var key in data["dailyjobs"]){
+            var array = [];
             if (platform == "All"){
               array = dictionary[key][branch].slice(0, 3);
             }
@@ -104,7 +169,7 @@
             date = new Date(parts[0], parts[1] - 1, parts[2]);
             var jobs = 0;
             var pushes = 0;
-            for (var list in array){
+            for (var list=0; list<array.length; list++){
               pushes = array[list][1];
               jobs += array[list][2];
             }
