@@ -20,6 +20,7 @@
       Range: <select id="range" onchange="changeRange();">
                 <option id="days"> days </option>
                 <option id="weeks"> weeks </option>
+                <option id="months"> months </option>
               </select>
       Branch: <select id="branch" onchange="changeBranch();">
                 <option id="mozilla-inbound"> mozilla-inbound </option>
@@ -101,16 +102,22 @@
       getDailyJobsByDate(start_date, end_date);
     }
 
-    function getRange(dict){
+    function getRange(dict, type){
       dictionary = {};
 
       for (var key in dict){
         // Calculating the week_number from key, and then converting it to date
         var date = key.replace(" 00:00:00", "");
         var parts = date.split('-');
-        var week_number = new Date(date).getWeekNumber();
         var year = parts[0];
-        var date = getDateOfWeek(week_number, year);
+        if (type == "weeks"){
+          var week_number = new Date(date).getWeekNumber();
+          var date = getDateOfWeek(week_number, year);
+        }
+        else if (type == "months"){
+          var month_number = new Date(date).getMonth() + 1;
+          var date = year+"-"+month_number+"-"+"01"
+        }
 
         if ( !(date in dictionary) ){
             dictionary[date] = {
@@ -141,8 +148,8 @@
       }
       $.getJSON(url, function(data){
           var range = document.getElementById("range").value;
-          if (range == "weeks"){
-            data["dailyjobs"] = getRange(data["dailyjobs"]);
+          if (range == "weeks" || range == "months"){
+            data["dailyjobs"] = getRange(data["dailyjobs"], range);
           }
           var dictionary = data["dailyjobs"];
           var plot_data = [];
