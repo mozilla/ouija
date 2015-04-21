@@ -62,11 +62,11 @@ $(function() {
   }
 
   function printTable(date) {
-    $.getJSON("/data/setadetails/", {date:date}).done(function (data) { getActiveJobs(data, date); });
+    $.getJSON("http://alertmanager.allizom.org/data/setadetails/", {date:date}).done(function (data) { getActiveJobs(data, date); });
   }
 
   function getActiveJobs(details, date) {
-    $.getJSON("/data/jobtypes/").done(function (data) { outputTable(data, details, date); });
+    $.getJSON("http://alertmanager.allizom.org/data/jobtypes/").done(function (data) { outputTable(data, details, date); });
   }
 
   // Simple text replace of full names -> Group-Code format
@@ -248,7 +248,7 @@ $(function() {
 
   function fetchData(e) {
     if (e) e.preventDefault();
-    $.getJSON("/data/setasummary/").done(gotsummary).fail(fail);
+    $.getJSON("http://alertmanager.allizom.org/data/setasummary/").done(gotsummary).fail(fail);
   }
 
   $(document).on("ajaxStart ajaxStop", function (e) {
