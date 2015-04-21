@@ -427,7 +427,8 @@ def run_seta_query():
 
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
+    query = "select bugid, platform, buildtype, testtype, duration from testjobs \
+             where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
     cursor.execute(query)
     failures = {}
     for d in cursor.fetchall():
@@ -538,7 +539,8 @@ def run_dailyjob_query():
     start_date, end_date = clean_date_params(request.args)
     db = create_db_connnection()
     cursor = db.cursor()
-    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs where date>='%s' and date <='%s';" % (start_date, end_date)
+    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs \
+             where date>='%s' and date <='%s'" % (start_date, end_date)
     cursor.execute(query)
     output = {}
     for rows in cursor.fetchall():
