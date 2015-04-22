@@ -187,7 +187,12 @@
           var events = [{
                           'date': new Date("04/10/2015").getTime(),
                           'title': "SETA Starts"
-                        }];
+                        },
+                        {
+                          'date': new Date("04/21/2015").getTime(),
+                          'title': "Added linux64 and osx 10.10"
+                        }
+                        ];
           var dataset = [{
             label: "jobs/pushes vs dates for seta",
             data: plot_data
@@ -209,6 +214,11 @@
                 color: "#000",
                 lineWidth: 1,
                 xaxis: { from: events[0]['date'], to: events[0]['date'] }
+              },
+              {
+                color: "#000",
+                lineWidth: 1,
+                xaxis: { from: events[1]['date'], to: events[1]['date'] }
               }]
             },
             xaxis: {
