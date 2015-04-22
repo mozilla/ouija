@@ -89,12 +89,15 @@ $(function() {
     retVal = retVal.replace('cppunit', 'O-Cpp');
     retVal = retVal.replace(/jittest[-]?/, 'O-Jit');
     retVal = retVal.replace('web-platform-tests', 'WPT');
+    retVal = retVal.replace('jetpack', 'JP');
+    retVal = retVal.replace('luciddream', 'O-Ld');
     return retVal;
   }
 
   function fixPlatform(plat) {
     retVal = plat.replace('osx10.6', 'osx-10-6');
     retVal = retVal.replace('osx10.8', 'osx-10-8');
+    retVal = retVal.replace('osx10.10', 'osx-10-10');
     retVal = retVal.replace('winxp', 'windowsxp');
     retVal = retVal.replace('win7', 'windows7-32');
     retVal = retVal.replace('win8', 'windows8-64');
@@ -160,7 +163,7 @@ $(function() {
     var active_oslist = ['linux32 opt', 'linux32 debug',
                          'linux64 opt', 'linux64 asan', 'linux64 debug',
                          'osx-10-6 opt', 'osx-10-6 debug',
-                         'osx-10-8 opt', 'osx-10-8 debug',
+                         'osx-10-10 opt', 'osx-10-10 debug',
                          'windowsxp opt', 'windowsxp debug',
                          'windows7-32 opt', 'windows7-32 debug',
                          'windows8-64 opt', 'windows8-64 debug'];
