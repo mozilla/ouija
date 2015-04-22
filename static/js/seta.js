@@ -83,6 +83,7 @@ $(function() {
     retVal = retVal.replace('jsreftest', 'R-J');
     retVal = retVal.replace('reftest-no-accel', 'R-RU');
     retVal = retVal.replace('reftest-e10s', 'Re10s-R');
+    retVal = retVal.replace('plain-reftest', 'R');
     retVal = retVal.replace('reftest', 'R-R');
     retVal = retVal.replace('xpcshell', 'O-X');
     retVal = retVal.replace('marionette', 'O-Mn');
@@ -91,6 +92,8 @@ $(function() {
     retVal = retVal.replace('web-platform-tests', 'WPT');
     retVal = retVal.replace('jetpack', 'JP');
     retVal = retVal.replace('luciddream', 'O-Ld');
+    retVal = retVal.replace('robocop', 'RC');
+    retVal = retVal.replace('androidx86-set', 'S');
     return retVal;
   }
 
@@ -166,7 +169,8 @@ $(function() {
                          'osx-10-10 opt', 'osx-10-10 debug',
                          'windowsxp opt', 'windowsxp debug',
                          'windows7-32 opt', 'windows7-32 debug',
-                         'windows8-64 opt', 'windows8-64 debug'];
+                         'windows8-64 opt', 'windows8-64 debug',
+                         'android-2-3-armv7-api9 opt', "android-4-2-x86 opt"];
 
     var mytable = $('#seta');
     var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 6 months";
@@ -190,7 +194,10 @@ $(function() {
       var types = { 'O': {'group': 'O'},
                     'M': {'group': 'M'}, "Me10s": {'group': 'M-e10s'},
                     'R': {'group': 'R'}, 'Re10s': {'group': 'R-e10s'},
-                    'WPT': {'group': 'W'}}
+                    'WPT': {'group': 'W'},
+                    'RC': {'group': 'RC'},
+                    'S': {'group': 'S'}
+                  }
 
       for (var type in types) {
           types[type]['div'] = $('<span></span>').html('').appendTo(td_div);
@@ -199,11 +206,19 @@ $(function() {
       // Iterate through all jobs for the given OS, find a group and code
       active_osjobs[os].sort();
       total_jobs += active_osjobs[os].length;
-      ignore_jobs += optional_jobs[os].length;
+      if (os in optional_jobs){
+        ignore_jobs += optional_jobs[os].length;
+      }
+      else{
+        optional_jobs[os] = [];
+      }
       for (var j = 0; j < active_osjobs[os].length; j++) {
-        var jobparts = printName(active_osjobs[os][j]).split('-', 2);
+        var jobparts = printName(active_osjobs[os][j]).split('-', 3);
         var group = jobparts[0];
         var jobcode = jobparts[1];
+        if (jobparts.length == 3){
+          jobcode = jobparts[1]+"-"+jobparts[2];
+        }
 
         if (group in types) {
           $('<span></span>').html(printableJobCode(active_osjobs[os][j], jobcode, optional_jobs[os])).appendTo(types[group]['div']);

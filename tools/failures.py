@@ -161,7 +161,8 @@ def format_in_table(active_jobs, master):
                  'robocop-6': {'group': 'RC', 'code': '6'},
                  'robocop-7': {'group': 'RC', 'code': '7'},
                  'robocop-8': {'group': 'RC', 'code': '8'},
-                 'reftest': {'group': 'R', 'code': 'R'}}
+                 'reftest': {'group': 'R', 'code': 'R'},
+                 'androidx86-set-4': {'group': 'S', 'code': '4'}}
 
     for jobtype in active_jobs:
         key = "%s_%s" % (jobtype[0], jobtype[1])
