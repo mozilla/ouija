@@ -540,7 +540,13 @@ def run_dailyjob_query():
     db = create_db_connnection()
     cursor = db.cursor()
     query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs \
-             where date>='%s' and date <='%s'" % (start_date, end_date)
+             where date>='%s' and date <='%s'\
+             order by case platform \
+                when 'linux' then 1 \
+                when 'osx' then 2  \
+                when 'win' then 3  \
+                when 'android' then 4 \
+                end" % (start_date, end_date)
     cursor.execute(query)
     output = {}
     for rows in cursor.fetchall():
