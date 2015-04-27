@@ -157,7 +157,7 @@
           for (var key in data["dailyjobs"]){
             var array = [];
             if (platform == "All"){
-              array = dictionary[key][branch].slice(0, 3);
+              array = dictionary[key][branch];
             }
             else if (platform == "Linux"){
               array = [dictionary[key][branch][0]];
@@ -189,8 +189,8 @@
                           'title': "SETA Starts"
                         },
                         {
-                          'date': new Date("04/21/2015").getTime(),
-                          'title': "Added linux64 and osx 10.10"
+                          'date': new Date("04/22/2015").getTime(),
+                          'title': "Added linux64/osx 10.10/android2.3"
                         }
                         ];
           var dataset = [{
