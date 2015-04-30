@@ -127,7 +127,22 @@ def failures_by_jobtype(failures, target, ignore_failure):
     total_detected = check_removal(failures, to_remove)
     return to_remove, total_detected
 
+
+def remove_b2g_jobs(failures):
+    for revision, jobtypes in failures.iteritems():
+        for job in list(jobtypes):
+            if "b2g" in job[0]:
+                jobtypes.remove(job)
+
+    for revision in failures.keys():
+        if failures[revision] == []:
+            del failures[revision]
+
+    return failures
+
+
 def weighted_by_jobtype(failures, target, ignore_failure):
+    failures = remove_b2g_jobs(failures)
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
     print "working with %s failures" % total
