@@ -399,7 +399,7 @@ def run_create_jobtypes_query():
                                 'other', 'other-e10s', 'other-snow', 'other-snow-e10s',
                                 'chromez', 'chromez-e10s', 'chromez-snow', 'chromez-snow-e10s',
                                 'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
-                                'g1', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
+                                'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
                                 'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
                                 'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
                                 'non-unified', 'valgrind']:
