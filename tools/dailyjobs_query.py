@@ -49,6 +49,7 @@ def summarize(date, branch):
         numpushes = 0
         numjobs = 0
         sumduration = 0
+
         for rev in revisions_dict:
             if platform not in revisions_dict[rev]:
                 continue
@@ -59,15 +60,17 @@ def summarize(date, branch):
 
             numpushes += 1
             numjobs += value[1]
-            sumduration += value[2]
+            if (value[2] >= 0):
+              sumduration += value[2]
 
         updatedb(date, platform, branch, numpushes, numjobs, sumduration)
 
 
 def retrievedb(branch, date):
     query = "select revision,count(result),sum(duration),platform from testjobs \
-             where branch='{0}' and date like '{1}%' group by revision,platform;"
+             where branch='{0}' and date like '{1}%' and testtype not like '%build%' and testtype!='valgrind' group by revision,platform;"
     query = query.format(branch, date)
+    print query
     cur.execute(query)
 
     for rows in cur.fetchall():

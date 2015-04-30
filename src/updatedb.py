@@ -57,7 +57,7 @@ class Downloader(Worker):
 
 
 def getResultSetID(branch, revision):
-    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s&with_jobs=true" % (branch, revision)
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s" % (branch, revision)
     try:
         response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
         cdata = response.json()
