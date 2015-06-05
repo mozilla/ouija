@@ -77,6 +77,7 @@ $(function() {
     retVal = retVal.replace('mochitest-e10s', 'Me10s');
     retVal = retVal.replace(/mochitest-devtools-chrome[-]?/, 'M-dt');
     retVal = retVal.replace('mochitest-other', 'M-oth');
+    retVal = retVal.replace('mochitest-push', 'M-p');
     retVal = retVal.replace('mochitest', 'M');
     retVal = retVal.replace('crashtest-ipc', 'R-C-ipc');
     retVal = retVal.replace('crashtest', 'R-C');
@@ -170,7 +171,8 @@ $(function() {
                          'windowsxp opt', 'windowsxp debug',
                          'windows7-32 opt', 'windows7-32 debug',
                          'windows8-64 opt', 'windows8-64 debug',
-                         'android-2-3-armv7-api9 opt', "android-4-2-x86 opt"];
+                         'android-2-3-armv7-api9 opt', 'android-4-2-x86 opt',
+                         'android-4-3-armv7-api11 opt', 'android-4-3-armv7-api11 debug'];
 
     var mytable = $('#seta');
     var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 6 months";

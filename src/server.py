@@ -372,7 +372,7 @@ def run_jobtypes_query():
 @json_response
 def run_create_jobtypes_query():
     # skipping b2g*, android*, mulet*
-    platforms = ['android-2-3-armv7-api9', 'android-4-2-x86', 'osx-10-6', 'osx-10-10', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
+    platforms = ['android-2-3-armv7-api9', 'android-4-2-x86', 'android-4-3-armv7-api11', 'osx-10-6', 'osx-10-10', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
 
     # skipping pgo - We run this infrequent enough that we should have all pgo results tested
     buildtypes = ['debug', 'asan', 'opt']
@@ -402,7 +402,7 @@ def run_create_jobtypes_query():
                                 'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
                                 'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
                                 'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
-                                'non-unified', 'valgrind']:
+                                'non-unified', 'valgrind', '5151c298eaed59034a45e3c4e3d4e0003fed4a14']:
                     continue
 
                 if testtype:
@@ -508,6 +508,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map = {}
     platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
     platform_map['android-4-2-x86'] = "android-4-2-x86"
+    platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
     platform_map['osx-10-10'] = "Rev5 MacOSX Yosemite 10.10"
     platform_map['osx-10-8'] = "Rev5 MacOSX Mountain Lion 10.8"
     platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
