@@ -180,6 +180,24 @@ def uploadResults(data, branch, revision, date):
             if notes:
                 bugid = notes[-1]['note']
 
+        # get failure snippets: https://treeherder.mozilla.org/api/project/mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
+        failures = []
+        if failure_classification == 2:
+            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&name=Bug+suggestions&type=json" % (branch, _id)
+            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
+            snippets = response.json()
+            if snippets:
+                for item in snippets[0]["blob"]:
+                    if not item['search_terms'] and len(item['search_terms']) < 1:
+                        continue
+                    filename = item['search_terms'][0]
+                    if filename.endswith('.js') or filename.endswith('.xul') or filename.endswith('.html'):
+                        dir = item['search']
+                        dir = (dir.split('|')[1]).strip()
+                        if dir.endswith(filename):
+                            dir = dir.split(filename)[0]
+                            failures.append(dir + '/' + filename)
+
         # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
         url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
         response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
@@ -194,13 +212,13 @@ def uploadResults(data, branch, revision, date):
         sql = """insert into testjobs (log, slave, result,
                                        duration, platform, buildtype, testtype,
                                        bugid, branch, revision, date,
-                                       failure_classification)
+                                       failure_classification, failures)
                              values ('%s', '%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
-                                     '%s', '%s', %s)""" % \
+                                     '%s', '%s', %s, '%s')""" % \
               (logfile, slave, _result, \
                duration, platform, buildtype, testtype, \
-               bugid, branch, revision, date, failure_classification)
+               bugid, branch, revision, date, failure_classification, ','.join(failures))
 
         try:
             cur.execute(sql)
