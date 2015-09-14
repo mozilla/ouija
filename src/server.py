@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
 from functools import wraps
+import treecodes
 
 import MySQLdb
 from flask import Flask, request, json, Response, abort
@@ -395,14 +396,18 @@ def run_create_jobtypes_query():
             for testtype in cursor.fetchall():
                 testtype = testtype[0]
                 # ignore talos, builds, jetpack
-                if testtype in ['svgr', 'svgr-e10s', 'svgr-snow', 'svgr-snow-e10s',
-                                'other', 'other-e10s', 'other-snow', 'other-snow-e10s',
-                                'chromez', 'chromez-e10s', 'chromez-snow', 'chromez-snow-e10s',
+                if testtype in ['svgr', 'svgr-e10s', 'svgr-osx', 'svgr-osx-e10s',
+                                'other', 'other-e10s', 'other-osx', 'other-osx-e10s',
+                                'chromez', 'chromez-e10s', 'chromez-osx', 'chromez-osx-e10s',
                                 'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
-                                'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
+                                'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-osx-e10s',
                                 'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
-                                'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
-                                'non-unified', 'valgrind', '5151c298eaed59034a45e3c4e3d4e0003fed4a14']:
+                                'xperf', 'xperf-e10s', 'other-e10s', 'dep', 'nightly', 'jetpack',
+                                'non-unified', 'valgrind']:
+                    continue
+
+                # skip taskcluster jobs
+                if len(testtype) == 40:
                     continue
 
                 if testtype:
@@ -533,6 +538,32 @@ def buildbot_name(platform, buildtype, jobname, branch):
     # TODO: do we need to do a jobname conversion?  I don't see a need yet
     return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
+@app.route("/data/jobnames/")
+@json_response
+def run_jobnames_query():
+    # inbound is a safe default
+    branch = request.args.get("branch", 'mozilla-inbound')
+    json_jobnames = {'results': []}
+
+    raw_names = jobtype_query()
+    for job in raw_names:
+        signature = '' # TH specific
+        buildtype = job[1]
+        platform = job[0] # TODO: transform this
+        name = job[2] # TODO: do we need to transform this?
+        jobname = '' # TH specific
+        buildername = buildbot_name(platform, buildtype, name, branch)
+        group = treecodes.getGroup(name)
+        groupcode = treecodes.getGroupCode(name)
+        code = treecodes.getCode(name)
+        data = {'jobname': jobname, 'signature': signature,
+                'job_type_name': group, 'job_group_symbol': groupcode,
+                'name': name, 'job_type_symbol': code,
+                'ref_data_name': buildername,
+                'platform': platform, 'buildtype': buildtype}
+        json_jobnames['results'].append(data)
+
+    return json_jobnames
 
 @app.route("/data/dailyjobs/")
 @json_response

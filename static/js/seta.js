@@ -66,38 +66,14 @@ $(function() {
   }
 
   function getActiveJobs(details, date) {
-    $.getJSON("http://alertmanager.allizom.org/data/jobtypes/").done(function (data) { outputTable(data, details, date); });
+    $.getJSON("http://alertmanager.allizom.org/data/jobtypes/").done(function (data) { getTreeNames(data, details, date); });
   }
 
-  // Simple text replace of full names -> Group-Code format
-  function printName(testname) {
-    var retVal = testname.replace(/mochitest-browser-chrome[-]?/, 'M-bc');
-    retVal = retVal.replace(/mochitest-e10s-browser-chrome[-]?/, 'Me10s-bc');
-    retVal = retVal.replace(/mochitest-e10s-devtools-chrome[-]?/, 'M-dt');
-    retVal = retVal.replace('mochitest-e10s', 'Me10s');
-    retVal = retVal.replace(/mochitest-devtools-chrome[-]?/, 'M-dt');
-    retVal = retVal.replace('mochitest-other', 'M-oth');
-    retVal = retVal.replace('mochitest-push', 'M-p');
-    retVal = retVal.replace('mochitest', 'M');
-    retVal = retVal.replace('crashtest-ipc', 'R-C-ipc');
-    retVal = retVal.replace('crashtest', 'R-C');
-    retVal = retVal.replace('jsreftest', 'R-J');
-    retVal = retVal.replace('reftest-no-accel', 'R-RU');
-    retVal = retVal.replace('reftest-e10s', 'Re10s-R');
-    retVal = retVal.replace('plain-reftest', 'R');
-    retVal = retVal.replace('reftest', 'R-R');
-    retVal = retVal.replace('xpcshell', 'O-X');
-    retVal = retVal.replace('marionette', 'O-Mn');
-    retVal = retVal.replace('cppunit', 'O-Cpp');
-    retVal = retVal.replace(/jittest[-]?/, 'O-Jit');
-    retVal = retVal.replace('web-platform-tests', 'WPT');
-    retVal = retVal.replace('jetpack', 'JP');
-    retVal = retVal.replace('luciddream', 'O-Ld');
-    retVal = retVal.replace('robocop', 'RC');
-    retVal = retVal.replace('androidx86-set', 'S');
-    return retVal;
+  function getTreeNames(activeJobs, details, date) {
+    $.getJSON("http://alertmanager.allizom.org/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
   }
 
+  //TODO: replace this
   function fixPlatform(plat) {
     retVal = plat.replace('osx10.6', 'osx-10-6');
     retVal = retVal.replace('osx10.8', 'osx-10-8');
@@ -147,7 +123,7 @@ $(function() {
     return map;
   }
 
-  function outputTable(active_jobs, details, date) {
+  function outputTable(treenames, active_jobs, details, date) {
     // Get the list of jobs per platform that we don't need to run
     var optional_jobs = buildOSJobMap(details['jobtypes'][date]);
 
@@ -164,6 +140,7 @@ $(function() {
     // Get a list of all the active jobs on the tree
     var active_osjobs = buildOSJobMap(active_jobs['jobtypes']);
 
+    // TODO: make this dynamic
     var active_oslist = ['linux32 opt', 'linux32 debug',
                          'linux64 opt', 'linux64 asan', 'linux64 debug',
                          'osx-10-6 opt', 'osx-10-6 debug',
@@ -193,16 +170,17 @@ $(function() {
       var td_jobs = $('<td></td>').appendTo(row);
       var td_div = $('<div style="float: left"></div>').appendTo(td_jobs);
 
-      var types = { 'O': {'group': 'O'},
-                    'M': {'group': 'M'}, "Me10s": {'group': 'M-e10s'},
-                    'R': {'group': 'R'}, 'Re10s': {'group': 'R-e10s'},
-                    'WPT': {'group': 'W'},
-                    'RC': {'group': 'RC'},
-                    'S': {'group': 'S'}
-                  }
+
+      var types = {'O': {}}; //Default with other
+      for (var jid = 0; jid < treenames.length; jid++) {
+        var g = treenames[jid]['job_group_symbol'];
+        if (!(g in types)) {
+          types[g] = {};
+        }
+      }
 
       for (var type in types) {
-          types[type]['div'] = $('<span></span>').html('').appendTo(td_div);
+        types[type]['div'] = $('<span></span>').html('').appendTo(td_div);
       }
 
       // Iterate through all jobs for the given OS, find a group and code
@@ -215,17 +193,24 @@ $(function() {
         optional_jobs[os] = [];
       }
       for (var j = 0; j < active_osjobs[os].length; j++) {
-        var jobparts = printName(active_osjobs[os][j]).split('-', 3);
-        var group = jobparts[0];
-        var jobcode = jobparts[1];
-        if (jobparts.length == 3){
-          jobcode = jobparts[1]+"-"+jobparts[2];
+        var group = '';
+        var jobcode = '';
+        for (var jid = 0; jid < treenames.length; jid++) {
+          if (treenames[jid]['name'] == active_osjobs[os][j]) {
+              group = treenames[jid]['job_group_symbol'];
+              jobcode = treenames[jid]['job_type_symbol'];
+              break;
+          }
+        }
+
+        if (jobcode != '' && group == '') {
+           group = 'O';
         }
 
         if (group in types) {
           $('<span></span>').html(printableJobCode(active_osjobs[os][j], jobcode, optional_jobs[os])).appendTo(types[group]['div']);
         } else {
-          alert("couldn't find matching group: " + group + ", with code: " + jobcode);
+          alert("couldn't find matching group: " + group + ", with code: " + jobcode + ": "+ active_osjobs[os][j] + ": " + types);
         }
       }
 
@@ -237,7 +222,7 @@ $(function() {
         if (leftover.replace(/ /g, '') == '') {
             types[type]['div'].html('');
         } else if (type != 'O') {
-           types[type]['div'].html(types[type]['group'] + '(' + leftover.replace(/\s+$/g, '') + ') ');
+           types[type]['div'].html(type + '(' + leftover.replace(/\s+$/g, '') + ') ');
         }
       }
 
