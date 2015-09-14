@@ -140,16 +140,10 @@ $(function() {
     // Get a list of all the active jobs on the tree
     var active_osjobs = buildOSJobMap(active_jobs['jobtypes']);
 
-    // TODO: make this dynamic
-    var active_oslist = ['linux32 opt', 'linux32 debug',
-                         'linux64 opt', 'linux64 asan', 'linux64 debug',
-                         'osx-10-6 opt', 'osx-10-6 debug',
-                         'osx-10-10 opt', 'osx-10-10 debug',
-                         'windowsxp opt', 'windowsxp debug',
-                         'windows7-32 opt', 'windows7-32 debug',
-                         'windows8-64 opt', 'windows8-64 debug',
-                         'android-2-3-armv7-api9 opt', 'android-4-2-x86 opt',
-                         'android-4-3-armv7-api11 opt', 'android-4-3-armv7-api11 debug'];
+    var active_oslist = [];
+    for (var os in active_osjobs) {
+      active_oslist.push(os);
+    }
 
     var mytable = $('#seta');
     var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 6 months";
