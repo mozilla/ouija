@@ -11,7 +11,8 @@ import treecodes
 import MySQLdb
 from flask import Flask, request, json, Response, abort
 
-static_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 
 class CSetSummary(object):
@@ -410,6 +411,16 @@ def run_create_jobtypes_query():
             for testtype in types:
                 jobtypes.append([platform, buildtype, testtype])
 
+    # Add in preseed.json
+    preseed = []
+    with open(os.path.join(SCRIPT_DIR, 'preseed.json'), 'r') as fHandle:
+        preseed = json.load(fHandle)
+
+    for job in preseed:
+        j = [job['platform'], job['buildtype'], job['name']]
+        if j not in jobtypes:
+            jobtypes.append(j)
+
     cursor.execute("delete from uniquejobs");
     for j in jobtypes:
         query = "insert into uniquejobs (platform, buildtype, testtype) values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
@@ -519,9 +530,10 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map['windows8-64'] = "Windows 8 64-bit"
 
     buildtype_map = {}
-    buildtype_map["opt"] = "opt"
-    buildtype_map["debug"] = "debug"
-    buildtype_map["asan"] = "opt"
+    buildtype_map["opt"] = "opt test"
+    buildtype_map["debug"] = "debug test"
+    buildtype_map["asan"] = "opt test"
+    buildtype_map["talos"] = "talos"
 
     if buildtype == 'asan':
         platform = 'linux64asan'
@@ -529,8 +541,11 @@ def buildbot_name(platform, buildtype, jobname, branch):
     if not branch:
         branch = "%s"
 
+    if jobname.startswith(('tp5o', 'chromez', 'dromaeojs', 'other', 'g1', 'g2', 'xperf', 'svgr')):
+        buildtype = 'talos'
+
     # TODO: do we need to do a jobname conversion?  I don't see a need yet
-    return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
+    return "%s %s %s %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
 @app.route("/data/jobnames/")
 @json_response
