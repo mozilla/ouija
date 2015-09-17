@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 import datetime
 import MySQLdb
@@ -7,6 +8,7 @@ from emails import send_email
 
 import seta
 
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_raw_data(start_date, end_date):
     if not end_date:
@@ -231,6 +233,20 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
         to_remove, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
     else:
         to_remove, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
+
+    preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
+    preseed = []
+    with open(preseed_path, 'r') as fHandle:
+        preseed = json.load(fHandle)
+
+    for job in preseed:
+        #TODO: if expired, ignore
+        jobspec = [job['platform'], job['buildtype'], job['name']]
+        if jobspec in to_remove and job['action'] == 'run':
+            to_remove.remove(jobspec)
+        elif jobspec not in to_remove and job['action'] == 'coalesce':
+            to_remove.append(jobspec)
+
     communicate(failures, to_remove, total_detected, testmode, end_date)
 
 if __name__ == "__main__":

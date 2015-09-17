@@ -11,7 +11,8 @@ import treecodes
 import MySQLdb
 from flask import Flask, request, json, Response, abort
 
-static_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 
 class CSetSummary(object):
@@ -372,8 +373,8 @@ def run_jobtypes_query():
 @app.route("/data/create_jobtypes/")
 @json_response
 def run_create_jobtypes_query():
-    # skipping b2g*, android*, mulet*
-    platforms = ['android-2-3-armv7-api9', 'android-4-2-x86', 'android-4-3-armv7-api11', 'osx-10-6', 'osx-10-10', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
+    alljobs = jobtype_query()
+    platforms = list(set(job[0] for job in alljobs))
 
     # skipping pgo - We run this infrequent enough that we should have all pgo results tested
     buildtypes = ['debug', 'asan', 'opt']
@@ -395,15 +396,8 @@ def run_create_jobtypes_query():
             types = []
             for testtype in cursor.fetchall():
                 testtype = testtype[0]
-                # ignore talos, builds, jetpack
-                if testtype in ['svgr', 'svgr-e10s', 'svgr-osx', 'svgr-osx-e10s',
-                                'other', 'other-e10s', 'other-osx', 'other-osx-e10s',
-                                'chromez', 'chromez-e10s', 'chromez-osx', 'chromez-osx-e10s',
-                                'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
-                                'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-osx-e10s',
-                                'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
-                                'xperf', 'xperf-e10s', 'other-e10s', 'dep', 'nightly', 'jetpack',
-                                'non-unified', 'valgrind']:
+                # ignore builds, jetpack
+                if testtype in ['dep', 'nightly', 'jetpack', 'non-unified', 'valgrind']:
                     continue
 
                 # skip taskcluster jobs
@@ -416,6 +410,16 @@ def run_create_jobtypes_query():
             types.sort()
             for testtype in types:
                 jobtypes.append([platform, buildtype, testtype])
+
+    # Add in preseed.json
+    preseed = []
+    with open(os.path.join(SCRIPT_DIR, 'preseed.json'), 'r') as fHandle:
+        preseed = json.load(fHandle)
+
+    for job in preseed:
+        j = [job['platform'], job['buildtype'], job['name']]
+        if j not in jobtypes:
+            jobtypes.append(j)
 
     cursor.execute("delete from uniquejobs");
     for j in jobtypes:
@@ -511,6 +515,7 @@ def run_seta_details_query():
 
 def buildbot_name(platform, buildtype, jobname, branch):
     platform_map = {}
+    #TODO: determine buildernames via alternative measures
     platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
     platform_map['android-4-2-x86'] = "android-4-2-x86"
     platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
@@ -525,9 +530,10 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map['windows8-64'] = "Windows 8 64-bit"
 
     buildtype_map = {}
-    buildtype_map["opt"] = "opt"
-    buildtype_map["debug"] = "debug"
-    buildtype_map["asan"] = "opt"
+    buildtype_map["opt"] = "opt test"
+    buildtype_map["debug"] = "debug test"
+    buildtype_map["asan"] = "opt test"
+    buildtype_map["talos"] = "talos"
 
     if buildtype == 'asan':
         platform = 'linux64asan'
@@ -535,8 +541,11 @@ def buildbot_name(platform, buildtype, jobname, branch):
     if not branch:
         branch = "%s"
 
+    if jobname.startswith(('tp5o', 'chromez', 'dromaeojs', 'other', 'g1', 'g2', 'xperf', 'svgr')):
+        buildtype = 'talos'
+
     # TODO: do we need to do a jobname conversion?  I don't see a need yet
-    return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
+    return "%s %s %s %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
 @app.route("/data/jobnames/")
 @json_response
