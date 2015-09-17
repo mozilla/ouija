@@ -10,7 +10,7 @@ database = MySQLdb.connect(host="localhost",
                          db="ouija")
 cur = database.cursor()
 
-branches = ["mozilla-inbound", "fx-team"]
+branches = ["mozilla-inbound", "fx-team", "try"]
 platforms = ["linux", "osx", "win", "android"]
 
 

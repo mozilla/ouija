@@ -599,11 +599,13 @@ def run_dailyjob_query():
         sumduration = int(rows[5])
 
         if date not in output:
-            output[date] = {'mozilla-inbound': [], 'fx-team': []}
+            output[date] = {'mozilla-inbound': [], 'fx-team': [], 'try': []}
         if 'mozilla-inbound' in branch:
             output[date]['mozilla-inbound'].append([platform, numpushes, numjobs, sumduration])
         elif 'fx-team' in branch:
             output[date]['fx-team'].append([platform, numpushes, numjobs, sumduration])
+        elif 'try' in branch:
+            output[date]['try'].append([platform, numpushes, numjobs, sumduration])
     return {'dailyjobs': output}
 
 
