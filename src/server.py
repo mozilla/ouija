@@ -519,7 +519,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
     platform_map['android-4-2-x86'] = "android-4-2-x86"
     platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
-    platform_map['osx-10-10'] = "Rev5 MacOSX Yosemite 10.10"
+    platform_map['osx-10-10'] = "Rev7 MacOSX Yosemite 10.10.5"
     platform_map['osx-10-8'] = "Rev5 MacOSX Mountain Lion 10.8"
     platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
     platform_map['linux32'] = "Ubuntu VM 12.04"
