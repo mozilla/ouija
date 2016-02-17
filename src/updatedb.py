@@ -10,6 +10,11 @@ from Queue import Queue
 
 import requests
 
+DEFAULT_REQUEST_HEADERS = {
+    'Accept': 'application/json',
+    'User-Agent': 'ouija',
+}
+
 branch_paths = {
     'mozilla-central': 'mozilla-central',
     'mozilla-inbound': 'integration/mozilla-inbound',
@@ -58,12 +63,7 @@ class Downloader(Worker):
 
 def getResultSetID(branch, revision):
     url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s" % (branch, revision)
-    try:
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        cdata = response.json()
-        return cdata
-    except SSLError:
-        pass
+    return fetch_json(url)
 
 def getCSetResults(branch, revision):
     """
@@ -76,20 +76,15 @@ def getCSetResults(branch, revision):
     rs_data = getResultSetID(branch, revision)
     results_set_id = rs_data['results'][0]['id']
     url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
-    try:
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        cdata = response.json()
-        return cdata
-    except SSLError:
-        pass
+    return fetch_json(url)
 
 def getPushLog(branch, startdate):
     """
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
-
+    # TODO: Replace this with fetch_json() using /jsonpushlog
     url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
-    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
+    response = requests.get(url)
     data = response.content
     pushes = []
     csetid = re.compile('.*Changeset ([0-9a-f]{12}).*')
@@ -186,8 +181,7 @@ def uploadResults(data, branch, revision, date):
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
         if _result != u'success':
             url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
-            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-            notes = response.json()
+            notes = fetch_json(url)
             if notes:
                 bugid = notes[-1]['note']
 
@@ -195,8 +189,7 @@ def uploadResults(data, branch, revision, date):
         failures = []
         if failure_classification == 2:
             url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&name=Bug+suggestions&type=json" % (branch, _id)
-            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-            snippets = response.json()
+            snippets = fetch_json(url)
             if snippets:
                 for item in snippets[0]["blob"]:
                     if not item['search_terms'] and len(item['search_terms']) < 1:
@@ -211,8 +204,7 @@ def uploadResults(data, branch, revision, date):
 
         # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
         url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        data1 = response.json()
+        data1 = fetch_json(url)
 
         slave = data1['machine_name']
 
@@ -281,6 +273,13 @@ def parseResults(args):
     #ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
 
     time.sleep(0.1)
+
+
+def fetch_json(url):
+    response = requests.get(url, headers=DEFAULT_REQUEST_HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')
