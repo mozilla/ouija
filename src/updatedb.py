@@ -161,6 +161,17 @@ def uploadResults(data, branch, revision, date):
         buildtype = r[i("platform_option")]
                    
         testtype = r[i("ref_data_name")].split()[-1]
+        if r[i("build_system_type")] == "taskcluster":
+            #TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
+            pmap = {"linux64": "Linux64",
+                    "linux32": "Linux32",
+                    "osx-10-7": "MacOSX64",
+                    "gecko-decision": "gecko-decision",
+                    "lint": "lint"}
+            p = platform
+            if platform in pmap:
+                p = pmap[platform]
+            testtype = r[i("job_type_name")].split(p)[-1]
 
         failure_classification = 0
         try:
