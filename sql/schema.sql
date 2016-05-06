@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `date` datetime NOT NULL,
 -- https://treeherder.mozilla.org/api/failureclassification/
   `failure_classification` int(11) NOT NULL,
+  `failures` varchar(256) DEFAULT NULL,
   index `revision` (`revision`),
   index `date` (`date`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
