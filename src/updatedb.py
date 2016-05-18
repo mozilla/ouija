@@ -83,27 +83,20 @@ def getPushLog(branch, startdate):
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
     # TODO: Replace this with fetch_json() using /jsonpushlog
-    url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
-    response = requests.get(url)
-    data = response.content
+    url = "https://hg.mozilla.org/%s//json-pushes?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
+    response = fetch_json(url)
+    pushids = response.keys()
     pushes = []
-    csetid = re.compile('.*Changeset ([0-9a-f]{12}).*')
-    dateid = re.compile('.*([0-9]{4}\-[0-9]{2}\-[0-9]{2})T([0-9\:]+)Z.*')
     push = None
     date = None
-    for line in data.split('\n'):
-        matches = csetid.match(line)
-        if matches:
-            push = matches.group(1)
+    for pushid in pushids:
+        # we should switch to 40 characters in the further
+        changeset = response[pushid]['changesets'][0][0:12]
+        if changeset:
+            date = datetime.datetime.fromtimestamp(response[pushid]['date'])
 
-        matches = dateid.match(line)
-        if matches:
-            ymd = map(int, matches.groups(2)[0].split('-'))
-            hms = map(int, matches.groups(2)[1].split(':'))
-            date = datetime.datetime(ymd[0], ymd[1], ymd[2], hms[0], hms[1], hms[2])
-
-        if push and date and date >= startdate:
-            pushes.append([push, date])
+        if changeset and date and date >= startdate:
+            pushes.append([changeset, date])
             push = None
             date = None
     return pushes
