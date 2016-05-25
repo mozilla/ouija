@@ -10,6 +10,7 @@ import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
+
 def get_raw_data(start_date, end_date):
     if not end_date:
         end_date = datetime.datetime.now()
@@ -17,7 +18,8 @@ def get_raw_data(start_date, end_date):
     if not start_date:
         start_date = end_date - datetime.timedelta(days=180)
 
-    url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
+          (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     response = requests.get(url, headers={'accept-encoding': 'json'}, verify=True)
     data = json.loads(response.content)
@@ -28,8 +30,9 @@ def communicate(failures, to_remove, total_detected, testmode, date):
 
     active_jobs = seta.get_distinct_tuples()
     format_in_table(active_jobs, to_remove)
-    percent_detected = ((len(total_detected) / (len(failures)*1.0)) * 100)
-    print "We will detect %.2f%% (%s) of the %s failures" % (percent_detected, len(total_detected), len(failures))
+    percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
+    print "We will detect %.2f%% (%s) of the %s failures" % \
+          (percent_detected, len(total_detected), len(failures))
 
     if testmode:
         return
@@ -38,16 +41,19 @@ def communicate(failures, to_remove, total_detected, testmode, date):
 
     if date is None:
         date = datetime.date.today()
-    change = print_diff("%s" % (date - datetime.timedelta(days=1)).strftime('%Y-%m-%d'), '%s' % date.strftime('%Y-%m-%d'))
+    change = print_diff("%s" % (date - datetime.timedelta(days=1)).strftime('%Y-%m-%d'), '%s' %
+                        date.strftime('%Y-%m-%d'))
     try:
         total_changes = len(change)
     except TypeError:
         total_changes = 0
 
     if total_changes == 0:
-        send_email(len(failures), len(to_remove), date, "no changes from previous day", admin=True, results=False)
+        send_email(len(failures), len(to_remove), date, "no changes from previous day",
+                   admin=True, results=False)
     else:
-        send_email(len(failures), len(to_remove), date, str(total_changes) + " changes from previous day", change, admin=True, results=True)
+        send_email(len(failures), len(to_remove), date, str(total_changes) +
+                   " changes from previous day", change, admin=True, results=True)
 
 
 def format_in_table(active_jobs, master):
@@ -55,7 +61,8 @@ def format_in_table(active_jobs, master):
     sum_removed = 0
     sum_remaining = 0
 
-    data = requests.get('http://alertmanager.allizom.org/data/jobnames/', headers={'accept-encoding': 'json'}, verify=True).json()
+    data = requests.get('http://alertmanager.allizom.org/data/jobnames/',
+                        headers={'accept-encoding': 'json'}, verify=True).json()
     running_jobs = data['results']
 
     for jobtype in active_jobs:
@@ -121,9 +128,9 @@ def insert_in_database(to_remove, date=None):
 
 def run_query(query):
     database = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
+                               user="root",
+                               passwd="root",
+                               db="ouija")
 
     cur = database.cursor()
     cur.execute(query)
@@ -173,7 +180,8 @@ def print_diff(start_date, end_date):
         deletion.sort()
         if not deletion:
             deletion = ''
-        print "%s: These jobs have changed from the previous day: %s" % (end_date.strftime("%Y-%m-%d"), deletion)
+        print "%s: These jobs have changed from the previous day: %s" % \
+              (end_date.strftime("%Y-%m-%d"), deletion)
         return deletion
 
 
@@ -227,7 +235,7 @@ def parse_args(argv=None):
 def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     failures = get_raw_data(start_date, end_date)
     print "date: %s, failures: %s" % (end_date, len(failures))
-    target = 100 # 100% detection
+    target = 100  # 100% detection
 
     if method == "failures":
         to_remove, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
@@ -240,7 +248,7 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
         preseed = json.load(fHandle)
 
     for job in preseed:
-        #TODO: if expired, ignore
+        # TODO: if expired, ignore
         jobspec = [job['platform'], job['buildtype'], job['name']]
         if jobspec in to_remove and job['action'] == 'run':
             to_remove.remove(jobspec)
@@ -269,4 +277,4 @@ if __name__ == "__main__":
             start_date = end_date - datetime.timedelta(days=180)
 
         analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
-                        options.method)
+                         options.method)

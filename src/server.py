@@ -15,6 +15,7 @@ SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 
+
 class CSetSummary(object):
     def __init__(self, cset_id):
         self.cset_id = cset_id
@@ -130,18 +131,23 @@ def binify(bins, data):
 @app.route("/data/results/flot/day/")
 @json_response
 def run_results_day_flot_query():
-    """ This function returns the total failures/total jobs data per day for all platforms. It is sending the data in the format required by flot.Flot is a jQuery package used for 'attractive' plotting """
+    """ This function returns the total failures/total jobs data per day for all platforms.
+        It is sending the data in the format required by flot.Flot is a jQuery package used
+        for 'attractive' plotting
+    """
 
     start_date, end_date = clean_date_params(request.args)
 
-    platforms = ['android4.0', 'android2.3', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
+    platforms = ['android4.0', 'android2.3', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6',
+                 'osx10.7', 'osx10.8']
     db = create_db_connnection()
 
     data_platforms = {}
     for platform in platforms:
         cursor = db.cursor()
-        cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as totals from testjobs
-                          where platform="%s" and date >= "%s" and date <= "%s" group by day""" % ('testfailed', platform, start_date, end_date))
+        cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as
+                          totals from testjobs where platform="%s" and date >= "%s" and date <= "%s"
+                          group by day""" % ('testfailed', platform, start_date, end_date))
 
         query_results = cursor.fetchall()
 
@@ -224,7 +230,6 @@ def run_slaves_query():
                                          results['total'])
         data[slave]['sfr'] = fail_rates
 
-
     platforms = {}
 
     # group slaves by platform and calculate platform failure rate
@@ -267,8 +272,8 @@ def run_platform_query():
     start_date, end_date = clean_date_params(request.args)
 
     log_message = 'platform: %s startDate: %s endDate: %s' % (platform,
-                    start_date.strftime('%Y-%m-%d'),
-                    end_date.strftime('%Y-%m-%d'))
+                                                              start_date.strftime('%Y-%m-%d'),
+                                                              end_date.strftime('%Y-%m-%d'))
     app.logger.debug(log_message)
 
     db = create_db_connnection()
@@ -364,6 +369,7 @@ def jobtype_query():
 
     return jobtypes
 
+
 @app.route("/data/jobtypes/")
 @json_response
 def run_jobtypes_query():
@@ -421,9 +427,10 @@ def run_create_jobtypes_query():
         if j not in jobtypes:
             jobtypes.append(j)
 
-    cursor.execute("delete from uniquejobs");
+    cursor.execute("delete from uniquejobs")
     for j in jobtypes:
-        query = "insert into uniquejobs (platform, buildtype, testtype) values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
+        query = "insert into uniquejobs (platform, buildtype, testtype) " \
+                "values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
         cursor.execute(query)
 
     return {'status': 'ok'}
@@ -515,7 +522,7 @@ def run_seta_details_query():
 
 def buildbot_name(platform, buildtype, jobname, branch):
     platform_map = {}
-    #TODO: determine buildernames via alternative measures
+    # TODO: determine buildernames via alternative measures
     platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
     platform_map['android-4-2-x86'] = "android-4-2-x86"
     platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
@@ -548,6 +555,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
     # TODO: do we need to do a jobname conversion?  I don't see a need yet
     return "%s %s %s %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
+
 @app.route("/data/jobnames/")
 @json_response
 def run_jobnames_query():
@@ -557,11 +565,11 @@ def run_jobnames_query():
 
     raw_names = jobtype_query()
     for job in raw_names:
-        signature = '' # TH specific
+        signature = ''  # TH specific
         buildtype = job[1]
-        platform = job[0] # TODO: transform this
-        name = job[2] # TODO: do we need to transform this?
-        jobname = '' # TH specific
+        platform = job[0]  # TODO: transform this
+        name = job[2]  # TODO: do we need to transform this?
+        jobname = ''  # TH specific
         buildername = buildbot_name(platform, buildtype, name, branch)
         group = treecodes.getGroup(name)
         groupcode = treecodes.getGroupCode(name)
@@ -574,6 +582,7 @@ def run_jobnames_query():
         json_jobnames['results'].append(data)
 
     return json_jobnames
+
 
 @app.route("/data/dailyjobs/")
 @json_response
@@ -615,9 +624,11 @@ def run_dailyjob_query():
 def handler404(error):
     return {"status": 404, "msg": str(error)}
 
+
 @app.route("/")
 def root_directory():
     return template("index.html")
+
 
 @app.route("/<string:filename>")
 def template(filename):

@@ -1,5 +1,4 @@
 import argparse
-import re
 import MySQLdb
 import datetime
 import sys
@@ -49,6 +48,7 @@ class Worker(Thread):
             finally:
                 self.queue.task_done()
 
+
 class Downloader(Worker):
 
     def __init__(self, download_queue, **kargs):
@@ -62,8 +62,10 @@ class Downloader(Worker):
 
 
 def getResultSetID(branch, revision):
-    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s" % (branch, revision)
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/" \
+          "?format=json&full=true&revision=%s" % (branch, revision)
     return fetch_json(url)
+
 
 def getCSetResults(branch, revision):
     """
@@ -75,15 +77,19 @@ def getCSetResults(branch, revision):
 
     rs_data = getResultSetID(branch, revision)
     results_set_id = rs_data['results'][0]['id']
-    url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
+    url = "https://treeherder.mozilla.org/api/project/%s/jobs/?" \
+          "count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
     return fetch_json(url)
+
 
 def getPushLog(branch, startdate):
     """
       https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
     """
     # TODO: Replace this with fetch_json() using /jsonpushlog
-    url = "https://hg.mozilla.org/%s//json-pushes?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
+    url = "https://hg.mozilla.org/%s//json-pushes?startdate=%04d-%02d-%02d&" \
+          "tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month,
+                          startdate.day)
     response = fetch_json(url)
     pushids = response.keys()
     pushes = []
@@ -101,10 +107,16 @@ def getPushLog(branch, startdate):
             date = None
     return pushes
 
+
 def clearResults(branch, startdate):
 
     date_xx_days_ago = datetime.date.today() - datetime.timedelta(days=180)
-    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, startdate.hour, startdate.minute, startdate.second, date_xx_days_ago.year, date_xx_days_ago.month, date_xx_days_ago.day)
+    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= ' \
+                                '"%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % \
+                                (branch, startdate.year, startdate.month, startdate.day,
+                                 startdate.hour, startdate.minute, startdate.second,
+                                 date_xx_days_ago.year, date_xx_days_ago.month,
+                                 date_xx_days_ago.day)
 
     db = MySQLdb.connect(host="localhost",
                          user="root",
@@ -114,6 +126,7 @@ def clearResults(branch, startdate):
     cur = db.cursor()
     cur.execute(delete_delta_and_old_data)
     cur.close()
+
 
 def uploadResults(data, branch, revision, date):
     db = MySQLdb.connect(host="localhost",
@@ -132,7 +145,8 @@ def uploadResults(data, branch, revision, date):
     results = data['results']
     count = 0
     for r in results:
-        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
+        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = \
+            '', '', '', '', '', '', '', '', ''
         _id = r[i("id")]
 
         # Skip if result = unknown
@@ -147,10 +161,10 @@ def uploadResults(data, branch, revision, date):
             continue
 
         buildtype = r[i("platform_option")]
-                   
+
         testtype = r[i("ref_data_name")].split()[-1]
         if r[i("build_system_type")] == "taskcluster":
-            #TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
+            # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
             pmap = {"linux64": "Linux64",
                     "linux32": "Linux32",
                     "osx-10-7": "MacOSX64",
@@ -168,7 +182,8 @@ def uploadResults(data, branch, revision, date):
         except ValueError:
             failure_classification = 0
         except TypeError:
-            logging.warning("Error, failure classification id: expecting an int, but recieved %s instead" % r[i("failure_classification_id")])
+            logging.warning("Error, failure classification id: expecting an int, "
+                            "but recieved %s instead" % r[i("failure_classification_id")])
             failure_classification = 0
 
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
@@ -178,17 +193,21 @@ def uploadResults(data, branch, revision, date):
             if notes:
                 bugid = notes[-1]['note']
 
-        # get failure snippets: https://treeherder.mozilla.org/api/project/mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
+        # get failure snippets:
+        # https://treeherder.mozilla.org/api/project/mozilla-inbound/artifact/?
+        # job_id=11651377&name=Bug+suggestions&type=json
         failures = []
         if failure_classification == 2:
-            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&name=Bug+suggestions&type=json" % (branch, _id)
+            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&" \
+                  "name=Bug+suggestions&type=json" % (branch, _id)
             snippets = fetch_json(url)
             if snippets:
                 for item in snippets[0]["blob"]:
                     if not item['search_terms'] and len(item['search_terms']) < 1:
                         continue
                     filename = item['search_terms'][0]
-                    if filename.endswith('.js') or filename.endswith('.xul') or filename.endswith('.html'):
+                    if (filename.endswith('.js') or filename.endswith('.xul') or
+                            filename.endswith('.html')):
                         dir = item['search']
                         dir = (dir.split('|')[1]).strip()
                         if dir.endswith(filename):
@@ -201,7 +220,7 @@ def uploadResults(data, branch, revision, date):
 
         slave = data1['machine_name']
 
-        if (len(data1.get("logs"))):
+        if len(data1.get("logs")):
             logfile = data1.get("logs", [])[0].get("url", "")
 
         # Insert into MySQL Database
@@ -212,8 +231,8 @@ def uploadResults(data, branch, revision, date):
                              values ('%s', '%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
                                      '%s', '%s', %s, '%s')""" % \
-              (logfile, slave, _result, \
-               duration, platform, buildtype, testtype, \
+              (logfile, slave, _result,
+               duration, platform, buildtype, testtype,
                bugid, branch, revision, date, failure_classification, ','.join(failures))
 
         try:
@@ -224,14 +243,15 @@ def uploadResults(data, branch, revision, date):
             logging.warning("sql failed to insert, we probably have this job: %s" % sql)
             pass
     cur.close()
-    logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" % (count, len(results), revision, branch, date))
+    logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" %
+                 (count, len(results), revision, branch, date))
 
 
 def parseResults(args):
     download_queue = Queue()
 
     for i in range(args.threads):
-        Downloader(download_queue, name="Downloader %s" % (i+1)).start()
+        Downloader(download_queue, name="Downloader %s" % (i + 1)).start()
 
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
@@ -251,19 +271,19 @@ def parseResults(args):
     download_queue.join()
     logging.info('Downloading completed')
 
-    #Sometimes the parent may exit and the child is not immidiately killed.
-    #This may result in the error like the following -
+    # Sometimes the parent may exit and the child is not immidiately killed.
+    # This may result in the error like the following -
     #
-    #Exception in thread DBHandler (most likely raised during interpreter shutdown):
-    #Traceback (most recent call last):
-    #File "/usr/lib/python2.7/threading.py", line 810, in __bootstrap_inner
-    #File "updatedb.py", line 120, in run
-    #File "/usr/lib/python2.7/Queue.py", line 168, in get
-    #File "/usr/lib/python2.7/threading.py", line 332, in wait
+    # Exception in thread DBHandler (most likely raised during interpreter shutdown):
+    # Traceback (most recent call last):
+    # File "/usr/lib/python2.7/threading.py", line 810, in __bootstrap_inner
+    # File "updatedb.py", line 120, in run
+    # File "/usr/lib/python2.7/Queue.py", line 168, in get
+    # File "/usr/lib/python2.7/threading.py", line 332, in wait
     #: 'NoneType' object is not callable
     #
-    #The following line works as a fix
-    #ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
+    # The following line works as a fix
+    # ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
 
     time.sleep(0.1)
 

@@ -1,13 +1,12 @@
 import MySQLdb
 import datetime
 from argparse import ArgumentParser
-import sys
 
 revisions_dict = {}
 database = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
+                           user="root",
+                           passwd="root",
+                           db="ouija")
 cur = database.cursor()
 
 branches = ["mozilla-inbound", "fx-team", "try"]
@@ -18,14 +17,14 @@ def parse_args(argv=None):
     parser = ArgumentParser()
     parser.add_argument("-s", "--start-date",
                         metavar="YYYY-MM-DD",
-                        default = datetime.date.today() - datetime.timedelta(days=1),
+                        default=datetime.date.today() - datetime.timedelta(days=1),
                         dest="start_date",
                         help="starting date."
                         )
 
     parser.add_argument("-e", "--end-date",
                         metavar="YYYY-MM-DD",
-                        default = datetime.date.today(),
+                        default=datetime.date.today(),
                         dest="end_date",
                         help="ending date."
                         )
@@ -35,7 +34,7 @@ def parse_args(argv=None):
 
 
 def updatedb(date, platform, branch, numpushes, numjobs, sumduration):
-    cur.execute('delete from dailyjobs where date="%s" and branch="%s" and platform="%s"' \
+    cur.execute('delete from dailyjobs where date="%s" and branch="%s" and platform="%s"'
                 % (date, branch, platform))
     query = 'insert into dailyjobs (date, platform, branch, numpushes, numjobs, sumduration) \
              values ("{0}", "{1}", "{2}", {3}, {4}, {5})'
@@ -60,15 +59,16 @@ def summarize(date, branch):
 
             numpushes += 1
             numjobs += value[1]
-            if (value[2] >= 0):
-              sumduration += value[2]
+            if value[2] >= 0:
+                sumduration += value[2]
 
         updatedb(date, platform, branch, numpushes, numjobs, sumduration)
 
 
 def retrievedb(branch, date):
     query = "select revision,count(result),sum(duration),platform from testjobs \
-             where branch='{0}' and date like '{1}%' and testtype not like '%build%' and testtype!='valgrind' group by revision,platform;"
+             where branch='{0}' and date like '{1}%' and testtype not like '%build%' " \
+            "and testtype!='valgrind' group by revision,platform;"
     query = query.format(branch, date)
     print query
     cur.execute(query)
@@ -121,12 +121,11 @@ if __name__ == "__main__":
     end_at = options.end_date + datetime.timedelta(days=1)
 
     for branch in branches:
-         current_date = start_at
-         while current_date <= end_at:
+        current_date = start_at
+        while current_date <= end_at:
             retrievedb(branch, str(current_date))
             current_date = current_date + datetime.timedelta(days=1)
-
-         current_date = options.start_date
-         while current_date <= options.end_date:
+            current_date = options.start_date
+        while current_date <= options.end_date:
             summarize(str(current_date), branch)
             current_date = current_date + datetime.timedelta(days=1)
