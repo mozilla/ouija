@@ -93,7 +93,6 @@ def getPushLog(branch, startdate):
     response = fetch_json(url)
     pushids = response.keys()
     pushes = []
-    push = None
     date = None
     for pushid in pushids:
         # we should switch to 40 characters in the further
@@ -103,7 +102,6 @@ def getPushLog(branch, startdate):
 
         if changeset and date and date >= startdate:
             pushes.append([changeset, date])
-            push = None
             date = None
     return pushes
 
@@ -145,8 +143,8 @@ def uploadResults(data, branch, revision, date):
     results = data['results']
     count = 0
     for r in results:
-        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = \
-            '', '', '', '', '', '', '', '', ''
+        _id, logfile, slave, duration, platform, buildtype, testtype, bugid = \
+            '', '', '', '', '', '', '', ''
         _id = r[i("id")]
 
         # Skip if result = unknown

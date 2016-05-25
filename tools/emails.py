@@ -1,6 +1,5 @@
 import smtplib
 import json
-import datetime
 import os
 from email.mime.text import MIMEText
 

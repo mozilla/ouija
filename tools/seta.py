@@ -95,7 +95,6 @@ def invert_index(failures, active_jobs):
         if len(inv_map[jobtype]) > maximum:
             maximum = len(inv_map[jobtype])
             max_job = jobtype
-            revision_list = inv_map[jobtype]
 
     if maximum == 1:
         return failures, None
@@ -111,6 +110,7 @@ def failures_by_jobtype(failures, target, ignore_failure):
     copy_failures = copy.deepcopy(failures)
     active_jobs = get_distinct_tuples()
     target = int(total * (target / 100))
+    master_root_cause = []
 
     job_needed = ""
     remaining_jobs = []
