@@ -42,7 +42,6 @@ def serialize_to_json(object):
 
 def json_response(func):
     """Decorator: Serialize response to json"""
-
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = json.dumps(func(*args, **kwargs) or {"error": "No data found for your request"},
@@ -131,11 +130,11 @@ def binify(bins, data):
 @app.route("/data/results/flot/day/")
 @json_response
 def run_results_day_flot_query():
-    """ This function returns the total failures/total jobs data per day for all platforms.
-        It is sending the data in the format required by flot.Flot is a jQuery package used
-        for 'attractive' plotting
     """
-
+    This function returns the total failures/total jobs data per day for all platforms.
+    It is sending the data in the format required by flot.Flot is a jQuery package used
+    for 'attractive' plotting
+    """
     start_date, end_date = clean_date_params(request.args)
 
     platforms = ['android4.0',

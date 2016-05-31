@@ -69,23 +69,19 @@ def getResultSetID(branch, revision):
 
 def getCSetResults(branch, revision):
     """
-      https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34
-
-      no caching as data will change over time.  Some results will be in asap, others will take
-      up to 12 hours (usually < 4 hours)
+    https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34.
+    no caching as data will change over time.  Some results will be in asap, others will take
+    up to 12 hours (usually < 4 hours)
     """
-
     rs_data = getResultSetID(branch, revision)
     results_set_id = rs_data['results'][0]['id']
     url = "https://treeherder.mozilla.org/api/project/%s/jobs/?" \
-          "count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
+          "count=2000&result_set_id=%s" % (branch, results_set_id)
     return fetch_json(url)
 
 
 def getPushLog(branch, startdate):
-    """
-      https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
-    """
+    """https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19"""
     # TODO: Replace this with fetch_json() using /jsonpushlog
     url = "https://hg.mozilla.org/%s//json-pushes?startdate=%04d-%02d-%02d&" \
           "tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month,
@@ -134,34 +130,31 @@ def uploadResults(data, branch, revision, date):
 
     cur = db.cursor()
 
-    if "job_property_names" not in data:
+    if "results" not in data:
         return
 
-    job_property_names = data["job_property_names"]
-    i = lambda x: job_property_names.index(x)
-
-    results = data['results']
+    results = data["results"]
     count = 0
     for r in results:
-        _id, logfile, slave, duration, platform, buildtype, testtype, bugid = \
-            '', '', '', '', '', '', '', ''
-        _id = r[i("id")]
+        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = \
+            '', '', '', '', '', '', '', '', ''
+        _id = r["id"]
 
-        # Skip if result = unknown
-        _result = r[i("result")]
-        if _result == u'unknown':
+        # Skip if 'result' is unknown
+        result = r["result"]
+        if result == u'unknown':
             continue
 
-        duration = '%s' % (int(r[i("end_timestamp")]) - int(r[i("start_timestamp")]))
+        duration = '%s' % (int(r["end_timestamp"]) - int(r["start_timestamp"]))
 
-        platform = r[i("platform")]
+        platform = r["platform"]
         if not platform:
             continue
 
-        buildtype = r[i("platform_option")]
+        buildtype = r["platform_option"]
 
-        testtype = r[i("ref_data_name")].split()[-1]
-        if r[i("build_system_type")] == "taskcluster":
+        testtype = r["ref_data_name"].split()[-1]
+        if r["build_system_type"] == "taskcluster":
             # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
             pmap = {"linux64": "Linux64",
                     "linux32": "Linux32",
@@ -171,37 +164,36 @@ def uploadResults(data, branch, revision, date):
             p = platform
             if platform in pmap:
                 p = pmap[platform]
-            testtype = r[i("job_type_name")].split(p)[-1]
+            testtype = r["job_type_name"].split(p)[-1]
 
         failure_classification = 0
         try:
-            # https://treeherder.mozilla.org/api/failureclassification/
-            failure_classification = int(r[i("failure_classification_id")])
+            # http://treeherder.mozilla.org/api/failureclassification/
+            failure_classification = int(r["failure_classification_id"])
         except ValueError:
             failure_classification = 0
         except TypeError:
             logging.warning("Error, failure classification id: expecting an int, "
-                            "but recieved %s instead" % r[i("failure_classification_id")])
+                            "but recieved %s instead" % r["failure_classification_id"])
             failure_classification = 0
 
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
-        if _result != u'success':
+        if result != u'success':
             url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
             notes = fetch_json(url)
             if notes:
                 bugid = notes[-1]['note']
 
-        # get failure snippets:
-        # https://treeherder.mozilla.org/api/project/mozilla-inbound/artifact/?
-        # job_id=11651377&name=Bug+suggestions&type=json
+        # Get failure snippets: https://treeherder.mozilla.org/api/project/
+        # mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
         failures = []
         if failure_classification == 2:
-            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&" \
-                  "name=Bug+suggestions&type=json" % (branch, _id)
+            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s" \
+                  "&name=Bug+suggestions&type=json" % (branch, _id)
             snippets = fetch_json(url)
             if snippets:
                 for item in snippets[0]["blob"]:
-                    if not item['search_terms'] and len(item['search_terms']) < 1:
+                    if not item["search_terms"] and len(item["search_term"]) < 1:
                         continue
                     filename = item['search_terms'][0]
                     if (filename.endswith('.js') or filename.endswith('.xul') or
@@ -229,7 +221,7 @@ def uploadResults(data, branch, revision, date):
                              values ('%s', '%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
                                      '%s', '%s', %s, '%s')""" % \
-              (logfile, slave, _result,
+              (logfile, slave, result,
                duration, platform, buildtype, testtype,
                bugid, branch, revision, date, failure_classification, ','.join(failures))
 
