@@ -44,7 +44,8 @@ def check_removal(master, removals):
         for failure_job in master[failure]:
             found = is_matched(failure_job, removals)
 
-            # we will add the test to the resulting structure unless we find a match in the jobtype we are trying to ignore.
+            # we will add the test to the resulting structure unless we find a match
+            # in the jobtype we are trying to ignore.
             if not found:
                 results[failure].append(failure_job)
 
@@ -78,6 +79,7 @@ def remove_root_cause_failures(failures, master_root_cause):
         del failures[revision]
     return failures
 
+
 def invert_index(failures, active_jobs):
     inv_map = {}
 
@@ -93,7 +95,6 @@ def invert_index(failures, active_jobs):
         if len(inv_map[jobtype]) > maximum:
             maximum = len(inv_map[jobtype])
             max_job = jobtype
-            revision_list = inv_map[jobtype]
 
     if maximum == 1:
         return failures, None
@@ -103,11 +104,13 @@ def invert_index(failures, active_jobs):
 
     return failures, max_job
 
+
 def failures_by_jobtype(failures, target, ignore_failure):
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
     active_jobs = get_distinct_tuples()
-    target = int(total* (target / 100))
+    target = int(total * (target / 100))
+    master_root_cause = []
 
     job_needed = ""
     remaining_jobs = []
@@ -148,7 +151,7 @@ def weighted_by_jobtype(failures, target, ignore_failure):
     print "working with %s failures" % total
     active_jobs = get_distinct_tuples()
 
-    target = int(total* (target / 100))
+    target = int(total * (target / 100))
     to_remove = []
 
     to_remove, master_root_cause = build_removals(active_jobs, failures, target)
