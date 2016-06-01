@@ -3,14 +3,10 @@ from setuptools import setup, find_packages
 
 required = [
     "Flask",
-    "Jinja2",
     "MarkupSafe",
     "MySQL-python",
-    "Werkzeug",
     "argparse",
-    "itsdangerous",
-    "requests",
-    "wsgiref",
+    "requests"
 ]
 
 setup(
