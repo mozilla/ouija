@@ -162,6 +162,12 @@ def weighted_by_jobtype(failures, target, ignore_failure):
         total = len(copy_failures)
         to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)
         ignore_failure -= 1
-
+    # only return high value job we want
+    for low_value_job in to_remove:
+        try:
+            active_jobs.remove(low_value_job)
+        except ValueError:
+            print "%s is missing from the job list" % low_value_job
     total_detected = check_removal(failures, to_remove)
-    return to_remove, total_detected
+    high_value_jobs = active_jobs
+    return high_value_jobs, total_detected
