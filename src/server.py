@@ -445,7 +445,7 @@ def run_create_jobtypes_query():
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
-    start_date, end_date = clean_date_params(request.args, delta=180)
+    start_date, end_date = clean_date_params(request.args, delta=90)
 
     db = create_db_connnection()
     cursor = db.cursor()

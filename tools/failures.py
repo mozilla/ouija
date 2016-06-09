@@ -16,7 +16,7 @@ def get_raw_data(start_date, end_date):
         end_date = datetime.datetime.now()
 
     if not start_date:
-        start_date = end_date - datetime.timedelta(days=180)
+        start_date = end_date - datetime.timedelta(days=90)
 
     url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
@@ -36,7 +36,7 @@ def communicate(failures, to_remove, total_detected, testmode, date):
 
     if testmode:
         return
-
+    prepare_the_database()
     insert_in_database(to_remove, date)
 
     if date is None:
@@ -124,6 +124,15 @@ def insert_in_database(to_remove, date=None):
         query = 'insert into seta (date, jobtype) values ("%s", ' % date
         query += '"%s")' % jobtype
         run_query(query)
+
+
+def prepare_the_database():
+    # wipe up the job data older than 90 days
+    date = datetime.datetime.now() - datetime.timedelta(days=90).strftime('%Y-%m-%d')
+    outdate_jobs = run_query("select jobtype from seta where date>'%s'" % date)
+    if len(outdate_jobs) > 0:
+        print "we have %s outdate jobs need to remove" % len(outdate_jobs)
+    run_query("delete from seta where date>='%s'" % date)
 
 
 def run_query(query):
