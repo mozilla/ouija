@@ -9,6 +9,7 @@ from emails import send_email
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+SETA_WINDOW = 90
 
 
 def get_raw_data(start_date, end_date):
@@ -16,7 +17,7 @@ def get_raw_data(start_date, end_date):
         end_date = datetime.datetime.now()
 
     if not start_date:
-        start_date = end_date - datetime.timedelta(days=90)
+        start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
@@ -128,11 +129,12 @@ def insert_in_database(to_insert, date=None):
 
 def prepare_the_database():
     # wipe up the job data older than 90 days
-    date = datetime.datetime.now() - datetime.timedelta(days=90)
-    outdate_jobs = run_query("select jobtype from seta where date>'%s'" % date)
+    date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
+    outdate_jobs = run_query("select jobtype from seta where date<='%s'" % date)
     if len(outdate_jobs) > 0:
         print "we have %s outdate jobs need to remove" % len(outdate_jobs)
-    run_query("delete from seta where date>='%s'" % date.strftime('%Y-%m-%d'))
+        for job in outdate_jobs:
+            run_query("delete from seta where jobtype=%s" % job)
 
 
 def run_query(query):
@@ -259,9 +261,9 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     for job in preseed:
         # TODO: if expired, ignore
         jobspec = [job['platform'], job['buildtype'], job['name']]
-        if jobspec in to_insert and job['action'] == 'run':
+        if jobspec in to_insert and job['action'] == 'coalesce':
             to_insert.remove(jobspec)
-        elif jobspec not in to_insert and job['action'] == 'coalesce':
+        elif jobspec not in to_insert and job['action'] == 'run':
             to_insert.append(jobspec)
 
     communicate(failures, to_insert, total_detected, testmode, end_date)
@@ -283,7 +285,7 @@ if __name__ == "__main__":
         if options.start_date:
             start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
         else:
-            start_date = end_date - datetime.timedelta(days=180)
+            start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
         analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
                          options.method)

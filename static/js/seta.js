@@ -101,7 +101,7 @@ $(function() {
     // when item.value == "Hide Optional Jobs", its true value is to "show".
     if (item.value == "Show required Jobs") {
       if (osMap.indexOf(rawName) >= 0) {
-        return "<span style='background: white; color: #444039;'>" + partName + " </span>";
+        return "<span style='background: white; color: black; font-weight: 14px;'>" + partName + " </span>";
       }
     }
     else {
@@ -146,7 +146,7 @@ $(function() {
     }
 
     var mytable = $('#seta');
-    var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 9 days";
+    var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 90 days";
     if (mytable.html() === undefined) {
       mytable = $('#seta');
     } else {

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from collections import Counter
 from functools import wraps
+from tools.failures import SETA_WINDOW
 import treecodes
 
 import MySQLdb
@@ -445,7 +446,7 @@ def run_create_jobtypes_query():
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
-    start_date, end_date = clean_date_params(request.args, delta=90)
+    start_date, end_date = clean_date_params(request.args, delta=SETA_WINDOW)
 
     db = create_db_connnection()
     cursor = db.cursor()
