@@ -37,3 +37,4 @@ Start the application:
     python server.py
 
 You should see ouija running at http://localhost:8314/index.html.
+
