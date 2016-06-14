@@ -9,6 +9,7 @@ from emails import send_email
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+SETA_WINDOW = 90
 
 
 def get_raw_data(start_date, end_date):
@@ -16,7 +17,7 @@ def get_raw_data(start_date, end_date):
         end_date = datetime.datetime.now()
 
     if not start_date:
-        start_date = end_date - datetime.timedelta(days=180)
+        start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
@@ -26,18 +27,18 @@ def get_raw_data(start_date, end_date):
     return data['failures']
 
 
-def communicate(failures, to_remove, total_detected, testmode, date):
+def communicate(failures, to_insert, total_detected, testmode, date):
 
     active_jobs = seta.get_distinct_tuples()
-    format_in_table(active_jobs, to_remove)
+    format_in_table(active_jobs, to_insert)  # we may need to fix this later
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     print "We will detect %.2f%% (%s) of the %s failures" % \
           (percent_detected, len(total_detected), len(failures))
 
     if testmode:
         return
-
-    insert_in_database(to_remove, date)
+    prepare_the_database()
+    insert_in_database(to_insert, date)
 
     if date is None:
         date = datetime.date.today()
@@ -49,10 +50,10 @@ def communicate(failures, to_remove, total_detected, testmode, date):
         total_changes = 0
 
     if total_changes == 0:
-        send_email(len(failures), len(to_remove), date, "no changes from previous day",
+        send_email(len(failures), len(to_insert), date, "no changes from previous day",
                    admin=True, results=False)
     else:
-        send_email(len(failures), len(to_remove), date, str(total_changes) +
+        send_email(len(failures), len(to_insert), date, str(total_changes) +
                    " changes from previous day", change, admin=True, results=True)
 
 
@@ -113,17 +114,27 @@ def format_in_table(active_jobs, master):
     print "Total jobs %s" % (sum_removed + sum_remaining)
 
 
-def insert_in_database(to_remove, date=None):
+def insert_in_database(to_insert, date=None):
     if not date:
         date = datetime.datetime.now().strftime('%Y-%m-%d')
     else:
         date = date.strftime('%Y-%m-%d')
 
     run_query('delete from seta where date="%s"' % date)
-    for jobtype in to_remove:
+    for jobtype in to_insert:
         query = 'insert into seta (date, jobtype) values ("%s", ' % date
         query += '"%s")' % jobtype
         run_query(query)
+
+
+def prepare_the_database():
+    # wipe up the job data older than 90 days
+    date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
+    outdate_jobs = run_query("select jobtype from seta where date<='%s'" % date)
+    if len(outdate_jobs) > 0:
+        print "we have %s outdate jobs need to remove" % len(outdate_jobs)
+        for job in outdate_jobs:
+            run_query("delete from seta where jobtype=%s" % job)
 
 
 def run_query(query):
@@ -238,9 +249,9 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     target = 100  # 100% detection
 
     if method == "failures":
-        to_remove, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
+        to_insert, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
     else:
-        to_remove, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
+        to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
 
     preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
     preseed = []
@@ -250,12 +261,12 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     for job in preseed:
         # TODO: if expired, ignore
         jobspec = [job['platform'], job['buildtype'], job['name']]
-        if jobspec in to_remove and job['action'] == 'run':
-            to_remove.remove(jobspec)
-        elif jobspec not in to_remove and job['action'] == 'coalesce':
-            to_remove.append(jobspec)
+        if jobspec in to_insert and job['action'] == 'coalesce':
+            to_insert.remove(jobspec)
+        elif jobspec not in to_insert and job['action'] == 'run':
+            to_insert.append(jobspec)
 
-    communicate(failures, to_remove, total_detected, testmode, end_date)
+    communicate(failures, to_insert, total_detected, testmode, end_date)
 
 if __name__ == "__main__":
     options = parse_args()
@@ -274,7 +285,7 @@ if __name__ == "__main__":
         if options.start_date:
             start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
         else:
-            start_date = end_date - datetime.timedelta(days=180)
+            start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
         analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
                          options.method)
