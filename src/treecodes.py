@@ -19,6 +19,7 @@ tbplnames = {'mochitest-1': {'group': 'M', 'code': '1'},
              'mochitest-browser-chrome-1': {'group': 'M', 'code': 'bc1'},
              'mochitest-browser-chrome-2': {'group': 'M', 'code': 'bc2'},
              'mochitest-browser-chrome-3': {'group': 'M', 'code': 'bc3'},
+             'mochitest-browser-chrome-7': {'group': 'M', 'code': 'bc7'},
              'mochitest-devtools-chrome-1': {'group': 'M', 'code': 'dt1'},
              'mochitest-devtools-chrome-2': {'group': 'M', 'code': 'dt2'},
              'mochitest-devtools-chrome-3': {'group': 'M', 'code': 'dt3'},
@@ -42,11 +43,18 @@ tbplnames = {'mochitest-1': {'group': 'M', 'code': '1'},
              'mochitest-e10s-browser-chrome-1': {'group': 'M-e10s', 'code': 'bc1'},
              'mochitest-e10s-browser-chrome-2': {'group': 'M-e10s', 'code': 'bc2'},
              'mochitest-e10s-browser-chrome-3': {'group': 'M-e10s', 'code': 'bc3'},
+             'mochitest-browser-chrome-e10s-1': {'group': 'M-e10s', 'code': 'bc1'},
+             'mochitest-browser-chrome-e10s-2': {'group': 'M-e10s', 'code': 'bc1'},
+             'mochitest-browser-chrome-e10s-3': {'group': 'M-e10s', 'code': 'bc1'},
              'mochitest-e10s-devtools-chrome': {'group': 'M-e10s', 'code': 'dt'},
              'mochitest-e10s-devtools-chrome-1': {'group': 'M-e10s', 'code': 'dt1'},
              'mochitest-e10s-devtools-chrome-2': {'group': 'M-e10s', 'code': 'dt2'},
              'mochitest-e10s-devtools-chrome-3': {'group': 'M-e10s', 'code': 'dt3'},
              'mochitest-e10s-devtools-chrome-4': {'group': 'M-e10s', 'code': 'dt4'},
+             'mochitest-devtools-chrome-e10s-1': {'group': 'M-e10s', 'code': 'dt4'},
+             'mochitest-devtools-chrome-e10s-2': {'group': 'M-e10s', 'code': 'dt4'},
+             'mochitest-devtools-chrome-e10s-3': {'group': 'M-e10s', 'code': 'dt4'},
+             'mochitest-devtools-chrome-e10s-4': {'group': 'M-e10s', 'code': 'dt4'},
              'mochitest-push': {'group': 'M', 'code': 'p'},
              'xpcshell': {'group': '', 'code': 'X'},
              'xpcshell-1': {'group': '', 'code': 'X1'},
@@ -213,7 +221,7 @@ def getGroup(name):
 
 def getGroupCode(name):
     try:
-        code = tbplnames[name]['group']
+        code = tbplnames[name.strip()]['group']
     except:
         code = ''
     return code
@@ -221,7 +229,7 @@ def getGroupCode(name):
 
 def getCode(name):
     try:
-        code = tbplnames[name]['code']
+        code = tbplnames[name.strip()]['code']
     except:
         code = ''
     return code
