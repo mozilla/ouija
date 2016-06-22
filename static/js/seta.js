@@ -99,7 +99,7 @@ $(function() {
   function printableJobCode(rawName, partName, osMap) {
     item = document.getElementById("toggle");
     // when item.value == "Hide Optional Jobs", its true value is to "show".
-    if (item.value == "Show required Jobs") {
+    if (item.value == "Show all Jobs") {
       if (osMap.indexOf(rawName) >= 0) {
         return "<span style='background: white; color: black; font-weight: 14px;'>" + partName + " </span>";
       }
