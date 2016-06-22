@@ -4,7 +4,6 @@ CREATE DATABASE ouija;
 USE ouija;
 
 CREATE TABLE IF NOT EXISTS `testjobs` (
-  `log` text NOT NULL,
   `slave` varchar(64) NOT NULL,
   `result` varchar(32) NOT NULL,
   `duration` int(11) NOT NULL,

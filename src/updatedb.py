@@ -136,8 +136,8 @@ def uploadResults(data, branch, revision, date):
     results = data["results"]
     count = 0
     for r in results:
-        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = \
-            '', '', '', '', '', '', '', '', ''
+        _id, slave, result, duration, platform, buildtype, testtype, bugid = \
+            '', '', '', '', '', '', '', ''
         _id = r["id"]
 
         # Skip if 'result' is unknown
@@ -210,18 +210,15 @@ def uploadResults(data, branch, revision, date):
 
         slave = data1['machine_name']
 
-        if len(data1.get("logs")):
-            logfile = data1.get("logs", [])[0].get("url", "")
-
         # Insert into MySQL Database
-        sql = """insert into testjobs (log, slave, result,
+        sql = """insert into testjobs (slave, result,
                                        duration, platform, buildtype, testtype,
                                        bugid, branch, revision, date,
                                        failure_classification, failures)
-                             values ('%s', '%s', '%s', %s,
+                             values ('%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
                                      '%s', '%s', %s, '%s')""" % \
-              (logfile, slave, result,
+              (slave, result,
                duration, platform, buildtype, testtype,
                bugid, branch, revision, date, failure_classification, ','.join(failures))
 
