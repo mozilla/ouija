@@ -101,7 +101,7 @@ $(function() {
     // when item.value == "Hide Optional Jobs", its true value is to "show".
     if (item.value == "Show all Jobs") {
       if (osMap.indexOf(rawName) >= 0) {
-        return "<span style='background: white; color: black; font-weight: 14px;'>" + partName + " </span>";
+        return "<span style='background: white; color: black; font-weight: 14px;'><b>" + partName + " </b></span>";
       }
     }
     else {
