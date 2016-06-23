@@ -51,9 +51,9 @@ tbplnames = {'mochitest-1': {'group': 'M', 'code': '1'},
              'mochitest-e10s-devtools-chrome-2': {'group': 'M-e10s', 'code': 'dt2'},
              'mochitest-e10s-devtools-chrome-3': {'group': 'M-e10s', 'code': 'dt3'},
              'mochitest-e10s-devtools-chrome-4': {'group': 'M-e10s', 'code': 'dt4'},
-             'mochitest-devtools-chrome-e10s-1': {'group': 'M-e10s', 'code': 'dt4'},
-             'mochitest-devtools-chrome-e10s-2': {'group': 'M-e10s', 'code': 'dt4'},
-             'mochitest-devtools-chrome-e10s-3': {'group': 'M-e10s', 'code': 'dt4'},
+             'mochitest-devtools-chrome-e10s-1': {'group': 'M-e10s', 'code': 'dt1'},
+             'mochitest-devtools-chrome-e10s-2': {'group': 'M-e10s', 'code': 'dt2'},
+             'mochitest-devtools-chrome-e10s-3': {'group': 'M-e10s', 'code': 'dt3'},
              'mochitest-devtools-chrome-e10s-4': {'group': 'M-e10s', 'code': 'dt4'},
              'mochitest-push': {'group': 'M', 'code': 'p'},
              'xpcshell': {'group': '', 'code': 'X'},
@@ -221,6 +221,9 @@ def getGroup(name):
 
 def getGroupCode(name):
     try:
+        # strip useless blank in test name.
+        # e.g change ' mochitest-devtools-chrome-e10s-2' to
+        # 'mochitest-devtools-chrome-e10s-2'
         code = tbplnames[name.strip()]['group']
     except:
         code = ''
