@@ -193,7 +193,7 @@ def uploadResults(data, branch, revision, date):
             snippets = fetch_json(url)
             if snippets:
                 for item in snippets[0]["blob"]:
-                    if not item["search_terms"] and len(item["search_term"]) < 1:
+                    if not item["search_terms"] and len(item["search_terms"]) < 1:
                         continue
                     filename = item['search_terms'][0]
                     if (filename.endswith('.js') or filename.endswith('.xul') or
