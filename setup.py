@@ -6,7 +6,8 @@ required = [
     "MarkupSafe",
     "MySQL-python",
     "argparse",
-    "requests"
+    "requests",
+    "redo"
 ]
 
 setup(
