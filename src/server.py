@@ -7,7 +7,7 @@ from itertools import groupby
 from collections import Counter
 from functools import wraps
 from tools.failures import SETA_WINDOW
-import treecodes
+from src import jobtypes
 
 import MySQLdb
 from flask import Flask, request, json, Response, abort
@@ -15,6 +15,7 @@ from flask import Flask, request, json, Response, abort
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
+JOBSDATA = jobtypes.Treecodes()
 
 
 class CSetSummary(object):
@@ -365,82 +366,10 @@ def run_platform_query():
             'dates': get_date_range(dates)}
 
 
-def jobtype_query():
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select platform, buildtype, testtype from uniquejobs"
-    cursor.execute(query)
-    jobtypes = []
-    for d in cursor.fetchall():
-        jobtypes.append([d[0], d[1], d[2]])
-
-    return jobtypes
-
-
 @app.route("/data/jobtypes/")
 @json_response
 def run_jobtypes_query():
-    return {'jobtypes': jobtype_query()}
-
-
-@app.route("/data/create_jobtypes/")
-@json_response
-def run_create_jobtypes_query():
-    alljobs = jobtype_query()
-    platforms = list(set(job[0] for job in alljobs))
-
-    # skipping pgo - We run this infrequent enough that we should have all pgo results tested
-    buildtypes = ['debug', 'asan', 'opt']
-
-    now = datetime.now()
-    twoweeks = now - timedelta(days=14)
-    twoweeks = twoweeks.strftime('%Y-%m-%d')
-
-    jobtypes = []
-    db = create_db_connnection()
-    for platform in platforms:
-        for buildtype in buildtypes:
-            # ignore *build* types
-            query = """select distinct testtype from testjobs where date>'%s' and platform='%s'
-                       and buildtype='%s' and testtype not like '%%build%%'
-                       and testtype not like '%%_dep'""" % (twoweeks, platform, buildtype)
-            cursor = db.cursor()
-            cursor.execute(query)
-            types = []
-            for testtype in cursor.fetchall():
-                testtype = testtype[0]
-                # ignore builds, jetpack
-                if testtype in ['dep', 'nightly', 'jetpack', 'non-unified', 'valgrind']:
-                    continue
-
-                # skip taskcluster jobs
-                if len(testtype) == 40:
-                    continue
-
-                if testtype:
-                    types.append(testtype)
-
-            types.sort()
-            for testtype in types:
-                jobtypes.append([platform, buildtype, testtype])
-
-    # Add in preseed.json
-    preseed = []
-    with open(os.path.join(SCRIPT_DIR, 'preseed.json'), 'r') as fHandle:
-        preseed = json.load(fHandle)
-
-    for job in preseed:
-        j = [job['platform'], job['buildtype'], job['name']]
-        if j not in jobtypes:
-            jobtypes.append(j)
-
-    cursor.execute("delete from uniquejobs")
-    for j in jobtypes:
-        query = "insert into uniquejobs (platform, buildtype, testtype) " \
-                "values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
-        cursor.execute(query)
-
-    return {'status': 'ok'}
+    return {'jobtypes': JOBSDATA.jobtype_query()}
 
 
 @app.route("/data/seta/")
@@ -505,7 +434,7 @@ def run_seta_details_query():
         jobtype.append([parts[1], parts[3], parts[5]])
 
     if active:
-        alljobs = jobtype_query()
+        alljobs = JOBSDATA.jobtype_query()
         active_jobs = []
         for job in alljobs:
             found = False
@@ -527,6 +456,7 @@ def run_seta_details_query():
     return {'jobtypes': retVal}
 
 
+# we still need this for builbot platform mapping
 def buildbot_name(platform, buildtype, jobname, branch):
     platform_map = {}
     # TODO: determine buildernames via alternative measures
@@ -567,26 +497,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
 @json_response
 def run_jobnames_query():
     # inbound is a safe default
-    branch = request.args.get("branch", 'mozilla-inbound')
-    json_jobnames = {'results': []}
-
-    raw_names = jobtype_query()
-    for job in raw_names:
-        signature = ''  # TH specific
-        buildtype = job[1]
-        platform = job[0]  # TODO: transform this
-        name = job[2]  # TODO: do we need to transform this?
-        jobname = ''  # TH specific
-        buildername = buildbot_name(platform, buildtype, name, branch)
-        group = treecodes.getGroup(name)
-        groupcode = treecodes.getGroupCode(name)
-        code = treecodes.getCode(name)
-        data = {'jobname': jobname, 'signature': signature,
-                'job_type_name': group, 'job_group_symbol': groupcode,
-                'name': name, 'job_type_symbol': code,
-                'ref_data_name': buildername,
-                'platform': platform, 'buildtype': buildtype}
-        json_jobnames['results'].append(data)
+    json_jobnames = {'results': JOBSDATA.jobnames_query()}
 
     return json_jobnames
 

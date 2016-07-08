@@ -73,17 +73,6 @@ $(function() {
     $.getJSON("http://alertmanager.allizom.org/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
   }
 
-  //TODO: replace this
-  function fixPlatform(plat) {
-    retVal = plat.replace('osx10.6', 'osx-10-6');
-    retVal = retVal.replace('osx10.8', 'osx-10-8');
-    retVal = retVal.replace('osx10.10', 'osx-10-10');
-    retVal = retVal.replace('winxp', 'windowsxp');
-    retVal = retVal.replace('win7', 'windows7-32');
-    retVal = retVal.replace('win8', 'windows8-64');
-
-    return retVal
-  }
 
   function toggleState() {
     item = document.getElementById("toggle");
@@ -111,128 +100,108 @@ $(function() {
 
   function buildOSJobMap(joblist) {
     var map = {};
-
-    for (var i = 0; i < joblist.length; i++) {
-      var job = joblist[i];
-      key = fixPlatform(job[0]) + " " + job[1];
-      if (map[key] === undefined) {
-          map[key] = [];
-      }
-      map[key].push(job[2]);
-    }
+    // use groupBy to sort joblist by platform and map them into object
+    map = _.mapObject(_.groupBy(joblist, function(job) {
+      return job[0] + ' ' + job[1];
+    }), function(val, key) {
+      return val = _.pluck(val, 2)
+    });
     return map;
   }
 
   function outputTable(treenames, active_jobs, details, date) {
-    // Get the list of jobs per platform that we don't need to run
-    var required_jobs = buildOSJobMap(details['jobtypes'][date]);
-
-    var keys = [];
-    for (var key in required_jobs) {
-      keys.push(key);
-    }
-    if (keys.length == 0) {
-      $('#datedesc').replaceWith('<div id="datedesc"><p><h3>Sorry, there is no data for the day ' + date + "</h3></div>");
-      $('#seta').html('<table id="seta" border=0></table>');
-      return;
-    }
-
-    // Get a list of all the active jobs on the tree
-    var active_osjobs = buildOSJobMap(active_jobs['jobtypes']);
-
-    var active_oslist = [];
-    for (var os in active_osjobs) {
-      active_oslist.push(os);
-    }
-
-    var mytable = $('#seta');
-    var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 90 days";
-    if (mytable.html() === undefined) {
-      mytable = $('#seta');
-    } else {
-      mytable.html('<table id="seta" border=0></table>');
-    }
-    $('#datedesc').replaceWith('<div id="datedesc">' + date + " - " + desc + "</div>");
-    total_jobs = 0;
-    high_value_jobs = 0;
-
-    // Iterate through each OS, add a row and colums
-    for (var i = 0; i < active_oslist.length; i++) {
-      var os = active_oslist[i];
-      var row = $('<tr></tr>').appendTo(mytable);
-      $('<td></td>').text(os).appendTo(row);
-      var td_jobs = $('<td></td>').appendTo(row);
-      var td_div = $('<div style="float: left"></div>').appendTo(td_jobs);
-
-
-      var types = {'O': {}}; //Default with other
-      for (var jid = 0; jid < treenames.length; jid++) {
-        var g = treenames[jid]['job_group_symbol'];
-        if (!(g in types)) {
-          types[g] = {};
-        }
+      // Get the list of jobs per platform that we don't need to run
+      var required_jobs = buildOSJobMap(details['jobtypes'][date]);
+      var keys = _.keys(required_jobs);
+      if (keys.length == 0) {
+          $('#datedesc').replaceWith('<div id="datedesc"><p><h3>Sorry, there is no data for the day ' + date + "</h3></div>");
+          $('#seta').html('<table id="seta" border=0></table>');
+          return;
       }
 
-      for (var type in types) {
-        types[type]['div'] = $('<span></span>').html('').appendTo(td_div);
-      }
+      // Get a list of all the active jobs on the tree
+      var active_jobs = buildOSJobMap(active_jobs['jobtypes']);
 
-      // Iterate through all jobs for the given OS, find a group and code
-      active_osjobs[os].sort();
-      total_jobs += active_osjobs[os].length;
-      if (os in required_jobs){
-        high_value_jobs += required_jobs[os].length;
+      var mytable = $('#seta');
+      var desc = "This is the list of jobs that would be required to run in order to catch every regression in the last 90 days";
+      if (mytable.html() === undefined) {
+          mytable = $('#seta');
+      } else {
+          mytable.html('<table id="seta" border=0></table>');
       }
-      else{
-        required_jobs[os] = [];
-      }
-      for (var j = 0; j < active_osjobs[os].length; j++) {
-        var group = '';
-        var jobcode = '';
-        for (var jid = 0; jid < treenames.length; jid++) {
-          if (treenames[jid]['name'] == active_osjobs[os][j]) {
-              group = treenames[jid]['job_group_symbol'];
-              jobcode = treenames[jid]['job_type_symbol'];
-              break;
+      $('#datedesc').replaceWith('<div id="datedesc">' + date + " - " + desc + "</div>");
+      total_jobs = 0;
+      high_value_jobs = 0;
+
+      // Iterate through each OS, add a row and colums
+      _.each(active_jobs, function(jobs, os) {
+          var row = $('<tr></tr>').appendTo(mytable);
+          $('<td></td>').text(os).appendTo(row);
+          var td_jobs = $('<td></td>').appendTo(row);
+          var td_div = $('<div style="float: left"></div>').appendTo(td_jobs);
+
+          var types = {'O': {}}; //Default with other
+          _.each(treenames, function(treename) {
+              var g = treename['job_group_symbol'];
+              if (!(g in types)) {
+                  types[g] = {};
+              }
+          });
+          for (var type in types) {
+              types[type]['div'] = $('<span></span>').html('').appendTo(td_div);
           }
-        }
 
-        if (jobcode != '' && group == '') {
-           group = 'O';
-        }
+          // Iterate through all jobs for the given OS, find a group and code
+          jobs.sort();
+          total_jobs += jobs.length;
+          if (os in required_jobs) {
+              high_value_jobs += required_jobs[os].length;
+          } else{
+              required_jobs[os] = [];
+          }
 
-        if (group in types) {
-          $('<span></span>').html(printableJobCode(active_osjobs[os][j], jobcode, required_jobs[os])).appendTo(types[group]['div']);
+        _.each(jobs, function(job) {
+            var group = '';
+            var jobcode = '';
+            _.each(treenames, function(treename) {
+                if (treename['name'] == job) {
+                    group = treename['job_group_symbol'];
+                    jobcode = treename['job_type_symbol'];
+                }
+            });
+            if (jobcode != '' && group == '') {
+                group = 'O';
+            }
+
+            if (group in types) {
+                $('<span></span>').html(printableJobCode(job, jobcode, required_jobs[os])).appendTo(types[group]['div']);
+            } else {
+                alert("couldn't find matching group: " + group + ", with code: " + jobcode + ": "+ active_osjobs[os][j] + ": " + types);
+            }
+        });
+
+        // remove empty groups, add group letter and () for visual grouping
+        for (var type in types) {
+            var leftover = types[type]['div'].html().replace(/\<\/span\>/g, '');
+            leftover = leftover.replace(/\<span\>/g, '');
+
+            if (leftover.replace(/ /g, '') == '') {
+                types[type]['div'].html('');
+            } else if (type != 'O') {
+                types[type]['div'].html(type + '(' + leftover.replace(/\s+$/g, '') + ') ');
+            }
+        }
+        var ignore = "Jobs to ignore: " + (total_jobs - high_value_jobs);
+        var remaining = "Jobs to run: " + high_value_jobs;
+        var total = "Total number of jobs: " + total_jobs;
+        $('#jobs_number').replaceWith('<div id="jobs_number">'+ignore+"<br>"+remaining+"<br>"+total+"<div>");
+
+        if (!($('#seta').length)) {
+            mytable.appendTo('body');
         } else {
-          alert("couldn't find matching group: " + group + ", with code: " + jobcode + ": "+ active_osjobs[os][j] + ": " + types);
+            $('#seta').replaceWith(mytable);
         }
-      }
-
-      // remove empty groups, add group letter and () for visual grouping
-      for (var type in types) {
-        var leftover = types[type]['div'].html().replace(/\<\/span\>/g, '');
-        leftover = leftover.replace(/\<span\>/g, '');
-
-        if (leftover.replace(/ /g, '') == '') {
-            types[type]['div'].html('');
-        } else if (type != 'O') {
-           types[type]['div'].html(type + '(' + leftover.replace(/\s+$/g, '') + ') ');
-        }
-      }
-
-    }
-
-    var ignore = "Jobs to ignore: " + (total_jobs - high_value_jobs);
-    var remaining = "Jobs to run: " + high_value_jobs;
-    var total = "Total number of jobs: " + total_jobs;
-    $('#jobs_number').replaceWith('<div id="jobs_number">'+ignore+"<br>"+remaining+"<br>"+total+"<div>");
-
-    if (!($('#seta').length)) {
-      mytable.appendTo('body');
-    } else {
-      $('#seta').replaceWith(mytable);
-    }
-
+    });
   }
 
   function gotsummary(data) {

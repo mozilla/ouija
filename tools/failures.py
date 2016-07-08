@@ -5,11 +5,20 @@ import datetime
 import MySQLdb
 from argparse import ArgumentParser
 from emails import send_email
+import time
+from redo import retry
 
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+ROOT_DIR = os.getcwd()
 SETA_WINDOW = 90
+TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
+                  "runnable_jobs/?decisionTaskID={1}&format=json"
+headers = {
+    'Accept': 'application/json',
+    'User-Agent': 'ouija',
+}
 
 
 def get_raw_data(start_date, end_date):
@@ -22,7 +31,8 @@ def get_raw_data(start_date, end_date):
     url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
-    response = requests.get(url, headers={'accept-encoding': 'json'}, verify=True)
+    response = retry(requests.get, args=(url, ),
+                     kwargs={'headers': headers, 'verify': True})
     data = json.loads(response.content)
     return data['failures']
 
@@ -62,8 +72,9 @@ def format_in_table(active_jobs, master):
     sum_removed = 0
     sum_remaining = 0
 
-    data = requests.get('http://alertmanager.allizom.org/data/jobnames/',
-                        headers={'accept-encoding': 'json'}, verify=True).json()
+    data = retry(requests.get, args=('http://alertmanager.allizom.org/data/jobnames/', ),
+                 kwargs={'headers': headers,
+                         'verify': True}).json()
     running_jobs = data['results']
 
     for jobtype in active_jobs:
@@ -268,9 +279,53 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
 
     communicate(failures, to_insert, total_detected, testmode, end_date)
 
+
+# TODO we need add test for this function to make sure it works under any situation
+def update_runnableapi():
+    """
+    Use it to update runnablejobs.json file.
+    """
+    url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
+    latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
+                       kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
+    task_id = latest_task['taskId']
+
+    # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part
+    expires = latest_task['expires'].split('T')[0]
+    time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").time_tuple()
+    new_timestamp = time.mktime(time_tuple)
+    path = ROOT_DIR + '/runablejobs.json'
+
+    # we do nothing if the timestamp of runablejobs.json is equal with the latest task
+    # otherwise we download and update it
+    if os.path.isfile(path):
+        with open(path, 'r+') as data:
+            # read the timesstamp of this task from json file
+            oldtime = json.loads(data.read())['meta']['timetamp']
+        if oldtime == new_timestamp:
+            print "The runnable json file is latest already."
+            return
+        else:
+            print "It's going to update your runnable jobs data."
+            download_runnable_jobs(new_timestamp, task_id)
+    else:
+        print "It's going to help you download the runnable jobs file."
+        download_runnable_jobs(new_timestamp, task_id)
+
+
+def download_runnable_jobs(new_timestamp, task_id=None):
+    if task_id:
+        url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
+        print url
+        data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
+        if len(data['results']) > 0:
+            data['meta'].update({'timetamp': new_timestamp})
+            with open(ROOT_DIR + '/runnablejobs.json', 'w') as f:
+                json.dump(data, f)
+
 if __name__ == "__main__":
     options = parse_args()
-
+    update_runnableapi()
     if options.diff:
         if options.start_date and options.end_date:
             print_diff(options.start_date, options.end_date)
