@@ -69,6 +69,7 @@ class Treecodes:
                 # for [TC] Linux64 reftest-2
                 else:
                     testtype = job['job_type_name'].split(' ')[-1]
+
                 # we don't need non-test job for seta, but we still need to verify this type list
                 if testtype in ['dep', 'nightly', 'non-unified', 'valgrind', 'build']:
                     continue
@@ -96,7 +97,6 @@ class Treecodes:
 
     def jobtype_query(self):
         """Query all available jobtypes and return it as list"""
-
         return self.jobtypes
 
     def jobnames_query(self):

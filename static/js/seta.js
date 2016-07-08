@@ -169,7 +169,7 @@ $(function() {
                     jobcode = treename['job_type_symbol'];
                 }
             });
-            if (jobcode != '' && group == ''){
+            if (jobcode != '' && group == '') {
                 group = 'O';
             }
 
