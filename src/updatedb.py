@@ -77,7 +77,27 @@ def getCSetResults(branch, revision):
     results_set_id = rs_data['results'][0]['id']
     url = "https://treeherder.mozilla.org/api/project/%s/jobs/?" \
           "count=2000&result_set_id=%s" % (branch, results_set_id)
-    return fetch_json(url)
+
+    done = False
+    offset = 0
+    count = 2000
+    num_results = 0
+    retVal = {}
+    while not done:
+        url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=%s&offset=%s&result_set_id=%s&return_type=list
+        data = fetch_json(url)
+        if len(data['results']) < 2000:
+            done = True
+        num_results += len(data['results'])
+        offset += count
+
+        if retVal == {}:
+            retVal = data
+        else:
+            retVal['results'].extend(data['results'])
+            retVal['meta']['count'] = num_results
+
+    return retVal
 
 
 def getPushLog(branch, startdate):
