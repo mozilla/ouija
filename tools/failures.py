@@ -287,7 +287,7 @@ def update_runnableapi():
     """
     url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
     latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
-                       kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
+                        kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
     task_id = latest_task['taskId']
 
     # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part

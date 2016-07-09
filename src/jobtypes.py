@@ -1,8 +1,9 @@
 import os
 import json
 import logging
+from tools.failures import update_runnableapi
 LOG = logging.getLogger(__name__)
-
+JSONPATH = os.getcwd() + '/runnablejobs.json'
 
 def _getgroup(name):
     """
@@ -50,7 +51,10 @@ class Treecodes:
         self.tbplnames = {}
         self.jobtypes = []
         self.jobnames = []
-        with open(os.getcwd() + '/runnablejobs.json') as data:
+        # we need to verify if the runnablejobs.json is exist and download it if not
+        if not os.path.isfile(JSONPATH):
+            update_runnableapi()
+        with open(JSONPATH) as data:
             joblist = json.loads(data.read())['results']
 
         # skipping pgo - We run this infrequent enough that we should have all pgo results tested
