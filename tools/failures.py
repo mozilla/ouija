@@ -141,11 +141,7 @@ def insert_in_database(to_insert, date=None):
 def prepare_the_database():
     # wipe up the job data older than 90 days
     date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
-    outdate_jobs = run_query("select jobtype from seta where date<='%s'" % date)
-    if len(outdate_jobs) > 0:
-        print "we have %s outdate jobs need to remove" % len(outdate_jobs)
-        for job in outdate_jobs:
-            run_query("delete from seta where jobtype=%s" % job)
+    run_query("delete from seta where date<='%s'" % date)
 
 
 def run_query(query):
@@ -292,7 +288,7 @@ def update_runnableapi():
 
     # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part
     expires = latest_task['expires'].split('T')[0]
-    time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").time_tuple()
+    time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").timetuple()
     new_timestamp = time.mktime(time_tuple)
     path = ROOT_DIR + '/runablejobs.json'
 
@@ -316,7 +312,6 @@ def update_runnableapi():
 def download_runnable_jobs(new_timestamp, task_id=None):
     if task_id:
         url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
-        print url
         data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
         if len(data['results']) > 0:
             data['meta'].update({'timetamp': new_timestamp})
