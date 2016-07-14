@@ -472,6 +472,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map['linux64asan'] = "Ubuntu ASAN VM 12.04 x64"
     platform_map['windowsxp'] = "Windows XP 32-bit"
     platform_map['windows7-32'] = "Windows 7 32-bit"
+    platform_map['windows7-32-vm'] = "Windows 7 32-bit VM"
     platform_map['windows8-64'] = "Windows 8 64-bit"
 
     buildtype_map = {}
