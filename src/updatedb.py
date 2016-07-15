@@ -75,8 +75,6 @@ def getCSetResults(branch, revision):
     """
     rs_data = getResultSetID(branch, revision)
     results_set_id = rs_data['results'][0]['id']
-    url = "https://treeherder.mozilla.org/api/project/%s/jobs/?" \
-          "count=2000&result_set_id=%s" % (branch, results_set_id)
 
     done = False
     offset = 0
@@ -84,8 +82,8 @@ def getCSetResults(branch, revision):
     num_results = 0
     retVal = {}
     while not done:
-        url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=%s&offset=%s&result_set_id=%s&return_type=list
-        data = fetch_json(url)
+        url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=%s&offset=%s&result_set_id=%s"
+        data = fetch_json(url % (branch, count, offset, results_set_id))
         if len(data['results']) < 2000:
             done = True
         num_results += len(data['results'])
