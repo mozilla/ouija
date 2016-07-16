@@ -173,7 +173,14 @@ def uploadResults(data, branch, revision, date):
 
         buildtype = r["platform_option"]
 
-        testtype = r["ref_data_name"].split()[-1]
+        # the testtype of builbot job is in 'ref_data_name'
+        # like web-platform-tests-4 in "Ubuntu VM 12.04 x64 mozilla-inbound
+        # but taskcluster's testtype is a part of its 'job_type_name
+        if r['build_system_type'] == 'buildbot':
+            testtype = r['ref_data_name'].split(' ')[-1]
+
+        else:
+            testtype = r['job_type_name'].split(' ')[-1]
         if r["build_system_type"] == "taskcluster":
             # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
             pmap = {"linux64": "Linux64",
