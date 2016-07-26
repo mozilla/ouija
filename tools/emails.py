@@ -12,7 +12,7 @@ def send_email(regression, jobs, date, message, change=None, admin=False, result
     server.starttls()
     server.login(data['username'], data['password'])
 
-    message = "We analyzed %s regressions and found %s jobs to disable: " \
+    message = "We analyzed %s regressions and found %s jobs to enable: " \
               % (regression, jobs) + message
     if change:
         message += "\nThe jobs added to the current day compared to previous " \

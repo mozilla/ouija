@@ -278,9 +278,7 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
 
 # TODO we need add test for this function to make sure it works under any situation
 def update_runnableapi():
-    """
-    Use it to update runnablejobs.json file.
-    """
+    """Use it to update runnablejobs.json file."""
     url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
     latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
                         kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
@@ -290,7 +288,7 @@ def update_runnableapi():
     expires = latest_task['expires'].split('T')[0]
     time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").timetuple()
     new_timestamp = time.mktime(time_tuple)
-    path = ROOT_DIR + '/runablejobs.json'
+    path = ROOT_DIR + '/runnablejobs.json'
 
     # we do nothing if the timestamp of runablejobs.json is equal with the latest task
     # otherwise we download and update it
