@@ -179,7 +179,15 @@ def uploadResults(data, branch, revision, date):
             testtype = r['ref_data_name'].split(' ')[-1]
 
         else:
-            testtype = r['job_type_name'].split(' ')[-1]
+            # The test name on taskcluster comes to a sort of combination
+            # (e.g desktop-test-linux64/debug-jittests-3)and asan job can
+            # been referenced as a opt job. we want the build type(debug or opt)
+            # to separate the job_type_name, then get "jittests-3" as testtype
+            # for job_type_name like desktop-test-linux64/debug-jittests-3
+            separator = r['platform_option'] \
+                            if r['platform_option'] != 'asan' else 'opt'
+            testtype = r['job_type_name'].split(
+                            '{buildtype}-'.format(buildtype=separator))[-1]
         if r["build_system_type"] == "taskcluster":
             # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
             pmap = {"linux64": "Linux64",
