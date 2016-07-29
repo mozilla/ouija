@@ -1,6 +1,17 @@
 $(function() {
-  var platform = location.search.substr(1).split('=')[1],
-      title    = platform.charAt(0).toUpperCase() + platform.substr(1),
+  function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+  }
+
+  var platform = getParameterByName('platform'),
+      ci       = getParameterByName('ci'),
+      title    = platform.charAt(0).toUpperCase() + platform.substr(1) + "(" + ci + ")",
       $form    = $("form"),
       $error   = $("#error"),
       $dates   = $(".reportDates"),
@@ -132,6 +143,7 @@ $(function() {
   }
 
   $("input[name='platform']").val(platform);
+  $("input[name='ci']").val(ci);
   $form.submit(fetchData);
 
   $(document).on("ajaxStart ajaxStop", function (e) {
