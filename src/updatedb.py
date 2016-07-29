@@ -171,7 +171,7 @@ def uploadResults(data, branch, revision, date):
             continue
 
         buildtype = r["platform_option"]
-
+        build_system_type = r['build_system_type']
         # the testtype of builbot job is in 'ref_data_name'
         # like web-platform-tests-4 in "Ubuntu VM 12.04 x64 mozilla-inbound
         # but taskcluster's testtype is a part of its 'job_type_name
@@ -179,7 +179,15 @@ def uploadResults(data, branch, revision, date):
             testtype = r['ref_data_name'].split(' ')[-1]
 
         else:
-            testtype = r['job_type_name'].split(' ')[-1]
+            # The test name on taskcluster comes to a sort of combination
+            # (e.g desktop-test-linux64/debug-jittests-3)and asan job can
+            # been referenced as a opt job. we want the build type(debug or opt)
+            # to separate the job_type_name, then get "jittests-3" as testtype
+            # for job_type_name like desktop-test-linux64/debug-jittests-3
+            separator = r['platform_option'] \
+                if r['platform_option'] != 'asan' else 'opt'
+            testtype = r['job_type_name'].split(
+                '{buildtype}-'.format(buildtype=separator))[-1]
         if r["build_system_type"] == "taskcluster":
             # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
             pmap = {"linux64": "Linux64",
@@ -206,9 +214,12 @@ def uploadResults(data, branch, revision, date):
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
         if result != u'success':
             url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
-            notes = fetch_json(url)
-            if notes:
-                bugid = notes[-1]['note']
+            try:
+                notes = fetch_json(url)
+                if notes:
+                    bugid = notes[-1]['note']
+            except KeyError:
+                pass
 
         # Get failure snippets: https://treeherder.mozilla.org/api/project/
         # mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
@@ -229,7 +240,6 @@ def uploadResults(data, branch, revision, date):
                         if dir.endswith(filename):
                             dir = dir.split(filename)[0]
                             failures.append(dir + '/' + filename)
-
         # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
         url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
         data1 = fetch_json(url)
@@ -237,16 +247,16 @@ def uploadResults(data, branch, revision, date):
         slave = data1['machine_name']
 
         # Insert into MySQL Database
-        sql = """insert into testjobs (slave, result,
+        sql = """insert into testjobs (slave, result, build_system_type,
                                        duration, platform, buildtype, testtype,
                                        bugid, branch, revision, date,
                                        failure_classification, failures)
-                             values ('%s', '%s', %s,
+                             values ('%s', '%s', '%s', %s,
                                      '%s', '%s', '%s', '%s', '%s',
                                      '%s', '%s', %s, '%s')""" % \
-              (slave, result,
+              (slave, result, build_system_type,
                duration, platform, buildtype, testtype,
-               bugid, branch, revision, date, failure_classification, ','.join(failures))
+               bugid, branch, revision, date, failure_classification, ','.join(failures[:5]))
 
         try:
             cur.execute(sql)
