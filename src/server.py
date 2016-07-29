@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import os
 import calendar
 from datetime import datetime, timedelta
@@ -417,7 +415,8 @@ def run_seta_details_query():
     active = request.args.get("active", 0)
     buildbot = request.args.get("buildbot", 0)
     branch = request.args.get("branch", '')
-
+    taskcluster = request.args.get("taskcluster", 0)
+    jobnames = JOBSDATA.jobnames_query()
     if date == "" or date == "latest":
         today = datetime.now()
         date = today.strftime("%Y-%m-%d")
@@ -429,6 +428,10 @@ def run_seta_details_query():
     retVal = {}
     retVal[date] = []
     jobtype = []
+
+    # we only support fx-team and mozilla-inbound branch in seta
+    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True and str(branch) != '':
+        abort(404)
     for d in cursor.fetchall():
         parts = d[0].split("'")
         jobtype.append([parts[1], parts[3], parts[5]])
@@ -448,49 +451,28 @@ def run_seta_details_query():
 
     if buildbot:
         active_jobs = []
+        # pick up buildbot jobs from job list to faster the filter process
+        buildbot_jobs = [job for job in jobnames if job['buildplatform'] == 'buildbot']
+        # find out the correspond job detail information
         for job in jobtype:
-            active_jobs.append(buildbot_name(job[0], job[1], job[2], branch))
+            for j in buildbot_jobs:
+                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                    active_jobs.append(j['ref_data_name'] if branch is 'mozilla-inbound'
+                                       else j['ref_data_name'].replace('mozilla-inbound', branch))
+
+        jobtype = active_jobs
+
+    if taskcluster:
+        active_jobs = []
+        taskcluster_jobs = [job for job in jobnames if job['buildplatform'] == 'taskcluster']
+        for job in jobtype:
+            for j in taskcluster_jobs:
+                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                    active_jobs.append(j['ref_data_name'])
         jobtype = active_jobs
 
     retVal[date] = jobtype
     return {'jobtypes': retVal}
-
-
-# we still need this for builbot platform mapping
-def buildbot_name(platform, buildtype, jobname, branch):
-    platform_map = {}
-    # TODO: determine buildernames via alternative measures
-    platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
-    platform_map['android-4-2-x86'] = "android-4-2-x86"
-    platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
-    platform_map['android-4-3-armv7-api15'] = "android-4-3-armv7-api15"
-    platform_map['osx-10-10'] = "Rev7 MacOSX Yosemite 10.10.5"
-    platform_map['osx-10-8'] = "Rev5 MacOSX Mountain Lion 10.8"
-    platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
-    platform_map['linux32'] = "Ubuntu VM 12.04"
-    platform_map['linux64'] = "Ubuntu VM 12.04 x64"
-    platform_map['linux64asan'] = "Ubuntu ASAN VM 12.04 x64"
-    platform_map['windowsxp'] = "Windows XP 32-bit"
-    platform_map['windows7-32'] = "Windows 7 32-bit"
-    platform_map['windows8-64'] = "Windows 8 64-bit"
-
-    buildtype_map = {}
-    buildtype_map["opt"] = "opt test"
-    buildtype_map["debug"] = "debug test"
-    buildtype_map["asan"] = "opt test"
-    buildtype_map["talos"] = "talos"
-
-    if buildtype == 'asan':
-        platform = 'linux64asan'
-
-    if not branch:
-        branch = "%s"
-
-    if jobname.startswith(('tp5o', 'chromez', 'dromaeojs', 'other', 'g1', 'g2', 'xperf', 'svgr')):
-        buildtype = 'talos'
-
-    # TODO: do we need to do a jobname conversion?  I don't see a need yet
-    return "%s %s %s %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
 
 
 @app.route("/data/jobnames/")
