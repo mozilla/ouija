@@ -416,6 +416,7 @@ def run_seta_details_query():
     buildbot = request.args.get("buildbot", 0)
     branch = request.args.get("branch", '')
     taskcluster = request.args.get("taskcluster", 0)
+    priority = request.args.get("priority", "low")
     jobnames = JOBSDATA.jobnames_query()
     if date == "" or date == "latest":
         today = datetime.now()
@@ -436,8 +437,15 @@ def run_seta_details_query():
         parts = d[0].split("'")
         jobtype.append([parts[1], parts[3], parts[5]])
 
+    alljobs = JOBSDATA.jobtype_query()
+
+    # we return low value job list as default, otherwise we return high value jobs
+    if priority == 'low':
+        low_value_jobs = [low_value_job for low_value_job in alljobs if
+                          low_value_job not in jobtype]
+        jobtype = low_value_jobs
+
     if active:
-        alljobs = JOBSDATA.jobtype_query()
         active_jobs = []
         for job in alljobs:
             found = False
