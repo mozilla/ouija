@@ -439,7 +439,8 @@ def run_seta_details_query():
 
     alljobs = JOBSDATA.jobtype_query()
 
-    # we return low value job list as default, otherwise we return high value jobs
+    # Because we store high value jobs in seta table as default, so we return low value jobs(default)
+    # when the priority is 'low', otherwise we return high value jobs.
     if priority == 'low':
         low_value_jobs = [low_value_job for low_value_job in alljobs if
                           low_value_job not in jobtype]
