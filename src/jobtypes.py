@@ -50,7 +50,9 @@ class Treecodes:
         self.tbplnames = {}
         self.jobtypes = []
         self.jobnames = []
-        with open(os.getcwd() + '/runnablejobs.json') as data:
+#TODO: figure out how to make this work for apache
+#        with open(os.getcwd() + '/runnablejobs.json') as data:
+        with open('/home/ubuntu/ouija/runnablejobs.json') as data:
             joblist = json.loads(data.read())['results']
 
         # skipping pgo - We run this infrequent enough that we should have all pgo results tested

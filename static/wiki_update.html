@@ -3,7 +3,7 @@
 <head>
      <script type="text/javascript">
         var platforms = ["android-4-3-armv7-api15", "android-4-3-armv7-api15-tc"];
-        var ci = "buildbot";
+        var build_system_type = "buildbot";
         var pIndex = 0;
         var today = new Date(); //to get current day's date        
         var s_today = today.toISOString().split('T')[0];//gives YYYY-MM-DD form        
@@ -14,13 +14,13 @@
                 
         function fetch_print(pIndex) {
             var android_version = "";
-            var ci = 'buildbot';
+            var build_system_type = 'buildbot';
             if (pIndex < platforms.length) {
                 android_version = platforms[pIndex];
             }
             if (android_version == 'android-4-3-armv7-api15-tc') {
                 android_version = 'android-4-3-armv7-api15';
-                ci = 'taskcluster';
+                build_system_type = 'taskcluster';
             }
 	    //first request which takes last week's and today's date  	 
             var request = new XMLHttpRequest();
@@ -34,16 +34,16 @@
                 document.getElementById('endDate').innerHTML = dates.endDate;
                 
                 //Storing values of failrates
-                document.getElementById('failure_rate'+android_version+ci).innerHTML = failRates['failRateWithRetries'];
-                document.getElementById('failure_exclude_retry'+android_version+ci).innerHTML = failRates['failRate'];
+                document.getElementById('failure_rate'+android_version+build_system_type).innerHTML = failRates['failRateWithRetries'];
+                document.getElementById('failure_exclude_retry'+android_version+build_system_type).innerHTML = failRates['failRate'];
                 
 
             }
-            request.open('get', '/data/platform?platform='+android_version+'&ci=' + ci + '&startdate='+s_last_week + '&enddate=' + s_today, true);
+            request.open('get', '/data/platform?platform='+android_version+'&build_system_type=' + build_system_type + '&startdate='+s_last_week + '&enddate=' + s_today, true);
             request.send();
-            document.writeln("* (" + ci + ") " +android_version+" Total failure rate: [[http://ouija.allizom.org/android_failures.html?platform=" +android_version+"&ci="+ci+"  <span id=\"failure_rate"+android_version+ci+"\"></span>%]]<br/>");
-            document.writeln("** last week <span id=\"failure_rate_last_week"+android_version+ci+"\"></span>%<br/>");
-            document.writeln("** total failure excluding retries <span id=\"failure_exclude_retry"+android_version+ci+"\"></span>%<br/>");
+            document.writeln("* (" + build_system_type + ") " +android_version+" Total failure rate: [[http://ouija.allizom.org/android_failures.html?platform=" +android_version+"&build_system_type="+build_system_type+"  <span id=\"failure_rate"+android_version+build_system_type+"\"></span>%]]<br/>");
+            document.writeln("** last week <span id=\"failure_rate_last_week"+android_version+build_system_type+"\"></span>%<br/>");
+            document.writeln("** total failure excluding retries <span id=\"failure_exclude_retry"+android_version+build_system_type+"\"></span>%<br/>");
 	    
 	    //second request which takes the week_before_last_week's date and last week's date  	 
             var request2 = new XMLHttpRequest();
@@ -54,11 +54,11 @@
                                 
 
                 //Storing values of failrates
-                document.getElementById('failure_rate_last_week'+android_version+ci).innerHTML = failRates['failRateWithRetries'];
+                document.getElementById('failure_rate_last_week'+android_version+build_system_type).innerHTML = failRates['failRateWithRetries'];
                 
                  
             }
-            request2.open('get', '/data/platform?platform='+android_version+'&ci=' + ci + '&startdate='+s_previous_week + '&enddate=' + s_last_week, true)
+            request2.open('get', '/data/platform?platform='+android_version+'&build_system_type=' + build_system_type + '&startdate='+s_previous_week + '&enddate=' + s_last_week, true)
             request2.send();
         }
         

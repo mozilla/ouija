@@ -125,7 +125,6 @@ if __name__ == "__main__":
         while current_date <= end_at:
             retrievedb(branch, str(current_date))
             current_date = current_date + datetime.timedelta(days=1)
-            current_date = options.start_date
         while current_date <= options.end_date:
             summarize(str(current_date), branch)
             current_date = current_date + datetime.timedelta(days=1)

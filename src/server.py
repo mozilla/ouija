@@ -277,6 +277,7 @@ def run_slaves_query():
 @json_response
 def run_platform_query():
     platform = request.args.get("platform")
+    build_system_type = request.args.get("build_system_type")
     start_date, end_date = clean_date_params(request.args)
 
     log_message = 'platform: %s startDate: %s endDate: %s' % (platform,
@@ -286,11 +287,15 @@ def run_platform_query():
 
     db = create_db_connnection()
     cursor = db.cursor()
-    cursor.execute("""select distinct revision from testjobs
+
+    query = """select distinct revision from testjobs
                       where platform = '%s'
                       and branch = 'mozilla-central'
                       and date between '%s' and '%s'
-                      order by date desc;""" % (platform, start_date, end_date))
+                      and build_system_type='%s'
+                      order by date desc;""" % (platform, start_date, end_date, build_system_type)
+
+    cursor.execute(query)
 
     csets = cursor.fetchall()
 
@@ -305,10 +310,11 @@ def run_platform_query():
         cset_id = cset[0]
         cset_summary = CSetSummary(cset_id)
 
-        cursor.execute("""select result, testtype, date from testjobs
-                          where platform='%s' and buildtype='opt' and revision='%s'
-                          order by testtype""" % (platform, cset_id))
+        query = """select result, testtype, date from testjobs
+                   where platform='%s' and buildtype='opt' and revision='%s' and build_system_type='%s'
+                   order by testtype""" % (platform, cset_id, build_system_type)
 
+        cursor.execute(query)
         test_results = cursor.fetchall()
 
         for res, testtype, date in test_results:
@@ -472,6 +478,7 @@ def buildbot_name(platform, buildtype, jobname, branch):
     platform_map['linux64asan'] = "Ubuntu ASAN VM 12.04 x64"
     platform_map['windowsxp'] = "Windows XP 32-bit"
     platform_map['windows7-32'] = "Windows 7 32-bit"
+    platform_map['windows7-32-vm'] = "Windows 7 32-bit VM"
     platform_map['windows8-64'] = "Windows 8 64-bit"
 
     buildtype_map = {}
@@ -527,13 +534,15 @@ def run_dailyjob_query():
         sumduration = int(rows[5])
 
         if date not in output:
-            output[date] = {'mozilla-inbound': [], 'fx-team': [], 'try': []}
+            output[date] = {'mozilla-inbound': [], 'fx-team': [], 'try': [], 'autoland': []}
         if 'mozilla-inbound' in branch:
             output[date]['mozilla-inbound'].append([platform, numpushes, numjobs, sumduration])
         elif 'fx-team' in branch:
             output[date]['fx-team'].append([platform, numpushes, numjobs, sumduration])
         elif 'try' in branch:
             output[date]['try'].append([platform, numpushes, numjobs, sumduration])
+        elif 'autoland' in branch:
+            output[date]['autoland'].append([platform, numpushes, numjobs, sumduration])
     return {'dailyjobs': output}
 
 

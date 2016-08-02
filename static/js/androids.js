@@ -10,8 +10,8 @@ $(function() {
   }
 
   var platform = getParameterByName('platform'),
-      ci       = getParameterByName('ci'),
-      title    = platform.charAt(0).toUpperCase() + platform.substr(1) + "(" + ci + ")",
+      build_system_type       = getParameterByName('build_system_type'),
+      title    = platform.charAt(0).toUpperCase() + platform.substr(1) + "(" + build_system_type + ")",
       $form    = $("form"),
       $error   = $("#error"),
       $dates   = $(".reportDates"),
@@ -143,7 +143,7 @@ $(function() {
   }
 
   $("input[name='platform']").val(platform);
-  $("input[name='ci']").val(ci);
+  $("input[name='build_system_type']").val(build_system_type);
   $form.submit(fetchData);
 
   $(document).on("ajaxStart ajaxStop", function (e) {
