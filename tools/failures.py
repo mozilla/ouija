@@ -84,7 +84,8 @@ def format_in_table(active_jobs, master):
 
         for item in master:
             if item[0] == jobtype[0] and item[1] == jobtype[1]:
-                results[key].append(item[2])
+                if item[2] not in results[key]:
+                    results[key].append(item[2])
 
     keys = results.keys()
     keys.sort()
@@ -141,11 +142,7 @@ def insert_in_database(to_insert, date=None):
 def prepare_the_database():
     # wipe up the job data older than 90 days
     date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
-    outdate_jobs = run_query("select jobtype from seta where date<='%s'" % date)
-    if len(outdate_jobs) > 0:
-        print "we have %s outdate jobs need to remove" % len(outdate_jobs)
-        for job in outdate_jobs:
-            run_query("delete from seta where jobtype=%s" % job)
+    run_query("delete from seta where date<'%s'" % date)
 
 
 def run_query(query):
@@ -292,7 +289,8 @@ def update_runnableapi():
 
     # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part
     expires = latest_task['expires'].split('T')[0]
-    time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").time_tuple()
+
+    time_tuple = time.strptime(expires, "%Y-%m-%d")
     new_timestamp = time.mktime(time_tuple)
     path = ROOT_DIR + '/runablejobs.json'
 
