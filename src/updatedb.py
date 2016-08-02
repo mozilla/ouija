@@ -17,7 +17,7 @@ DEFAULT_REQUEST_HEADERS = {
 branch_paths = {
     'mozilla-central': 'mozilla-central',
     'mozilla-inbound': 'integration/mozilla-inbound',
-    'b2g-inbound': 'integration/b2g-inbound',
+    'autoland': 'integration/autoland',
     'fx-team': 'integration/fx-team',
     'try': 'try',
 }
@@ -25,9 +25,8 @@ branch_paths = {
 branches = [
     'mozilla-central',
     'mozilla-inbound',
-    'b2g-inbound',
-    'fx-team',
-    'try'
+    'autoland',
+    'fx-team'
 ]
 
 
@@ -157,6 +156,14 @@ def uploadResults(data, branch, revision, date):
     for r in results:
         _id, slave, result, duration, platform, buildtype, testtype, bugid = \
             '', '', '', '', '', '', '', ''
+
+#[1468489471, u'taskcluster', u'i-0ba5dce1fab3f3768', u'?', u'unknown', u'opt', u'', 5945, 107, u'success',
+# 4355877, u'-', 6689, u'gecko-decision', u'12626cb1-b7fc-4d8f-bcee-0ee10af509fe/0', u'Gecko Decision Task', 
+# u'6751f6b4d53bef7733d3063aa3f72b0832dbde74', u'gecko-decision', u'completed', 503, 1468489740, u'-', 
+# u'mozilla-taskcluster-maintenance@mozilla.com', u'102210fe594ee9b33d82058545b1ed14f4c8206e', 1, u'D', 
+# u'scheduled', u'fill me', 1, None, u'-', 1468489475, u'-', u'2016-07-14T09:49:00', 
+# u'6751f6b4d53bef7733d3063aa3f72b0832dbde74', 2]
+
         _id = r["id"]
 
         # Skip if 'result' is unknown
