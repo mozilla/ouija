@@ -11,7 +11,8 @@ from redo import retry
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-ROOT_DIR = os.getcwd()
+#ROOT_DIR = os.getcwd()
+ROOT_DIR = '/home/ubuntu/ouija/data'
 SETA_WINDOW = 90
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
@@ -289,6 +290,7 @@ def update_runnableapi():
     expires = latest_task['expires'].split('T')[0]
     time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").timetuple()
     new_timestamp = time.mktime(time_tuple)
+
     path = ROOT_DIR + '/runnablejobs.json'
 
     # we do nothing if the timestamp of runablejobs.json is equal with the latest task
