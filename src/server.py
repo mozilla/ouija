@@ -309,8 +309,9 @@ def run_platform_query():
         cset_summary = CSetSummary(cset_id)
 
         query = """select result, testtype, date from testjobs
-                   where platform='%s' and buildtype='opt' and revision='%s' and build_system_type='%s'
-                   order by testtype""" % (platform, cset_id, build_system_type)
+                   where platform='%s' and buildtype='opt' and revision='%s' and
+                   build_system_type='%s' order by testtype""" % (
+            platform, cset_id, build_system_type)
 
         cursor.execute(query)
         test_results = cursor.fetchall()
@@ -437,7 +438,8 @@ def run_seta_details_query():
     jobtype = []
 
     # we only support fx-team and mozilla-inbound branch in seta
-    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True and str(branch) != '':
+    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True \
+            and str(branch) != '':
         abort(404)
     for d in cursor.fetchall():
         parts = d[0].split("'")
@@ -445,8 +447,9 @@ def run_seta_details_query():
 
     alljobs = JOBSDATA.jobtype_query()
 
-    # Because we store high value jobs in seta table as default, so we return low value jobs(default)
-    # when the priority is 'low', otherwise we return high value jobs.
+    # Because we store high value jobs in seta table as default,
+    # so we return low value jobs(default) when the priority is 'low',
+    # otherwise we return high value jobs.
     if priority == 'low':
         low_value_jobs = [low_value_job for low_value_job in alljobs if
                           low_value_job not in jobtype]

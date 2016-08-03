@@ -5,13 +5,13 @@ import datetime
 import MySQLdb
 from argparse import ArgumentParser
 from emails import send_email
-import time
 from redo import retry
+from update_runnablejobs import update_runnableapi
 
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-#ROOT_DIR = os.getcwd()
+# ROOT_DIR = os.getcwd()
 ROOT_DIR = '/home/ubuntu/ouija/data'
 SETA_WINDOW = 90
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
@@ -277,47 +277,6 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
 
     communicate(failures, to_insert, total_detected, testmode, end_date)
 
-
-# TODO we need add test for this function to make sure it works under any situation
-def update_runnableapi():
-    """Use it to update runnablejobs.json file."""
-    url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
-    latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
-                        kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
-    task_id = latest_task['taskId']
-
-    # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part
-    expires = latest_task['expires'].split('T')[0]
-    time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").timetuple()
-    new_timestamp = time.mktime(time_tuple)
-
-    path = ROOT_DIR + '/runnablejobs.json'
-
-    # we do nothing if the timestamp of runablejobs.json is equal with the latest task
-    # otherwise we download and update it
-    if os.path.isfile(path):
-        with open(path, 'r+') as data:
-            # read the timesstamp of this task from json file
-            oldtime = json.loads(data.read())['meta']['timetamp']
-        if oldtime == new_timestamp:
-            print "The runnable json file is latest already."
-            return
-        else:
-            print "It's going to update your runnable jobs data."
-            download_runnable_jobs(new_timestamp, task_id)
-    else:
-        print "It's going to help you download the runnable jobs file."
-        download_runnable_jobs(new_timestamp, task_id)
-
-
-def download_runnable_jobs(new_timestamp, task_id=None):
-    if task_id:
-        url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
-        data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
-        if len(data['results']) > 0:
-            data['meta'].update({'timetamp': new_timestamp})
-            with open(ROOT_DIR + '/runnablejobs.json', 'w') as f:
-                json.dump(data, f)
 
 if __name__ == "__main__":
     options = parse_args()
