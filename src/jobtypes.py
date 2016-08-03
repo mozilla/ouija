@@ -1,9 +1,9 @@
 import os
 import json
 import logging
-from tools.failures import update_runnableapi
+from tools.update_runnablejobs import update_runnableapi
 LOG = logging.getLogger(__name__)
-#JSONPATH = os.getcwd() + '/runnablejobs.json'
+# JSONPATH = os.getcwd() + '/runnablejobs.json'
 JSONPATH = '/home/ubuntu/ouija/data/runnablejobs.json'
 
 
