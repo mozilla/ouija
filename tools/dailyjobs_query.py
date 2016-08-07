@@ -1,7 +1,12 @@
 import MySQLdb
 import datetime
+from database.models import Dailyjobs, Testjobs
+from database.config import session
+from sqlalchemy import and_, func
 from argparse import ArgumentParser
+import logging
 
+logger = logging.getLogger(__name__)
 revisions_dict = {}
 database = MySQLdb.connect(host="localhost",
                            user="root",
@@ -34,13 +39,18 @@ def parse_args(argv=None):
 
 
 def updatedb(date, platform, branch, numpushes, numjobs, sumduration):
-    cur.execute('delete from dailyjobs where date="%s" and branch="%s" and platform="%s"'
-                % (date, branch, platform))
-    query = 'insert into dailyjobs (date, platform, branch, numpushes, numjobs, sumduration) \
-             values ("{0}", "{1}", "{2}", {3}, {4}, {5})'
-    query = query.format(date, platform, branch, numpushes, numjobs, sumduration)
-    print query
-    cur.execute(query)
+    session.query(Dailyjobs).filter(and_(Dailyjobs.date == date, Dailyjobs.branch == branch,
+                                         Dailyjobs.platform == platform)).all().delete()
+    session.commit()
+
+    dailyjob = Dailyjobs(date, platform, branch, numpushes, numjobs, sumduration)
+    try:
+        session.add(dailyjob)
+    except Exception as e:
+        logger.warning(e)
+        session.rollback()
+
+    session.close()
 
 
 def summarize(date, branch):
@@ -66,14 +76,13 @@ def summarize(date, branch):
 
 
 def retrievedb(branch, date):
-    query = "select revision,count(result),sum(duration),platform from testjobs \
-             where branch='{0}' and date like '{1}%' and testtype not like '%build%' " \
-            "and testtype!='valgrind' group by revision,platform;"
-    query = query.format(branch, date)
-    print query
-    cur.execute(query)
+    data = session.query(Testjobs.revision, func.count(Testjobs.result),
+                         func.sum(Testjobs.duration), Testjobs.platform).\
+        filter(and_(Testjobs.branch == branch, Testjobs.date.like(date),
+                    ~Testjobs.testtype.like('build'), Testjobs.testtype != 'valgrind')).group_by(
+        Testjobs.revision, Testjobs.platform).all()
 
-    for rows in cur.fetchall():
+    for rows in data:
         revision = rows[0]
         jobs = int(rows[1])
         duration = int(rows[2])
