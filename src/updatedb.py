@@ -1,11 +1,13 @@
 import argparse
-import MySQLdb
 import datetime
 import sys
 import time
 import logging
-from threading import Thread
 from Queue import Queue
+from sqlalchemy import and_
+from threading import Thread
+from database.models import Testjobs
+from database.config import session
 
 import requests
 
@@ -123,31 +125,14 @@ def getPushLog(branch, startdate):
 def clearResults(branch, startdate):
 
     date_xx_days_ago = datetime.date.today() - datetime.timedelta(days=180)
-    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= ' \
-                                '"%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % \
-                                (branch, startdate.year, startdate.month, startdate.day,
-                                 startdate.hour, startdate.minute, startdate.second,
-                                 date_xx_days_ago.year, date_xx_days_ago.month,
-                                 date_xx_days_ago.day)
+    session.query(Testjobs).filter(branch == branch).\
+        filter(and_(Testjobs.date >= startdate), (Testjobs.date < date_xx_days_ago)).\
+        delete(synchronize_session='fetch')
 
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
-
-    cur = db.cursor()
-    cur.execute(delete_delta_and_old_data)
-    cur.close()
+    session.commit()
 
 
 def uploadResults(data, branch, revision, date):
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
-
-    cur = db.cursor()
-
     if "results" not in data:
         return
 
@@ -255,25 +240,20 @@ def uploadResults(data, branch, revision, date):
         slave = data1['machine_name']
 
         # Insert into MySQL Database
-        sql = """insert into testjobs (slave, result, build_system_type,
-                                       duration, platform, buildtype, testtype,
-                                       bugid, branch, revision, date,
-                                       failure_classification, failures)
-                             values ('%s', '%s', '%s', %s,
-                                     '%s', '%s', '%s', '%s', '%s',
-                                     '%s', '%s', %s, '%s')""" % \
-              (slave, result, build_system_type,
-               duration, platform, buildtype, testtype,
-               bugid, branch, revision, date, failure_classification, ','.join(failures[:5]))
-
         try:
-            cur.execute(sql)
+            testjob = Testjobs(str(slave), str(result), str(build_system_type),
+                               str(duration), str(platform), str(buildtype),
+                               str(testtype), str(bugid), str(branch), str(revision),
+                               str(date), str(failure_classification), str(failures))
+
+            session.add(testjob)
             count += 1
-        except MySQLdb.IntegrityError:
-            # we already have this job
-            logging.warning("sql failed to insert, we probably have this job: %s" % sql)
-            pass
-    cur.close()
+            session.commit()
+        except Exception as error:
+            session.rollback()
+            logging.warning(error)
+        finally:
+            session.close()
     logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" %
                  (count, len(results), revision, branch, date))
 
