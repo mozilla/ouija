@@ -93,7 +93,7 @@ def clean_date_params(query_dict, delta=7):
     start_date = parse_date(start_date_param) or end_date - timedelta(days=delta)
 
     # validate dates
-    if start_date > now or start_date.date() >= end_date.date():
+    if start_date > now or start_date.date() > end_date.date():
         start_date = now - timedelta(days=7)
         end_date = now + timedelta(days=1)
 
