@@ -6,6 +6,7 @@ from collections import Counter
 from functools import wraps
 from tools.failures import SETA_WINDOW
 from src import jobtypes
+import re
 
 import MySQLdb
 from flask import Flask, request, json, Response, abort
@@ -55,6 +56,20 @@ def json_response(func):
     return wrapper
 
 
+def sanitize_string(input):
+    m = re.search('[a-zA-Z0-9\-\_\.]+', input)
+    if m:
+        return input
+    else:
+        return ''
+
+def sanitize_bool(input):
+    if int(input) == 0 or int(input) == 1:
+        return int(input)
+    else:
+        return 0
+
+
 def get_date_range(dates):
     if dates:
         return {'startDate': min(dates).strftime('%Y-%m-%d %H:%M'),
@@ -66,8 +81,12 @@ def clean_date_params(query_dict, delta=7):
     now = datetime.now()
 
     # get dates params
-    start_date_param = query_dict.get('startDate') or query_dict.get('startdate')
-    end_date_param = query_dict.get('endDate') or query_dict.get('enddate')
+    start_date_param = query_dict.get('startDate') or \
+                       query_dict.get('startdate') or \
+                       query_dict.get('date')
+    end_date_param = query_dict.get('endDate') or \
+                     query_dict.get('enddate') or \
+                     query_dict.get('date')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
@@ -274,8 +293,8 @@ def run_slaves_query():
 @app.route("/data/platform/")
 @json_response
 def run_platform_query():
-    platform = request.args.get("platform")
-    build_system_type = request.args.get("build_system_type")
+    platform = sanitize_string(request.args.get("platform"))
+    build_system_type = sanitize_string(request.args.get("build_system_type"))
     start_date, end_date = clean_date_params(request.args)
 
     log_message = 'platform: %s startDate: %s endDate: %s' % (platform,
@@ -417,16 +436,17 @@ def run_seta_summary_query():
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    date = request.args.get("date", "")
-    active = request.args.get("active", 0)
-    buildbot = request.args.get("buildbot", 0)
-    branch = request.args.get("branch", '')
-    taskcluster = request.args.get("taskcluster", 0)
-    priority = request.args.get("priority", "low")
+    startDate, date = clean_date_params(request.args)
+    active = sanitize_bool(request.args.get("active", 0))
+    buildbot = sanitize_bool(request.args.get("buildbot", 0))
+    branch = sanitize_string(request.args.get("branch", ''))
+    taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
+    priority = sanitize_string(request.args.get("priority", "low"))
     jobnames = JOBSDATA.jobnames_query()
     if date == "" or date == "latest":
         today = datetime.now()
         date = today.strftime("%Y-%m-%d")
+    date = "%s" % date
 
     db = create_db_connnection()
     cursor = db.cursor()
@@ -487,7 +507,7 @@ def run_seta_details_query():
         jobtype = active_jobs
 
     retVal[date] = jobtype
-    return {'jobtypes': retVal}
+    return {"jobtypes": retVal}
 
 
 @app.route("/data/jobnames/")
