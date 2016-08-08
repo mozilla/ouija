@@ -2,10 +2,11 @@ import json
 import os
 import requests
 import datetime
-import MySQLdb
 from argparse import ArgumentParser
 from emails import send_email
 from redo import retry
+from database.models import Seta
+from database.config import session
 from update_runnablejobs import update_runnableapi
 
 import seta
@@ -133,51 +134,35 @@ def insert_in_database(to_insert, date=None):
     else:
         date = date.strftime('%Y-%m-%d')
 
-    run_query('delete from seta where date="%s"' % date)
+    session.query(Seta).filter(Seta.date == date).delete(synchronize_session='fetch')
+    session.commit()
     for jobtype in to_insert:
-        query = 'insert into seta (date, jobtype) values ("%s", ' % date
-        query += '"%s")' % jobtype
-        run_query(query)
+        job = Seta(str(jobtype), date)
+        session.add(job)
+        session.commit()
+    session.close()
 
 
 def prepare_the_database():
     # wipe up the job data older than 90 days
     date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
-    run_query("delete from seta where date<='%s'" % date)
-
-
-def run_query(query):
-    database = MySQLdb.connect(host="localhost",
-                               user="root",
-                               passwd="root",
-                               db="ouija")
-
-    cur = database.cursor()
-    cur.execute(query)
-
-    results = []
-    # each row is in ('val',) format, we want 'val'
-    for rows in cur.fetchall():
-        results.append(rows[0])
-
-    cur.close()
-    return results
+    session.query(Seta).filter(Seta.date <= date)
 
 
 def check_data(query_date):
     ret_val = []
-    data = run_query('select jobtype from seta where date="%s"' % query_date)
+    data = session.query(Seta.jobtype).filter(Seta.date == query_date).all()
     if not data:
         print "The database does not have data for the given %s date." % query_date
         for date in range(-3, 4):
             current_date = query_date + datetime.timedelta(date)
-            jobtype = run_query('select jobtype from seta where date="%s"' % current_date)
+            jobtype = session.query(Seta).filter(Seta.date == current_date)
             if jobtype:
                 print "The data is available for date=%s" % current_date
         return ret_val
 
     for job in data:
-        parts = job.split("'")
+        parts = job[0].split("'")
         ret_val.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
 
     return ret_val

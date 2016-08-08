@@ -42,7 +42,7 @@ def update_runnableapi():
         else:
             print "It's going to update your runnable jobs data."
             data = query_the_runnablejobs(new_timestamp, task_id)
-            add_new_jobs_into_pressed(data=data)
+            add_new_jobs_into_pressed(new_data=data)
             with open(ROOT_DIR + '/runnablejobs.json', 'w') as f:
                 json.dump(data, f)
     else:

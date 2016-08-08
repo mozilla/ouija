@@ -1,12 +1,15 @@
 import os
+import re
 import calendar
-from datetime import datetime, timedelta
+from src import jobtypes
+from functools import wraps
 from itertools import groupby
 from collections import Counter
-from functools import wraps
+from database.config import session
 from tools.failures import SETA_WINDOW
-from src import jobtypes
-import re
+from datetime import datetime, timedelta
+from sqlalchemy import and_, func, desc, case
+from database.models import Seta, Testjobs, Dailyjobs
 
 import MySQLdb
 from flask import Flask, request, json, Response, abort
@@ -62,6 +65,7 @@ def sanitize_string(input):
         return input
     else:
         return ''
+
 
 def sanitize_bool(input):
     if int(input) == 0 or int(input) == 1:
@@ -165,16 +169,15 @@ def run_results_day_flot_query():
                  'osx10.6',
                  'osx10.7',
                  'osx10.8']
-    db = create_db_connnection()
 
     data_platforms = {}
     for platform in platforms:
-        cursor = db.cursor()
-        cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as
-                          totals from testjobs where platform="%s" and date >= "%s" and date <= "%s"
-                          group by day""" % ('testfailed', platform, start_date, end_date))
-
-        query_results = cursor.fetchall()
+        query_results = session.query(Testjobs.date.label('day'),
+                                      func.count(Testjobs.result == 'testfailed'
+                                                 ).label("failures"),
+                                      func.count(Testjobs).label('totals')).filter(
+            and_(Testjobs.platform == platform,
+                 Testjobs.date >= start_date, Testjobs.date <= end_date)).group_by('day').all()
 
         dates = []
         data = {}
@@ -187,11 +190,9 @@ def run_results_day_flot_query():
             data['failures'].append((timestamp, int(fail)))
             data['totals'].append((timestamp, int(total)))
 
-        cursor.close()
-
         data_platforms[platform] = {'data': data, 'dates': get_date_range(dates)}
 
-    db.close()
+    session.close()
     return data_platforms
 
 
@@ -208,17 +209,10 @@ def run_slaves_query():
 
     info = '''Only slaves with more than %d jobs are displayed.''' % jobs
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    cursor.execute("""select slave, result, date from testjobs
-                      where result in
-                      ("retry", "testfailed", "success", "busted", "exception")
-                      and date between "{0}" and "{1}"
-                      order by date;""".format(start_date, end_date))
-
-    query_results = cursor.fetchall()
-    cursor.close()
-    db.close()
+    query_results = session.query(Testjobs.slave, Testjobs.result, Testjobs.date).filter(
+        and_(Testjobs.result.in_(["retry", "testfailed", "success", "busted", "exception"]),
+             Testjobs.date.between(start_date, end_date))).all().order_by(Testjobs.date)
+    session.close()
 
     if not query_results:
         return
@@ -302,19 +296,11 @@ def run_platform_query():
                                                               end_date.strftime('%Y-%m-%d'))
     app.logger.debug(log_message)
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-
-    query = """select distinct revision from testjobs
-                      where platform = '%s'
-                      and branch = 'mozilla-central'
-                      and date between '%s' and '%s'
-                      and build_system_type='%s'
-                      order by date desc;""" % (platform, start_date, end_date, build_system_type)
-
-    cursor.execute(query)
-
-    csets = cursor.fetchall()
+    csets = session.query(Testjobs.revision).distinct().\
+        filter(and_(Testjobs.platform == platform,
+                    Testjobs.branch == 'mozilla-central',
+                    Testjobs.date.between(start_date, end_date),
+                    Testjobs.build_system_type == build_system_type)).order_by(desc(Testjobs.date))
 
     cset_summaries = []
     test_summaries = {}
@@ -327,13 +313,12 @@ def run_platform_query():
         cset_id = cset[0]
         cset_summary = CSetSummary(cset_id)
 
-        query = """select result, testtype, date from testjobs
-                   where platform='%s' and buildtype='opt' and revision='%s' and
-                   build_system_type='%s' order by testtype""" % (
-            platform, cset_id, build_system_type)
-
-        cursor.execute(query)
-        test_results = cursor.fetchall()
+        test_results = session.query(Testjobs.result, Testjobs.testtype, Testjobs.date).\
+            filter(and_(Testjobs.platform == platform,
+                        Testjobs.buildtype == 'opt',
+                        Testjobs.revision == cset_id,
+                        Testjobs.build_system_type == build_system_type)).all().order_by(
+            Testjobs.testtype)
 
         for res, testtype, date in test_results:
             test_summary = test_summaries.setdefault(testtype, summary.copy())
@@ -358,9 +343,6 @@ def run_platform_query():
 
         cset_summaries.append(cset_summary)
 
-    cursor.close()
-    db.close()
-
     # sort tests alphabetically and append total & percentage to end of the list
     test_types = sorted(test_summaries.keys())
     test_types += ['total', 'percentage']
@@ -382,7 +364,7 @@ def run_platform_query():
 
     test_summaries['total'] = total
     test_summaries['percentage'] = percentage
-
+    session.close()
     return {'testTypes': test_types,
             'byRevision': cset_summaries,
             'byTest': test_summaries,
@@ -401,13 +383,15 @@ def run_jobtypes_query():
 def run_seta_query():
     start_date, end_date = clean_date_params(request.args, delta=SETA_WINDOW)
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs \
-             where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
-    cursor.execute(query)
+    # we would like to enlarge the datetime range to make sure the latest failures been get.
+    start_date = start_date - timedelta(days=1)
+    end_date = end_date + timedelta(days=1)
+    data = session.query(Testjobs.bugid, Testjobs.platform, Testjobs.buildtype, Testjobs.testtype,
+                         Testjobs.duration).filter(and_(Testjobs.failure_classification == 2,
+                                                        Testjobs.date >= start_date,
+                                                        Testjobs.date <= end_date)).all()
     failures = {}
-    for d in cursor.fetchall():
+    for d in data:
         failures.setdefault(d[0], []).append(d[1:])
 
     return {'failures': failures}
@@ -416,20 +400,15 @@ def run_seta_query():
 @app.route("/data/setasummary/")
 @json_response
 def run_seta_summary_query():
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select distinct date from seta"
-    cursor.execute(query)
+    query = session.query(Seta.date).distinct().all()
     retVal = {}
     dates = []
-    for d in cursor.fetchall():
-        dates.append(d[0])
+    for d in query:
+        dates.append(d[0].strftime("%Y-%m-%d"))
 
     for d in dates:
-        query = "select count(id) from seta where date='%s'" % d
-        cursor.execute(query)
-        results = cursor.fetchall()
-        retVal['%s' % d] = "%s" % results[0]
+        count = session.query(Seta.id).filter(Seta.date == d).count()
+        retVal['%s' % d] = "%s" % int(count)
 
     return {'dates': retVal}
 
@@ -448,11 +427,7 @@ def run_seta_details_query():
         today = datetime.now()
         date = today.strftime("%Y-%m-%d")
     date = "%s" % date
-
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select jobtype from seta where date='%s 00:00:00'" % date
-    cursor.execute(query)
+    query = session.query(Seta.jobtype).filter(Seta.date == date).all()
     retVal = {}
     retVal[date] = []
     jobtype = []
@@ -461,7 +436,7 @@ def run_seta_details_query():
     if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True \
             and str(branch) != '':
         abort(404)
-    for d in cursor.fetchall():
+    for d in query:
         parts = d[0].split("'")
         jobtype.append([parts[1], parts[3], parts[5]])
 
@@ -526,19 +501,18 @@ def run_jobnames_query():
 @json_response
 def run_dailyjob_query():
     start_date, end_date = clean_date_params(request.args)
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs \
-             where date>='%s' and date <='%s'\
-             order by case platform \
-                when 'linux' then 1 \
-                when 'osx' then 2  \
-                when 'win' then 3  \
-                when 'android' then 4 \
-                end" % (start_date, end_date)
-    cursor.execute(query)
+    start_date = start_date - timedelta(days=1)
+    end_date = end_date + timedelta(days=1)
+    data = session.query(Dailyjobs.date, Dailyjobs.platform, Dailyjobs.branch, Dailyjobs.numjobs,
+                         Dailyjobs.sumduration).\
+        filter(Dailyjobs.date.between(start_date, end_date)).order_by(case([
+            (Dailyjobs.platform == 'linux', 1),
+            (Dailyjobs.platform == 'osx', 2),
+            (Dailyjobs.platform == 'win', 3),
+            (Dailyjobs.platform == 'android', 4)], else_='5')).all()
+
     output = {}
-    for rows in cursor.fetchall():
+    for rows in data:
         date = str(rows[0])
         platform = rows[1]
         branch = rows[2]
@@ -580,4 +554,4 @@ def template(filename):
     abort(404)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8157, debug=False)
+    app.run(host="0.0.0.0", port=8157, debug=True)
