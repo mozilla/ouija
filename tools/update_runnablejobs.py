@@ -55,11 +55,16 @@ def update_runnableapi():
 
 def query_the_runnablejobs(new_timestamp, task_id=None):
     if task_id:
-        url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
-        data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
-        if len(data['results']) > 0:
-            data['meta'].update({'timetamp': new_timestamp})
-            return data
+        try:
+            url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
+            data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
+            if len(data['results']) > 0:
+                data['meta'].update({'timetamp': new_timestamp})
+        except:
+            "We have something wrong with the runnable api, switch to the old runnablejob.json now"
+            with open(ROOT_DIR + '/runnablejobs.json', 'r+') as data:
+                data = json.loads(data.read())['results']
+        return data
 
 
 def add_new_jobs_into_pressed(new_data=None):
