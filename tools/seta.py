@@ -4,7 +4,7 @@ import copy
 
 
 def get_distinct_tuples():
-    url = "http://alertmanager.allizom.org/data/jobtypes/"
+    url = "http://seta-dev.herokuapp.com/data/jobtypes/"
     response = requests.get(url, headers={'accept-encoding': 'json'}, verify=True)
     data = json.loads(response.content)
     return data['jobtypes']

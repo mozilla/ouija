@@ -1,4 +1,3 @@
-import MySQLdb
 import datetime
 from database.models import Dailyjobs, Testjobs
 from database.config import session
@@ -8,11 +7,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 revisions_dict = {}
-database = MySQLdb.connect(host="localhost",
-                           user="root",
-                           passwd="root",
-                           db="ouija")
-cur = database.cursor()
 
 branches = ["mozilla-inbound", "fx-team", "try"]
 platforms = ["linux", "osx", "win", "android"]

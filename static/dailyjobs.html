@@ -13,7 +13,7 @@
 <body>
   <h1>Tracking SETA</h1>
   <p>
-    <a href="http://alertmanager.allizom.org/data/dailyjobs/">Raw Data</a><br />
+    <a href="http://seta-dev.herokuapp.com/data/dailyjobs/">Raw Data</a><br />
     <p>
       Start Date: <input type="text" id="datepicker1">
       End Date: <input type="text" id="datepicker2">
@@ -144,7 +144,7 @@
     }
 
     function getDailyJobsByDate(start_date, end_date){
-      var url = "http://alertmanager.allizom.org/data/dailyjobs/?";
+      var url = "http://seta-dev.herokuapp.com/data/dailyjobs/?";
       if (typeof start_date !== 'undefined' || typeof end_date !== 'undefined'){
         url += "startDate="+start_date+"&endDate="+end_date;
       }

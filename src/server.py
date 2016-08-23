@@ -1,6 +1,7 @@
 import os
 import re
 import calendar
+import urlparse
 from src import jobtypes
 from functools import wraps
 from itertools import groupby
@@ -11,13 +12,17 @@ from datetime import datetime, timedelta
 from sqlalchemy import and_, func, desc, case
 from database.models import Seta, Testjobs, Dailyjobs
 
-import MySQLdb
 from flask import Flask, request, json, Response, abort
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 JOBSDATA = jobtypes.Treecodes()
+
+# These are necesary setup for postgresql on heroku
+PORT = int(os.environ.get("PORT", 8157))
+urlparse.uses_netloc.append("postgres")
+DBURL = urlparse.urlparse(os.environ["DATABASE_URL"])
 
 
 class CSetSummary(object):
@@ -27,13 +32,6 @@ class CSetSummary(object):
         self.orange = Counter()
         self.red = Counter()
         self.blue = Counter()
-
-
-def create_db_connnection():
-    return MySQLdb.connect(host="localhost",
-                           user="root",
-                           passwd="root",
-                           db="ouija")
 
 
 def serialize_to_json(object):
@@ -86,11 +84,11 @@ def clean_date_params(query_dict, delta=7):
 
     # get dates params
     start_date_param = query_dict.get('startDate') or \
-                       query_dict.get('startdate') or \
-                       query_dict.get('date')
+        query_dict.get('startdate') or \
+        query_dict.get('date')
     end_date_param = query_dict.get('endDate') or \
-                     query_dict.get('enddate') or \
-                     query_dict.get('date')
+        query_dict.get('enddate') or \
+        query_dict.get('date')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
@@ -554,4 +552,4 @@ def template(filename):
     abort(404)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8157, debug=True)
+    app.run(host="0.0.0.0", port=PORT, debug=True)

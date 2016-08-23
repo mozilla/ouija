@@ -74,7 +74,7 @@ def format_in_table(active_jobs, master):
     sum_removed = 0
     sum_remaining = 0
 
-    data = retry(requests.get, args=('http://alertmanager.allizom.org/data/jobnames/', ),
+    data = retry(requests.get, args=('http://seta-dev.herokuapp.com/data/jobnames/', ),
                  kwargs={'headers': headers,
                          'verify': True}).json()
     running_jobs = data['results']

@@ -4,6 +4,7 @@ from setuptools import setup, find_packages
 required = [
     "Flask",
     "MarkupSafe",
+    "psycopg2",
     "MySQL-python",
     "argparse",
     "requests",
