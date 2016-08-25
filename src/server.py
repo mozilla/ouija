@@ -63,6 +63,7 @@ def sanitize_string(input):
     else:
         return ''
 
+
 def sanitize_bool(input):
     if int(input) == 0 or int(input) == 1:
         return int(input)
@@ -82,11 +83,11 @@ def clean_date_params(query_dict, delta=7):
 
     # get dates params
     start_date_param = query_dict.get('startDate') or \
-                       query_dict.get('startdate') or \
-                       query_dict.get('date')
+        query_dict.get('startdate') or \
+        query_dict.get('date')
     end_date_param = query_dict.get('endDate') or \
-                     query_dict.get('enddate') or \
-                     query_dict.get('date')
+        query_dict.get('enddate') or \
+        query_dict.get('date')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
@@ -328,8 +329,9 @@ def run_platform_query():
         cset_summary = CSetSummary(cset_id)
 
         query = """select result, testtype, date from testjobs
-                   where platform='%s' and buildtype='opt' and revision='%s' and build_system_type='%s'
-                   order by testtype""" % (platform, cset_id, build_system_type)
+                   where platform='%s' and buildtype='opt' and revision='%s'
+                   and build_system_type='%s' order by
+                   testtype""" % (platform, cset_id, build_system_type)
 
         cursor.execute(query)
         test_results = cursor.fetchall()
@@ -457,7 +459,8 @@ def run_seta_details_query():
     jobtype = []
 
     # we only support fx-team and mozilla-inbound branch in seta
-    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True and str(branch) != '':
+    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) \
+            is not True and str(branch) != '':
         abort(404)
     for d in cursor.fetchall():
         parts = d[0].split("'")
@@ -465,8 +468,8 @@ def run_seta_details_query():
 
     alljobs = JOBSDATA.jobtype_query()
 
-    # Because we store high value jobs in seta table as default, so we return low value jobs(default)
-    # when the priority is 'low', otherwise we return high value jobs.
+    # Because we store high value jobs in seta table as default, so we return low value
+    # jobs(default) when the priority is 'low', otherwise we return high value jobs.
     if priority == 'low':
         low_value_jobs = [low_value_job for low_value_job in alljobs if
                           low_value_job not in jobtype]
@@ -556,6 +559,46 @@ def run_dailyjob_query():
     return {'dailyjobs': output}
 
 
+# It's a temp endpoint to make database migration from alermanager server to heroku more easier
+@app.route("/data/dump/")
+@json_response
+def run_old_job_dump():
+    limit = request.args.get('limit')
+    offset = request.args.get('offset')
+    date_format = "%04d-%02d-%02d %02d:%02d:%02d"
+    db = create_db_connnection()
+    cursor = db.cursor()
+    query = "select slave, result, build_system_type, duration, platform, buildtype, " \
+            "testtype, bugid, branch, revision, date, failure_classification, failures " \
+            "from testjobs LIMIT %s OFFSET %s" % (limit, offset)
+    cursor.execute(query)
+    data = cursor.fetchall()
+    cursor.close()
+    output = []
+    if len(data) > 0:
+        temp = {}
+        for (slave, result, build_system_type, duration, platform, buildtype, testtype,
+             bugid, branch, revision, date, failure_classification, failures) in data:
+
+            temp['slave'] = slave
+            temp['bugid'] = bugid
+            temp['result'] = result
+            temp['branch'] = branch
+            temp['duration'] = duration
+            temp['platform'] = platform
+            temp['failures'] = failures
+            temp['testtype'] = testtype
+            temp['revision'] = revision
+            temp['buildtype'] = buildtype
+            temp['build_system_type'] = build_system_type
+            temp['failure_classification'] = failure_classification
+            temp['date'] = date_format % (date.year, date.month, date.day,
+                                          date.hour, date.minute, date.second)
+            output.append(temp)
+
+    return {'result': output}
+
+
 @app.errorhandler(404)
 @json_response
 def handler404(error):
@@ -577,4 +620,4 @@ def template(filename):
     abort(404)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8157, debug=False)
+    app.run(host="0.0.0.0", port=8157, debug=True)
