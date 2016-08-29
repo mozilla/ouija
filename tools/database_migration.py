@@ -1,11 +1,13 @@
 import argparse
 import requests
+import logging
 from redo import retry
 from database.config import session
 from database.models import Testjobs
 
 # alertmanager server URL
 URL = "http://alertmanager.allizom.org/data/dump/?limit=%d&offset=%d"
+logger = logging.getLogger(__name__)
 
 
 def migration(args):
@@ -24,11 +26,11 @@ def migration(args):
                 session.add(Testjob)
                 session.commit()
 
-            except:
+            except Exception as error:
+                logging.warning(error)
                 session.rollback()
 
-            finally:
-                session.close()
+        session.close()
 
         # The process will move forward by set offset
         offset += limit
