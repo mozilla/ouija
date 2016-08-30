@@ -34,6 +34,7 @@ def migration(args):
 
         # The process will move forward by set offset
         offset += limit
+        url = URL % (limit, offset)
         response = retry(requests.get, args=(url, )).json()
         datasets = response['result']
 
