@@ -62,7 +62,7 @@ $(function() {
   }
 
   function printTable(date) {
-    $.getJSON("http://alertmanager.allizom.org/data/setadetails/", {date:date}).done(function (data) { getActiveJobs(data, date); });
+    $.getJSON("http://alertmanager.allizom.org/data/setadetails/?priority=high", {date:date}).done(function (data) { getActiveJobs(data, date); });
   }
 
   function getActiveJobs(details, date) {
