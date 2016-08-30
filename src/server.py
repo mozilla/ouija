@@ -576,10 +576,9 @@ def run_old_job_dump():
     cursor.close()
     output = []
     if len(data) > 0:
-        temp = {}
         for (slave, result, build_system_type, duration, platform, buildtype, testtype,
              bugid, branch, revision, date, failure_classification, failures) in data:
-
+            temp = {}
             temp['slave'] = slave
             temp['bugid'] = bugid
             temp['result'] = result
