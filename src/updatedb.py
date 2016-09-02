@@ -216,7 +216,7 @@ def uploadResults(data, branch, revision, date):
 
         # Get failure snippets: https://treeherder.mozilla.org/api/project/
         # mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
-        failures = []
+        failures = set()
         if failure_classification == 2:
             url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s" \
                   "&name=Bug+suggestions&type=json" % (branch, _id)
@@ -232,28 +232,28 @@ def uploadResults(data, branch, revision, date):
                         dir = (dir.split('|')[1]).strip()
                         if dir.endswith(filename):
                             dir = dir.split(filename)[0]
-                            failures.append(dir + '/' + filename)
-        # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
-        url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
-        data1 = fetch_json(url)
+                            failures.add(dir + filename)
+            # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
+            url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
+            data1 = fetch_json(url)
 
-        slave = data1['machine_name']
+            slave = data1['machine_name']
 
-        # Insert into MySQL Database
-        try:
-            testjob = Testjobs(str(slave), str(result), str(build_system_type),
-                               str(duration), str(platform), str(buildtype),
-                               str(testtype), str(bugid), str(branch), str(revision),
-                               str(date), str(failure_classification), str(failures))
+            # Insert into MySQL Database
+            try:
+                testjob = Testjobs(str(slave), str(result), str(build_system_type),
+                                   str(duration), str(platform), str(buildtype),
+                                   str(testtype), str(bugid), str(branch), str(revision),
+                                   str(date), str(failure_classification), str(list(failures)[0:10]))
 
-            session.add(testjob)
-            count += 1
-            session.commit()
-        except Exception as error:
-            session.rollback()
-            logging.warning(error)
-        finally:
-            session.close()
+                session.add(testjob)
+                count += 1
+                session.commit()
+            except Exception as error:
+                session.rollback()
+                logging.warning(error)
+            finally:
+                session.close()
     logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" %
                  (count, len(results), revision, branch, date))
 
