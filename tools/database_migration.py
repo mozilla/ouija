@@ -30,7 +30,8 @@ def migration(args):
                 logging.warning(error)
                 session.rollback()
 
-        session.close()
+            finally:
+                session.close()
 
         # The process will move forward by set offset
         offset += limit
