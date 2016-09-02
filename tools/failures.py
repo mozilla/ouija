@@ -12,8 +12,10 @@ from update_runnablejobs import update_runnableapi
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-# ROOT_DIR = os.getcwd()
-ROOT_DIR = '/home/ubuntu/ouija/data'
+if os.path.isfile('/home/ubuntu/ouija/data'):
+    ROOT_DIR = '/home/ubuntu/ouija/data'
+else:
+    ROOT_DIR = os.getcwd()
 SETA_WINDOW = 90
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
@@ -30,7 +32,7 @@ def get_raw_data(start_date, end_date):
     if not start_date:
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
-    url = "http://alertmanager.allizom.org/data/seta/?startDate=%s&endDate=%s" % \
+    url = "http://seta-dev.herokuapp.com/data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     response = retry(requests.get, args=(url, ),
