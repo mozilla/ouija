@@ -1,10 +1,9 @@
 import os
 import json
 import logging
-from tools.update_runnablejobs import update_runnableapi
+from tools.update_runnablejobs import update_runnableapi, get_rootdir
 LOG = logging.getLogger(__name__)
-JSONPATH = os.getcwd() + '/runnablejobs.json'
-# JSONPATH = '/home/ubuntu/ouija/data/runnablejobs.json'
+JSONPATH = get_rootdir() + '/runnablejobs.json'
 
 
 def _getgroup(name):
@@ -56,7 +55,7 @@ class Treecodes:
         if not os.path.isfile(JSONPATH):
             update_runnableapi()
         with open(JSONPATH) as data:
-            joblist = json.loads(data.read())['results']
+            joblist = json.loads(data.read())
 
         # skipping pgo - We run this infrequent enough that we should have all pgo results tested
         self.joblist = [job for job in joblist if job['platform_option'] != 'pgo']

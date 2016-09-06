@@ -15,6 +15,16 @@ TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
 ROOT_DIR = os.getcwd()
 
+def get_rootdir():
+    try:
+        x = ROOT_DIR
+    except:
+        ROOT_DIR = os.getcwd()
+
+    if not os.path.exists(ROOT_DIR + '/seta.html'):
+        ROOT_DIR = os.path.dirname(ROOT_DIR)
+
+    return ROOT_DIR
 
 # TODO we need add test for this function to make sure it works under any situation
 def update_runnableapi():
@@ -28,12 +38,12 @@ def update_runnableapi():
     expires = latest_task['expires'].split('T')[0]
     time_tuple = datetime.datetime.strptime(expires, "%Y-%m-%d").timetuple()
     new_timestamp = time.mktime(time_tuple)
-    path = ROOT_DIR + '/runnablejobs.json'
+    path = get_rootdir() + '/runnablejobs.json'
 
     # we do nothing if the timestamp of runablejobs.json is equal with the latest task
     # otherwise we download and update it
     if os.path.isfile(path):
-        with open(path, 'r+') as data:
+        with open(path, 'r') as data:
             # read the timesstamp of this task from json file
             oldtime = json.loads(data.read())['meta']['timetamp']
         if oldtime == new_timestamp:
@@ -43,13 +53,13 @@ def update_runnableapi():
             print "It's going to update your runnable jobs data."
             data = query_the_runnablejobs(new_timestamp, task_id)
             add_new_jobs_into_pressed(new_data=data)
-            with open(ROOT_DIR + '/runnablejobs.json', 'w') as f:
+            with open(path, 'w') as f:
                 json.dump(data, f)
     else:
         print "It's going to help you download the runnable jobs file."
         data = query_the_runnablejobs(new_timestamp, task_id)
         if data:
-            with open(ROOT_DIR + '/runnablejobs.json', 'w') as f:
+            with open(path, 'w') as f:
                 json.dump(data, f)
 
 
@@ -61,18 +71,19 @@ def query_the_runnablejobs(new_timestamp, task_id=None):
             if len(data['results']) > 0:
                 data['meta'].update({'timetamp': new_timestamp})
         except:
-            "We have something wrong with the runnable api, switch to the old runnablejob.json now"
-            with open(ROOT_DIR + '/runnablejobs.json', 'r+') as data:
-                data = json.loads(data.read())['results']
+            print "failed to get runnablejobs via %s" % url
+            print "We have something wrong with the runnable api, switch to the old runnablejobs.json now"
+            with open(get_rootdir() + '/runnablejobs.json', 'r') as data:
+                data = json.loads(data.read())
         return data
 
 
 def add_new_jobs_into_pressed(new_data=None):
     if new_data:
-        with open(ROOT_DIR + '/runnablejobs.json', 'r+') as f:
+        with open(get_rootdir() + '/runnablejobs.json', 'r') as f:
             old_data = json.loads(f.read())['results']
 
-        with open(ROOT_DIR + '/src/preseed.json', 'r+') as f:
+        with open(get_rootdir() + '/src/preseed.json', 'r') as f:
             preseed_jobs = json.loads(f.read())
 
         # If a job in recent runnablejobs and can't been found in the old runnablejobs,
@@ -113,7 +124,7 @@ def add_new_jobs_into_pressed(new_data=None):
                         if temp not in preseed_jobs:
                             preseed_jobs.append(temp)
 
-            with open(ROOT_DIR + '/src/preseed.json', 'w+') as f:
+            with open(get_rootdir() + '/src/preseed.json', 'w+') as f:
                 json.dump(preseed_jobs, f)
 
 if __name__ == "__main__":
