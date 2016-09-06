@@ -20,7 +20,8 @@ headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
 }
-HOST = "http://alertmanager.allizom.org/"
+#HOST = "http://alertmanager.allizom.org/"
+HOST = "http://seta-dev.herokuapp.com/"
 
 def get_raw_data(start_date, end_date):
     if not end_date:

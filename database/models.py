@@ -48,7 +48,7 @@ class Testjobs(MetaBase):
     revision = Column(String(32), nullable=False, index=True)
     date = Column(DateTime, nullable=False, index=True)
     failure_classification = Column(Integer, nullable=False)
-    failures = Column(String(256), nullable=False)
+    failures = Column(String(1024), nullable=False)
 
     def __init__(self, slave, result, build_system_type,
                  duration, platform, buildtype,
