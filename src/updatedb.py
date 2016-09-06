@@ -179,6 +179,15 @@ def uploadResults(data, branch, revision, date):
         if not platform:
             continue
 
+        # ignore b2g, autophone, firefox-ui-tests/qa-lab
+        if platform in ['mulet-linux64', 'b2g-device-image',
+                        'osx-10-7', 'osx-10-9', 'osx-10-11', 'windows8-32',
+                        'android-4-2-armv7-api15', 'android-4-4-armv7-api15',
+                        'android-5-0-armv8-api15', 'android-5-1-armv7-api15',
+                        'android-6-0-armv8-api15', 'taskcluster-images', 'other',
+                        'Win 6.3.9600 x86_64', 'windows7-64']:
+            continue
+
         buildtype = r["platform_option"]
         build_system_type = r['build_system_type']
         # the testtype of builbot job is in 'ref_data_name'
@@ -187,27 +196,36 @@ def uploadResults(data, branch, revision, date):
         if r['build_system_type'] == 'buildbot':
             testtype = r['ref_data_name'].split(' ')[-1]
 
-        else:
-            # The test name on taskcluster comes to a sort of combination
-            # (e.g desktop-test-linux64/debug-jittests-3)and asan job can
-            # been referenced as a opt job. we want the build type(debug or opt)
-            # to separate the job_type_name, then get "jittests-3" as testtype
-            # for job_type_name like desktop-test-linux64/debug-jittests-3
-            separator = r['platform_option'] \
-                if r['platform_option'] != 'asan' else 'opt'
-            testtype = r['job_type_name'].split(
-                '{buildtype}-'.format(buildtype=separator))[-1]
-        if r["build_system_type"] == "taskcluster":
-            # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
-            pmap = {"linux64": "Linux64",
-                    "linux32": "Linux32",
-                    "osx-10-7": "MacOSX64",
-                    "gecko-decision": "gecko-decision",
-                    "lint": "lint"}
-            p = platform
-            if platform in pmap:
-                p = pmap[platform]
-            testtype = r["job_type_name"].split(p)[-1]
+        elif r["build_system_type"] == "taskcluster":
+            testtype = r["job_type_name"]
+            testtype = testtype.split('/opt-')[-1]
+            testtype = testtype.split('/debug-')[-1]
+
+            # this is plain-reftests for android
+            testtype = testtype.replace('plain-', '')
+
+            # SETA/Ouija do not care about builds, or other jobs like lint, etc.
+            testtype = testtype.replace(' Opt', 'build')
+            testtype = testtype.replace(' Debug', 'build')
+            testtype = testtype.replace(' Dbg', 'build')
+            testtype = testtype.replace(' (opt)', 'build')
+            testtype = testtype.replace(' PGO Opt', 'build')
+            testtype = testtype.replace(' Valgrind Opt', 'build')
+            testtype = testtype.replace(' Artifact Opt', 'build')
+            testtype = testtype.replace(' (debug)', 'build')
+
+            testtype = testtype.strip(' ')
+
+
+        # TODO: file bugs
+        # need to fix tc definitions so these match buildbot
+        testtype = testtype.replace('browser-chrome-e10s', 'e10s-browser-chrome')
+        testtype = testtype.replace('devtools-chrome-e10s', 'e10s-devtools-chrome')
+        testtype = testtype.replace('[TC] Android 4.3 API15+ ', '')
+        testtype = testtype.replace('jittests-', 'jittest-')
+
+        if testtype.startswith('[funsize'):
+            continue
 
         failure_classification = 0
         try:
@@ -254,6 +272,9 @@ def uploadResults(data, branch, revision, date):
         data1 = fetch_json(url)
 
         slave = data1['machine_name']
+        # these jobs have 40 character hash for testtype :(
+        if slave.endswith('qa.scl3.mozilla.com') or slave.endswith('community.scl3.mozilla.com'):
+            continue
 
         # Insert into MySQL Database
         sql = """insert into testjobs (slave, result, build_system_type,

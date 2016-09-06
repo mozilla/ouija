@@ -570,7 +570,8 @@ def run_old_job_dump():
     cursor = db.cursor()
     query = "select slave, result, build_system_type, duration, platform, buildtype, " \
             "testtype, bugid, branch, revision, date, failure_classification, failures " \
-            "from testjobs LIMIT %s OFFSET %s" % (limit, offset)
+            "from testjobs where failure_classification=2 LIMIT %s OFFSET %s" % (limit, offset)
+
     cursor.execute(query)
     data = cursor.fetchall()
     cursor.close()

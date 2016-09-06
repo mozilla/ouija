@@ -9,7 +9,7 @@ database = MySQLdb.connect(host="localhost",
                            db="ouija")
 cur = database.cursor()
 
-branches = ["mozilla-inbound", "fx-team", "try"]
+branches = ["mozilla-inbound", "fx-team", "try", "autoland"]
 platforms = ["linux", "osx", "win", "android"]
 
 
@@ -39,7 +39,6 @@ def updatedb(date, platform, branch, numpushes, numjobs, sumduration):
     query = 'insert into dailyjobs (date, platform, branch, numpushes, numjobs, sumduration) \
              values ("{0}", "{1}", "{2}", {3}, {4}, {5})'
     query = query.format(date, platform, branch, numpushes, numjobs, sumduration)
-    print query
     cur.execute(query)
 
 
@@ -125,6 +124,8 @@ if __name__ == "__main__":
         while current_date <= end_at:
             retrievedb(branch, str(current_date))
             current_date = current_date + datetime.timedelta(days=1)
+
+        current_date = start_at
         while current_date <= options.end_date:
             summarize(str(current_date), branch)
             current_date = current_date + datetime.timedelta(days=1)
