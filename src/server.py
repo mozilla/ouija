@@ -22,8 +22,12 @@ JOBSDATA = jobtypes.Treecodes()
 # These are necesary setup for postgresql on heroku
 PORT = int(os.environ.get("PORT", 8157))
 urlparse.uses_netloc.append("postgres")
-DBURL = urlparse.urlparse(os.environ["DATABASE_URL"])
 
+try:
+    DBURL = urlparse.urlparse(os.environ["DATABASE_URL"])
+except:
+    # use mysql
+    pass
 
 class CSetSummary(object):
     def __init__(self, cset_id):

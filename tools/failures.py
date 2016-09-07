@@ -7,15 +7,12 @@ from emails import send_email
 from redo import retry
 from database.models import Seta
 from database.config import session
-from update_runnablejobs import update_runnableapi
+from update_runnablejobs import update_runnableapi, get_rootdir
 
 import seta
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-if os.path.isfile('/home/ubuntu/ouija/data'):
-    ROOT_DIR = '/home/ubuntu/ouija/data'
-else:
-    ROOT_DIR = os.getcwd()
+ROOT_DIR = get_rootdir()
 SETA_WINDOW = 90
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
@@ -23,7 +20,8 @@ headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
 }
-
+#HOST = "http://alertmanager.allizom.org/"
+HOST = "http://seta-dev.herokuapp.com/"
 
 def get_raw_data(start_date, end_date):
     if not end_date:
@@ -32,7 +30,7 @@ def get_raw_data(start_date, end_date):
     if not start_date:
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
-    url = "http://seta-dev.herokuapp.com/data/seta/?startDate=%s&endDate=%s" % \
+    url = HOST + "data/seta/?startDate=%s&endDate=%s" % \
           (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     response = retry(requests.get, args=(url, ),
