@@ -13,18 +13,14 @@ headers = {
 
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
-ROOT_DIR = os.getcwd()
 
 def get_rootdir():
-    try:
-        x = ROOT_DIR
-    except:
-        ROOT_DIR = os.getcwd()
 
-    if not os.path.exists(ROOT_DIR + '/seta.html'):
-        ROOT_DIR = os.path.dirname(ROOT_DIR)
+    path = os.path.expanduser('~/.mozilla/seta/')
+    if not os.path.exists(path):
+        os.makedirs(path)
 
-    return ROOT_DIR
+    return path
 
 # TODO we need add test for this function to make sure it works under any situation
 def update_runnableapi():
