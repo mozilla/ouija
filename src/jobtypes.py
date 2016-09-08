@@ -55,7 +55,7 @@ class Treecodes:
         if not os.path.isfile(JSONPATH):
             update_runnableapi()
         with open(JSONPATH) as data:
-            joblist = json.loads(data.read())
+            joblist = json.loads(data.read())['results']
 
         # skipping pgo - We run this infrequent enough that we should have all pgo results tested
         self.joblist = [job for job in joblist if job['platform_option'] != 'pgo']
