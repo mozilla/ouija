@@ -14,7 +14,12 @@ def migration(args):
     limit = int(args.limit)
     offset = 0
     url = URL % (limit, offset)
-    response = retry(requests.get, args=(url, )).json()
+    try:
+        response = retry(requests.get, args=(url, )).json()
+    except Exception as error:
+        # we will return an empty 'result' list if got exception here
+        logger.debug("the request to %s failed, due to %s" % (url, error))
+        response = {'result': []}
     datasets = response['result']
 
     session.query(Testjobs).filter(Testjobs.date>'2016-01-01 00:00:00').delete()

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import requests
 import datetime
@@ -11,6 +12,7 @@ from update_runnablejobs import update_runnableapi, get_rootdir
 
 import seta
 
+logger = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ROOT_DIR = get_rootdir()
 SETA_WINDOW = 90
@@ -22,6 +24,7 @@ headers = {
 }
 HOST = "http://seta-dev.herokuapp.com/"
 
+
 def get_raw_data(start_date, end_date):
     if not end_date:
         end_date = datetime.datetime.now()
@@ -30,18 +33,21 @@ def get_raw_data(start_date, end_date):
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     url = HOST + "data/seta/?startDate=%s&endDate=%s" % \
-          (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
-
-    response = retry(requests.get, args=(url, ),
-                     kwargs={'headers': headers, 'verify': True})
-    data = json.loads(response.content)
+                 (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    try:
+        response = retry(requests.get, args=(url, ),
+                         kwargs={'headers': headers, 'verify': True})
+        data = json.loads(response.content)
+    except Exception as error:
+        # we will return an empty 'failures' list if got exception here
+        logger.debug("the request to %s failed, due to %s" % (url, error))
+        data = {'failures': []}
     return data['failures']
 
 
 def communicate(failures, to_insert, total_detected, testmode, date):
 
     active_jobs = seta.get_distinct_tuples()
-    format_in_table(active_jobs, to_insert)  # we may need to fix this later
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     print "We will detect %.2f%% (%s) of the %s failures" % \
           (percent_detected, len(total_detected), len(failures))
@@ -66,65 +72,6 @@ def communicate(failures, to_insert, total_detected, testmode, date):
     else:
         send_email(len(failures), len(to_insert), date, str(total_changes) +
                    " changes from previous day", change, admin=True, results=True)
-
-
-def format_in_table(active_jobs, master):
-    results = {}
-    sum_removed = 0
-    sum_remaining = 0
-
-    data = retry(requests.get, args=(HOST + 'data/jobnames/', ),
-                 kwargs={'headers': headers,
-                         'verify': True}).json()
-    running_jobs = data['results']
-
-    for jobtype in active_jobs:
-        key = "%s_%s" % (jobtype[0], jobtype[1])
-        if key not in results:
-            results[key] = []
-
-        for item in master:
-            if item[0] == jobtype[0] and item[1] == jobtype[1]:
-                if item[2] not in results[key]:
-                    results[key].append(item[2])
-
-    keys = results.keys()
-    keys.sort()
-    missing_jobs = []
-    for key in keys:
-        data = results[key]
-        data.sort()
-        output = ""
-        for platform, buildtype, test in active_jobs:
-            if "%s_%s" % (platform, buildtype) != key:
-                continue
-
-            output += '\t'
-            if test in data or '' in data:
-                found = False
-                for job in running_jobs:
-                    if job['name'] == test:
-                        output += job['job_type_symbol']
-                        found = True
-                        break
-
-                if not found:
-                    output += '**'
-                    missing_jobs.append(test)
-
-                sum_removed += 1
-            else:
-                output += "--"
-                sum_remaining += 1
-
-        print "%s%s" % (key, output)
-
-    if missing_jobs:
-        print "** new jobs which need a code: %s" % ','.join(missing_jobs)
-
-    print "Total removed %s" % (sum_removed)
-    print "Total remaining %s" % (sum_remaining)
-    print "Total jobs %s" % (sum_removed + sum_remaining)
 
 
 def insert_in_database(to_insert, date=None):
