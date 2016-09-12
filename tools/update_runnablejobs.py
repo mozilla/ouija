@@ -3,6 +3,7 @@ import json
 import time
 import datetime
 import requests
+import logging
 
 from redo import retry
 
@@ -10,7 +11,7 @@ headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
 }
-
+logger = logging.getLogger(__name__)
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decisionTaskID={1}&format=json"
 
@@ -22,12 +23,19 @@ def get_rootdir():
 
     return path
 
+
 # TODO we need add test for this function to make sure it works under any situation
 def update_runnableapi():
     """Use it to update runnablejobs.json file."""
     url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
-    latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
-                        kwargs={'headers': {'accept-encoding': 'json'}, 'verify': True}).json()
+    try:
+        latest_task = retry(requests.get, args=(url % "mozilla-inbound", ),
+                            kwargs={'headers': {'accept-encoding': 'json'},
+                                    'verify': True}).json()
+    except Exception as error:
+        # we will end this function if got exception here
+        logger.debug("the request to %s failed, due to %s" % (url, error))
+        return
     task_id = latest_task['taskId']
 
     # The format of expires is like 2017-07-04T22:13:23.248Z and we only want 2017-07-04 part
@@ -61,8 +69,8 @@ def update_runnableapi():
 
 def query_the_runnablejobs(new_timestamp, task_id=None):
     if task_id:
+        url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
         try:
-            url = TREEHERDER_HOST.format('mozilla-inbound', task_id)
             data = retry(requests.get, args=(url, ), kwargs={'headers': headers}).json()
             if len(data['results']) > 0:
                 data['meta'].update({'timetamp': new_timestamp})
