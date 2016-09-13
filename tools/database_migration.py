@@ -1,19 +1,21 @@
 import argparse
 import requests
 import logging
+import datetime
 from redo import retry
 from database.config import session
 from database.models import Testjobs
 
 # alertmanager server URL
-URL = "http://alertmanager.allizom.org/data/dump/?limit=%d&offset=%d"
+URL = "http://alertmanager.allizom.org/data/dump/?startDate=%s&limit=%d&offset=%d"
 logger = logging.getLogger(__name__)
 
 
 def migration(args):
     limit = int(args.limit)
+    startDate = args.startDate
     offset = 0
-    url = URL % (limit, offset)
+    url = URL % (startDate, limit, offset)
     try:
         response = retry(requests.get, args=(url, )).json()
     except Exception as error:
@@ -22,7 +24,7 @@ def migration(args):
         response = {'result': []}
     datasets = response['result']
 
-    session.query(Testjobs).filter(Testjobs.date>'2016-01-01 00:00:00').delete()
+    session.query(Testjobs).filter(Testjobs.date>='%s 00:00:00' % startDate).delete()
 
     while len(datasets) > 0:
         for data in datasets:
@@ -88,15 +90,23 @@ def migration(args):
 
         # The process will move forward by set offset
         offset += limit
-        url = URL % (limit, offset)
+        url = URL % (startDate, limit, offset)
         response = retry(requests.get, args=(url, )).json()
         datasets = response['result']
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='migrate the seta database.')
-    parser.add_argument('--limit', dest='limit', default=20,
+    parser.add_argument('--limit', dest='limit', default=10000,
                         help='How much data sets will be migrated for one time.')
+    parser.add_argument('--startDate', dest='startDate', default='',
+                        help='YYYY-MM-DD format for date of when to start migrating data, default 2 days ago.')
 
     args = parser.parse_args()
+
+    if args.startDate == '':
+        now = "%s" % str(datetime.datetime.now() - datetime.timedelta(days=2))
+        args.startDate = now.split(' ')[0]
+        logger.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
+
     migration(args)
