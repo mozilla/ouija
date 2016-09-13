@@ -244,8 +244,10 @@ def uploadResults(data, branch, revision, date):
             try:
                 notes = fetch_json(url)
                 if notes:
-                    bugid = notes[-1]['note']
+                    bugid = notes[-1]['text']
             except KeyError:
+                if failure_classification == 2:
+                    bugid = revision
                 pass
 
         # Get failure snippets: https://treeherder.mozilla.org/api/project/

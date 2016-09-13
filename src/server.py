@@ -563,14 +563,20 @@ def run_dailyjob_query():
 @app.route("/data/dump/")
 @json_response
 def run_old_job_dump():
-    limit = request.args.get('limit')
-    offset = request.args.get('offset')
+    limit = request.args.get('limit', 1000)
+    offset = request.args.get('offset', 0)
+
+    # we care about startDate, otherwise default to 100 days in the past
+    start_date = request.args.get('startDate')
+    startDate = parse_date(start_date) or datetime.now() - timedelta(days=100)
+
     date_format = "%04d-%02d-%02d %02d:%02d:%02d"
     db = create_db_connnection()
     cursor = db.cursor()
     query = "select slave, result, build_system_type, duration, platform, buildtype, " \
             "testtype, bugid, branch, revision, date, failure_classification, failures " \
-            "from testjobs where failure_classification=2 LIMIT %s OFFSET %s" % (limit, offset)
+            "from testjobs where failure_classification=2 and branch!='try' " \
+            "and date>='%s' LIMIT %s OFFSET %s" % (startDate, limit, offset)
 
     cursor.execute(query)
     data = cursor.fetchall()
