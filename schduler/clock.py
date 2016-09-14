@@ -24,13 +24,10 @@ def trigger_failures():
 # and trigger failures.py in every 2:00.
 @sched.scheduled_job('cron', day_of_week='mon-sun', hour=1)
 def timed_trigger_updatedb():
-#    q.enqueue(trigger_updatedb())
     q.enqueue(trigger_migratedb())
-
 
 @sched.scheduled_job('cron', day_of_week='mon-sun', hour=13)
 def timed_trigger_updatedb_sec():
-#    q.enqueue(trigger_updatedb())
     q.enqueue(trigger_migratedb())
 
 
