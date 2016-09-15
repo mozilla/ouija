@@ -66,12 +66,13 @@ def communicate(failures, to_insert, total_detected, testmode, date):
     except TypeError:
         total_changes = 0
 
-    if total_changes == 0:
-        send_email(len(failures), len(to_insert), date, "no changes from previous day",
-                   admin=True, results=False)
-    else:
-        send_email(len(failures), len(to_insert), date, str(total_changes) +
-                   " changes from previous day", change, admin=True, results=True)
+# TODO: we need to setup username/password to work in Heroku, probably via env variables
+#    if total_changes == 0:
+#        send_email(len(failures), len(to_insert), date, "no changes from previous day",
+#                   admin=True, results=False)
+#    else:
+#        send_email(len(failures), len(to_insert), date, str(total_changes) +
+#                   " changes from previous day", change, admin=True, results=True)
 
 
 def insert_in_database(to_insert, date=None):

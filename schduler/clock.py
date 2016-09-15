@@ -16,12 +16,12 @@ q = Queue(connection=conn)
 def timed_trigger_updatedb():
     q.enqueue(trigger_migratedb)
 
-@sched.scheduled_job('cron', day_of_week='mon-sun', minute=22)
+@sched.scheduled_job('cron', day_of_week='mon-sun', hour=13)
 def timed_trigger_updatedb_sec():
     q.enqueue(trigger_migratedb)
 
 
-@sched.scheduled_job('cron', day_of_week='mon-sun', minute=25)
+@sched.scheduled_job('cron', day_of_week='mon-sun', hour=14)
 def timed_trigger_failures():
     q.enqueue(trigger_failures)
 
