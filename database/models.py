@@ -81,6 +81,20 @@ class Seta(MetaBase):
         self.date = date
 
 
+class TaskRequests(MetaBase):
+    __tablename__ = 'taskrequests'
+
+    id = Column(Integer, primary_key=True)
+    head_rev = Column(String(128), nullable=False, index=True)
+    pushlog_id = Column(String(8), nullable=False, index=True)
+    priority = Column(Integer)
+
+    def __init__(self, head_rev, pushlog_id, priority):
+        self.head_rev = head_rev
+        self.pushlog_id = pushlog_id
+        self.priority = priority
+
+
 if __name__ == "__main__":
     # create all table and column, so we must call this before
     # all things begin.
