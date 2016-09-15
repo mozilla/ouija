@@ -1,17 +1,19 @@
 import os
 import re
 import calendar
+import urlparse
 from src import jobtypes
 from functools import wraps
 from itertools import groupby
 from collections import Counter
 from database.config import session
 from tools.failures import SETA_WINDOW
+from tools.utils import RequestCounter
 from datetime import datetime, timedelta
 from sqlalchemy import and_, func, desc, case
-from database.models import Seta, Testjobs, Dailyjobs
+from database.models import (Seta, Testjobs, Dailyjobs,
+                             TaskRequests)
 
-import MySQLdb
 from flask import Flask, request, json, Response, abort
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -19,6 +21,15 @@ static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 JOBSDATA = jobtypes.Treecodes()
 
+# These are necesary setup for postgresql on heroku
+PORT = int(os.environ.get("PORT", 8157))
+urlparse.uses_netloc.append("postgres")
+
+try:
+    DBURL = urlparse.urlparse(os.environ["DATABASE_URL"])
+except:
+    # use mysql
+    pass
 
 class CSetSummary(object):
     def __init__(self, cset_id):
@@ -27,13 +38,6 @@ class CSetSummary(object):
         self.orange = Counter()
         self.red = Counter()
         self.blue = Counter()
-
-
-def create_db_connnection():
-    return MySQLdb.connect(host="localhost",
-                           user="root",
-                           passwd="root",
-                           db="ouija")
 
 
 def serialize_to_json(object):
@@ -86,11 +90,11 @@ def clean_date_params(query_dict, delta=7):
 
     # get dates params
     start_date_param = query_dict.get('startDate') or \
-                       query_dict.get('startdate') or \
-                       query_dict.get('date')
+        query_dict.get('startdate') or \
+        query_dict.get('date')
     end_date_param = query_dict.get('endDate') or \
-                     query_dict.get('enddate') or \
-                     query_dict.get('date')
+        query_dict.get('enddate') or \
+        query_dict.get('date')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
@@ -148,6 +152,38 @@ def binify(bins, data):
     result.append(len(filter(lambda x: x >= bins[-1], data)))
 
     return result
+
+
+def valve(head_rev, pushlog_id, branch, priority):
+    """Determine which kind of job should been returned"""
+    priority = priority
+    BRANCH_COUNTER.increase_the_counter(branch)
+    request_list = []
+    try:
+        request_list = session.query(TaskRequests.head_rev, TaskRequests.pushlog_id,
+                                     TaskRequests.priority).limit(40)
+    except Exception:
+        session.rollback()
+
+    requests = {}
+    for head_rev, pushlog_id, priority in request_list:
+        requests[pushlog_id] = {'head_rev': head_rev,
+                                'priority': priority}
+
+    # If this pushlog_id has been schduled, we just return
+    # the priority returned before.
+    if pushlog_id in requests.keys():
+        priority = requests.get(pushlog_id)['priority']
+    else:
+
+        # we return all jobs for every 5 pushes.
+        if RequestCounter.BRANCH_COUNTER[branch] >= 5:
+            RequestCounter.reset(branch)
+            priority = None
+        task_request = TaskRequests(str(head_rev), str(pushlog_id), priority)
+        session.add(task_request)
+        session.commit()
+    return priority
 
 
 @app.route("/data/results/flot/day/")
@@ -421,7 +457,9 @@ def run_seta_details_query():
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
-    priority = sanitize_string(request.args.get("priority", "low"))
+    priority = sanitize_string(request.args.get("priority", 0))
+    head_rev = sanitize_string(request.args.get("head_rev", ''))
+    pushlog_id = sanitize_string(request.args.get("pushlog_id", ''))
     jobnames = JOBSDATA.jobnames_query()
     if date == "" or date == "latest":
         today = datetime.now()
@@ -439,16 +477,30 @@ def run_seta_details_query():
     for d in query:
         parts = d[0].split("'")
         jobtype.append([parts[1], parts[3], parts[5]])
+    # We call valve to determine what kind of jobs we should return only if
+    # this request is comes from taskcluster. Otherwise, we just return what people
+    # request for.
+    if request.headers.get('User-Agent', '') == 'TaskCluster':
+
+        # We should return full job list as a fallback, if it's a request from
+        # taskcluster and without head_rev or pushlog_id in there
+        if head_rev or pushlog_id:
+            priority = valve(head_rev, pushlog_id, branch, priority)
+        else:
+            priority = None
 
     alljobs = JOBSDATA.jobtype_query()
 
     # Because we store high value jobs in seta table as default,
-    # so we return low value jobs(default) when the priority is 'low',
-    # otherwise we return high value jobs.
-    if priority == 'low':
+    # so we return low value jobs, means no failure related with this job as default
+    # when the priority is 0, otherwise we return high value jobs(1 ~ 5).
+    if priority == 0:
         low_value_jobs = [low_value_job for low_value_job in alljobs if
                           low_value_job not in jobtype]
         jobtype = low_value_jobs
+
+    elif priority is None:
+        jobtype = []
 
     if active:
         active_jobs = []
@@ -554,4 +606,4 @@ def template(filename):
     abort(404)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8157, debug=True)
+    app.run(host="0.0.0.0", port=PORT, debug=True)

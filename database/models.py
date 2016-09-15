@@ -48,7 +48,7 @@ class Testjobs(MetaBase):
     revision = Column(String(32), nullable=False, index=True)
     date = Column(DateTime, nullable=False, index=True)
     failure_classification = Column(Integer, nullable=False)
-    failures = Column(String(256), nullable=False)
+    failures = Column(String(1024), nullable=False)
 
     def __init__(self, slave, result, build_system_type,
                  duration, platform, buildtype,
@@ -79,6 +79,20 @@ class Seta(MetaBase):
     def __init__(self, jobtype, date):
         self.jobtype = jobtype
         self.date = date
+
+
+class TaskRequests(MetaBase):
+    __tablename__ = 'taskrequests'
+
+    id = Column(Integer, primary_key=True)
+    head_rev = Column(String(128), nullable=False, index=True)
+    pushlog_id = Column(String(8), nullable=False, index=True)
+    priority = Column(Integer)
+
+    def __init__(self, head_rev, pushlog_id, priority):
+        self.head_rev = head_rev
+        self.pushlog_id = pushlog_id
+        self.priority = priority
 
 
 if __name__ == "__main__":

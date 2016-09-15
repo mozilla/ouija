@@ -1,10 +1,9 @@
 import os
 import json
 import logging
-from tools.update_runnablejobs import update_runnableapi
+from tools.update_runnablejobs import update_runnableapi, get_rootdir
 LOG = logging.getLogger(__name__)
-# JSONPATH = os.getcwd() + '/runnablejobs.json'
-JSONPATH = '/home/ubuntu/ouija/data/runnablejobs.json'
+JSONPATH = get_rootdir() + '/runnablejobs.json'
 
 
 def _getgroup(name):

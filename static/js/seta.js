@@ -62,15 +62,15 @@ $(function() {
   }
 
   function printTable(date) {
-    $.getJSON("http://alertmanager.allizom.org/data/setadetails/", {date:date}).done(function (data) { getActiveJobs(data, date); });
+    $.getJSON("http://seta-dev.herokuapp.com/data/setadetails/?priority=high", {date:date}).done(function (data) { getActiveJobs(data, date); });
   }
 
   function getActiveJobs(details, date) {
-    $.getJSON("http://alertmanager.allizom.org/data/jobtypes/").done(function (data) { getTreeNames(data, details, date); });
+    $.getJSON("http://seta-dev.herokuapp.com/data/jobtypes/").done(function (data) { getTreeNames(data, details, date); });
   }
 
   function getTreeNames(activeJobs, details, date) {
-    $.getJSON("http://alertmanager.allizom.org/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
+    $.getJSON("http://seta-dev.herokuapp.com/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
   }
 
 
@@ -216,7 +216,7 @@ $(function() {
 
   function fetchData(e) {
     if (e) e.preventDefault();
-    $.getJSON("http://alertmanager.allizom.org/data/setasummary/").done(gotsummary).fail(fail);
+    $.getJSON("http://seta-dev.herokuapp.com/data/setasummary/").done(gotsummary).fail(fail);
   }
 
   $(document).on("ajaxStart ajaxStop", function (e) {
