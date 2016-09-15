@@ -1,3 +1,4 @@
+import sys
 import argparse
 import requests
 import logging
@@ -110,4 +111,4 @@ if __name__ == '__main__':
         logger.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
 
     migration(args)
-    return 0
+    sys.exit(0)
