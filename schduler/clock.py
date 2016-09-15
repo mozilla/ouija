@@ -2,7 +2,7 @@ from rq import Queue
 from worker import conn
 import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
-import trigger_jobs
+from trigger_jobs import trigger_migratedb, trigger_failures
 
 
 logger = logging.info(__name__)
@@ -16,7 +16,7 @@ q = Queue(connection=conn)
 def timed_trigger_updatedb():
     q.enqueue(trigger_migratedb)
 
-@sched.scheduled_job('cron', day_of_week='mon-sun', minute=20)
+@sched.scheduled_job('cron', day_of_week='mon-sun', minute=22)
 def timed_trigger_updatedb_sec():
     q.enqueue(trigger_migratedb)
 
