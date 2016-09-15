@@ -1,23 +1,13 @@
-import os
 from rq import Queue
 from worker import conn
 import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
+import trigger_jobs
 
 
 logger = logging.info(__name__)
 sched = BlockingScheduler()
 q = Queue(connection=conn)
-
-
-def trigger_updatedb():
-    os.system("python src/updatedb.py --delta 24 --threads 4")
-
-def trigger_migratedb():
-    os.system("python tools/database_migration.py")
-
-def trigger_failures():
-    os.system("python tools/failures.py")
 
 
 # It will triggers updatedb.py on 1:00 and 13:00 everyday(from Monday to Sunday)
