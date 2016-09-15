@@ -26,12 +26,12 @@ def trigger_failures():
 def timed_trigger_updatedb():
     q.enqueue(trigger_migratedb)
 
-@sched.scheduled_job('cron', day_of_week='mon-sun', hour=13)
+@sched.scheduled_job('cron', day_of_week='mon-sun', hour=17, minutes=40)
 def timed_trigger_updatedb_sec():
     q.enqueue(trigger_migratedb)
 
 
-@sched.scheduled_job('cron', day_of_week='mon-sun', hour=2)
+@sched.scheduled_job('cron', day_of_week='mon-sun', hour=17, minutes=45)
 def timed_trigger_failures():
     q.enqueue(trigger_failures)
 
