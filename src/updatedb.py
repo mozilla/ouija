@@ -245,8 +245,9 @@ def uploadResults(data, branch, revision, date):
             try:
                 testjob = Testjobs(str(slave), str(result), str(build_system_type),
                                    str(duration), str(platform), str(buildtype),
-                                   str(testtype), str(bugid), str(branch), str(revision),
-                                   str(date), str(failure_classification), str(list(failures)[0:10]))
+                                   str(testtype), str(bugid), str(branch),
+                                   str(revision), str(date), str(failure_classification),
+                                   str(list(failures)[0:10]))
 
                 session.add(testjob)
                 count += 1
