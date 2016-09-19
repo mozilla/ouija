@@ -81,6 +81,7 @@ class Seta(MetaBase):
         self.date = date
 
 
+# TODO: deprecate this!
 class TaskRequests(MetaBase):
     __tablename__ = 'taskrequests'
 
@@ -93,6 +94,26 @@ class TaskRequests(MetaBase):
         self.head_rev = head_rev
         self.pushlog_id = pushlog_id
         self.priority = priority
+
+
+class JobPriorities(MetaBase):
+    __tablename__ = 'jobpriorities'
+
+    id = Column(Integer, primary_key=True)
+    testtype = Column(String(128), nullable=False, index=True)
+    buildtype = Column(String(64), nullable=False, index=True)
+    platform = Column(String(64), nullable=False, index=True)
+    priority = Column(Integer)
+    timeout = Column(Integer)
+    expires = Column(DateTime)
+
+    def __init__(self, testtype, buildtype, platform, priority, timeout, expires):
+        self.testtype = testtype
+        self.buildtype = buildtype
+        self.platform = platform
+        self.priority = priority
+        self.timeout = timeout
+        self.expires = expires
 
 
 if __name__ == "__main__":

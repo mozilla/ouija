@@ -6,9 +6,10 @@ import datetime
 from argparse import ArgumentParser
 from emails import send_email
 from redo import retry
-from database.models import Seta
-from database.config import session
+from database.models import Seta, JobPriorities
+from database.config import session, engine
 from update_runnablejobs import update_runnableapi, get_rootdir
+from sqlalchemy import update, and_
 
 import seta
 
@@ -56,6 +57,10 @@ def communicate(failures, to_insert, total_detected, testmode, date):
         return
     prepare_the_database()
     insert_in_database(to_insert, date)
+    priority = 1
+    timeout = 0
+    updated_jobs = update_jobpriorities(to_insert, priority, timeout)
+    print "updated %s (%s) jobs" % (len(updated_jobs), len(to_insert))
 
     if date is None:
         date = datetime.date.today()
@@ -88,6 +93,57 @@ def insert_in_database(to_insert, date=None):
         session.add(job)
         session.commit()
     session.close()
+
+
+def reset_preseed():
+    data = session.query(JobPriorities.expires, JobPriorities.id)\
+                  .filter(JobPriorities.expires != None).all()
+
+    now = datetime.datetime.now()
+    for item in data:
+        try:
+            dv = datetime.datetime.strptime(item[0], "%Y-%M-%d")
+        except ValueError:
+            # TODO: consider updating column to have expires=None?
+            continue
+
+        # reset expire field if date is today or in the past
+        if dv.date() <= now.date():
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(JobPriorities.id == item[1])\
+                          .values(expires=None)
+            conn.execute(statement)
+
+
+def update_jobpriorities(to_insert, _priority, _timeout):
+    # to_insert is currently high priority, pri=1 jobs, all else are pri=5 jobs
+
+    changed_jobs = []
+    for item in to_insert:
+        # NOTE: we ignore JobPriorities with expires as they take precendence
+        data = session.query(JobPriorities.id, JobPriorities.priority)\
+                      .filter(and_(JobPriorities.testtype == item[2],
+                                   JobPriorities.buildtype == item[1],
+                                   JobPriorities.platform == item[0],
+                                   JobPriorities.expires != None)).all()
+        if len(data) != 1:
+            # TODO: if 0 items, do we add the job?  if >1 do we alert and cleanup?
+            continue
+
+        if data[0][1] != _priority:
+            changed_jobs.append(item)
+
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(and_(JobPriorities.testtype == item[2],
+                                      JobPriorities.buildtype == item[1],
+                                      JobPriorities.platform == item[0]))\
+                          .values(priority=_priority,
+                                  timeout=_timeout)
+            conn.execute(statement)
+
+    return changed_jobs
 
 
 def prepare_the_database():
@@ -189,24 +245,7 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100  # 100% detection
 
-    if method == "failures":
-        to_insert, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
-    else:
-        to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
-
-    preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
-    preseed = []
-    with open(preseed_path, 'r') as fHandle:
-        preseed = json.load(fHandle)
-
-    for job in preseed:
-        # TODO: if expired, ignore
-        jobspec = [job['platform'], job['buildtype'], job['name']]
-        if jobspec in to_insert and job['action'] == 'coalesce':
-            to_insert.remove(jobspec)
-        elif jobspec not in to_insert and job['action'] == 'run':
-            to_insert.append(jobspec)
-
+    to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
     communicate(failures, to_insert, total_detected, testmode, end_date)
 
 
