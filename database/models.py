@@ -69,18 +69,6 @@ class Testjobs(MetaBase):
         self.failures = failures
 
 
-class Seta(MetaBase):
-    __tablename__ = 'seta'
-
-    id = Column(Integer, primary_key=True)
-    jobtype = Column(String(256), nullable=False)
-    date = Column(DateTime, nullable=False, index=True)
-
-    def __init__(self, jobtype, date):
-        self.jobtype = jobtype
-        self.date = date
-
-
 # TODO: deprecate this!
 class TaskRequests(MetaBase):
     __tablename__ = 'taskrequests'

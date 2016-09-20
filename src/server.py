@@ -11,7 +11,7 @@ from tools.failures import SETA_WINDOW
 from tools.utils import RequestCounter
 from datetime import datetime, timedelta
 from sqlalchemy import and_, func, desc, case, update
-from database.models import (Seta, Testjobs, Dailyjobs,
+from database.models import (Testjobs, Dailyjobs,
                              TaskRequests, JobPriorities)
 
 from flask import Flask, request, json, Response, abort
@@ -154,6 +154,7 @@ def binify(bins, data):
     return result
 
 
+#TODO: redo this to have a simpler branch, count, timestamp
 def valve(head_rev, pushlog_id, branch, priority):
     """Determine which kind of job should been returned"""
     priority = priority
@@ -433,50 +434,38 @@ def run_seta_query():
     return {'failures': failures}
 
 
-@app.route("/data/setasummary/")
-@json_response
-def run_seta_summary_query():
-    query = session.query(Seta.date).distinct().all()
-    retVal = {}
-    dates = []
-    for d in query:
-        dates.append(d[0].strftime("%Y-%m-%d"))
-
-    for d in dates:
-        count = session.query(Seta.id).filter(Seta.date == d).count()
-        retVal['%s' % d] = "%s" % int(count)
-
-    return {'dates': retVal}
-
-
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    startDate, date = clean_date_params(request.args)
-    active = sanitize_bool(request.args.get("active", 0))
+    inactive = sanitize_bool(request.args.get("inactive", 0))
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
-    priority = sanitize_string(request.args.get("priority", 0))
-    head_rev = sanitize_string(request.args.get("head_rev", ''))
-    pushlog_id = sanitize_string(request.args.get("pushlog_id", ''))
+    priority = int(sanitize_string(request.args.get("priority", '1')))
+
     jobnames = JOBSDATA.jobnames_query()
-    if date == "" or date == "latest":
-        today = datetime.now()
-        date = today.strftime("%Y-%m-%d")
-    date = "%s" % date
-    query = session.query(Seta.jobtype).filter(Seta.date == date).all()
+    date = str(datetime.now().date())
+
+    if inactive == 1:
+        priority = 5
+    else:
+        priority = 1
+
+    # TODO: we can make this a variable priority in the future based on input
+    query = session.query(JobPriorities.platform,
+                          JobPriorities.buildtype,
+                          JobPriorities.testtype).filter(JobPriorities.priority == 1).all()
     retVal = {}
     retVal[date] = []
     jobtype = []
 
-    # we only support fx-team and mozilla-inbound branch in seta
+    # we only support fx-team, autoland, and mozilla-inbound branch in seta
     if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True \
             and str(branch) != '':
         abort(404)
     for d in query:
-        parts = d[0].split("'")
-        jobtype.append([parts[1], parts[3], parts[5]])
+        jobtype.append([d[0], d[1], d[2]])
+
     # We call valve to determine what kind of jobs we should return only if
     # this request is comes from taskcluster. Otherwise, we just return what people
     # request for.
@@ -487,33 +476,26 @@ def run_seta_details_query():
         if head_rev or pushlog_id:
             priority = valve(head_rev, pushlog_id, branch, priority)
         else:
-            priority = None
+            priority = 0
 
     alljobs = JOBSDATA.jobtype_query()
 
     # Because we store high value jobs in seta table as default,
     # so we return low value jobs, means no failure related with this job as default
-    # when the priority is 0, otherwise we return high value jobs(1 ~ 5).
+
+    # priority = 0; run all the jobs
     if priority == 0:
+        jobtype = alljobs
+    # priority =5 run all low value jobs
+    elif priority == 5:
         low_value_jobs = [low_value_job for low_value_job in alljobs if
                           low_value_job not in jobtype]
         jobtype = low_value_jobs
+    # priority =1, run all high value jobs
+    elif priority == 1:
+        pass # use jobtype as a high value query
 
-    elif priority is None:
-        jobtype = []
-
-    if active:
-        active_jobs = []
-        for job in alljobs:
-            found = False
-            for j in jobtype:
-                if j[0] == job[0] and j[1] == job[1] and j[2] == job[2]:
-                    found = True
-                    break
-            if not found:
-                active_jobs.append(job)
-        jobtype = active_jobs
-
+    # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
         active_jobs = []
         # pick up buildbot jobs from job list to faster the filter process
@@ -527,6 +509,7 @@ def run_seta_details_query():
 
         jobtype = active_jobs
 
+    # TODO: filter out based on buildsystem from database, either 'taskcluster' or '*'
     if taskcluster:
         active_jobs = []
         taskcluster_jobs = [job for job in jobnames if job['buildplatform'] == 'taskcluster']
