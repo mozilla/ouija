@@ -7,6 +7,11 @@ import logging
 
 from redo import retry
 
+from database.models import JobPriorities
+from database.config import session, engine
+from sqlalchemy import update
+
+
 headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
@@ -56,7 +61,10 @@ def update_runnableapi():
         else:
             print "It's going to update your runnable jobs data."
             data = query_the_runnablejobs(new_timestamp, task_id)
-            add_new_jobs_into_pressed(new_data=data)
+            new_jobs = add_jobs_to_jobpriority(new_data=data,
+                                               priority=1,
+                                               timeout=0,
+                                               set_expired=True)
             with open(path, 'w') as f:
                 json.dump(data, f)
     else:
@@ -65,6 +73,7 @@ def update_runnableapi():
         if data:
             with open(path, 'w') as f:
                 json.dump(data, f)
+            add_jobs_to_jobpriority(new_data=data, priority=5, timeout=5400)
 
 
 def query_the_runnablejobs(new_timestamp, task_id=None):
@@ -82,54 +91,139 @@ def query_the_runnablejobs(new_timestamp, task_id=None):
         return data
 
 
-def add_new_jobs_into_pressed(new_data=None):
-    if new_data:
-        with open(get_rootdir() + '/runnablejobs.json', 'r') as f:
-            old_data = json.loads(f.read())['results']
+def parse_testtype(build_system_type, refdata, platform_option, job_type_name):
+    #TODO: figure out how to ignore build, lint, etc. jobs
 
-        with open(get_rootdir() + '/src/preseed.json', 'r') as f:
-            preseed_jobs = json.loads(f.read())
+    if build_system_type == 'buildbot':
+        return refdata.split(' ')[-1]
 
-        # If a job in recent runnablejobs and can't been found in the old runnablejobs,
-        # that job been determined as a new job and pick it up.
-        new_jobs = [new_job for new_job in new_data['results']
-                    if new_job not in old_data]
-        if len(new_jobs) > 0:
-            for job in new_jobs:
-                # This part of code is actually duplicate with jobtypes.
-                if job['build_system_type'] == 'buildbot':
-                    testtype = job['ref_data_name'].split(' ')[-1]
-                else:
-                    if job['ref_data_name'].startswith('desktop-test') or \
-                            job['ref_data_name'].startswith('android-test'):
-                        separator = job['platform_option'] if \
-                            job['platform_option'] != 'asan' else 'opt'
-                        testtype = job['job_type_name'].split(
-                            '{buildtype}-'.format(buildtype=separator))[-1]
+    # taskcluster test types
+    testtype = job_type_name
+    testtype = testtype.split('/opt-')[-1]
+    testtype = testtype.split('/debug-')[-1]
 
-                    else:
-                        continue
-                for j in preseed_jobs:
-                    # If the job had already in there, we just keep it.
-                    if (j['name'] == testtype and
-                            j['platform'] == job["build_platform"] and
-                            j['buildtype'] == job["platform_option"]):
-                        continue
+    # this is plain-reftests for android
+    testtype = testtype.replace('plain-', '')
 
-                    else:
-                        expires = (datetime.date.today() +
-                                   datetime.timedelta(days=14)).strftime('%Y-%m-%d')
+    # SETA/Ouija do not care about builds, or other jobs like lint, etc.
+    testtype = testtype.replace(' Opt', 'build')
+    testtype = testtype.replace(' Debug', 'build')
+    testtype = testtype.replace(' Dbg', 'build')
+    testtype = testtype.replace(' (opt)', 'build')
+    testtype = testtype.replace(' PGO Opt', 'build')
+    testtype = testtype.replace(' Valgrind Opt', 'build')
+    testtype = testtype.replace(' Artifact Opt', 'build')
+    testtype = testtype.replace(' (debug)', 'build')
 
-                        temp = {"platform": job["build_platform"],
-                                "buildtype": job["platform_option"],
-                                "name": testtype,
-                                "expires": expires,
-                                "action": "run"}
-                        if temp not in preseed_jobs:
-                            preseed_jobs.append(temp)
+    testtype = testtype.strip(' ')
 
-            with open(get_rootdir() + '/src/preseed.json', 'w+') as f:
-                json.dump(preseed_jobs, f)
+    #TODO: these changes should have bugs on file to fix the names
+    testtype = testtype.replace('browser-chrome-e10s', 'e10s-browser-chrome')
+    testtype = testtype.replace('devtools-chrome-e10s', 'e10s-devtools-chrome')
+    testtype = testtype.replace('[TC] Android 4.3 API15+ ', '')
+    testtype = testtype.replace('jittests-', 'jittest-')
+
+    #TODO: fix this in updatedb.py
+    testtype = testtype.replace('webgl-', 'gl-')
+
+    if testtype.startswith('[funsize'):
+        return None
+
+    return testtype
+
+
+def parse_platform(platform):
+    if platform in ['mulet-linux64', 'b2g-device-image',
+                    'osx-10-7', 'osx-10-9', 'osx-10-11', 'windows8-32',
+                    'android-4-2-armv7-api15', 'android-4-4-armv7-api15',
+                    'android-5-0-armv8-api15', 'android-5-1-armv7-api15',
+                    'android-6-0-armv8-api15', 'taskcluster-images', 'other',
+                    'Win 6.3.9600 x86_64', 'windows7-64']:
+        return None
+    return platform
+
+
+def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=False):
+    added_jobs = []
+
+    if not new_data:
+        return
+
+    # TODO: as a perf improvement we can reduce jobs prior to this expensive for loop
+    for job in new_data['results']:
+
+        # TODO: potentially ensure no duplicates in new_data and query once outside the loop
+        db_data = []
+        db_data = session.query(JobPriorities.id,
+                                JobPriorities.testtype,
+                                JobPriorities.buildtype,
+                                JobPriorities.platform,
+                                JobPriorities.priority,
+                                JobPriorities.timeout,
+                                JobPriorities.expires,
+                                JobPriorities.buildsystem).all()
+
+        platform = parse_platform(job['build_platform'])
+        if platform == None or platform == "":
+            continue
+
+        testtype = parse_testtype(job['build_system_type'],
+                                  job['ref_data_name'],
+                                  job['platform_option'],
+                                  job['job_type_name'])
+        if testtype == None or testtype == "":
+            continue
+
+        _buildsystem = job["build_system_type"]
+        found = False
+        found_id = None
+        for row in db_data:
+            if (row[1] == testtype and
+                row[3] == platform and
+                row[2] == job["platform_option"]):
+                #TODO: what if we have a race condition with two identical jobs
+                # verify the build system type is the same, or make it *
+                found = True
+                if row[7] != "*" and _buildsystem != row[7]:
+                    _buildsystem = "*"
+                    found_id = row[0]
+
+
+        # We have new jobs from runnablejobs to add to our master list
+        if not found:
+            _expired = None
+            if set_expired:
+                # set _expired = today + 14 days
+                # TODO: write test for it
+                _expired = "%s" % (datetime.datetime.now() + datetime.timedelta(days=14))
+
+            try:
+                jobpriority = JobPriorities(str(testtype),
+                                            str(job["platform_option"]),
+                                            str(job["build_platform"]),
+                                            priority,
+                                            timeout,
+                                            _expired,
+                                            _buildsystem)
+
+                session.add(jobpriority)
+                session.commit()
+                added_jobs.append(job)
+            except Exception as error:
+                session.rollback()
+                logging.warning(error)
+            finally:
+                session.close()
+        elif _buildsystem != job['build_system_type']:
+            # update table with new buildsystem
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(JobPriorities.id == found_id)\
+                          .values(buildsystem=_buildsystem)
+            conn.execute(statement)
+
+    return added_jobs
+
 
 if __name__ == "__main__":
     update_runnableapi()
