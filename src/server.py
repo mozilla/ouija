@@ -437,6 +437,7 @@ def run_seta_query():
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
+    # TODO: remove inactive when buildbot api queries s/inactive/priority/
     inactive = sanitize_bool(request.args.get("inactive", 0))
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
@@ -607,7 +608,7 @@ def update_preseed():
     # we assume it is for all flavors of the * field: i.e. linux64,pgo,* - all tests
     # assumption - preseed fields are sanitized already - move parse_testtype to utils.py ?
     for job in preseed:
-        _buildsystem = "buildbot" # use this as a default
+        _buildsystem = job["build_system_type"]
 
         data = session.query(JobPriorities.id,
                              JobPriorities.testtype,
