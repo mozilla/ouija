@@ -1,19 +1,25 @@
 import argparse
-import re
-import MySQLdb
 import datetime
 import sys
 import time
 import logging
-from threading import Thread
 from Queue import Queue
+from sqlalchemy import and_
+from threading import Thread
+from database.models import Testjobs
+from database.config import session
 
 import requests
+
+DEFAULT_REQUEST_HEADERS = {
+    'Accept': 'application/json',
+    'User-Agent': 'ouija',
+}
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
     'mozilla-inbound': 'integration/mozilla-inbound',
-    'b2g-inbound': 'integration/b2g-inbound',
+    'autoland': 'integration/autoland',
     'fx-team': 'integration/fx-team',
     'try': 'try',
 }
@@ -21,9 +27,8 @@ branch_paths = {
 branches = [
     'mozilla-central',
     'mozilla-inbound',
-    'b2g-inbound',
-    'fx-team',
-    'try'
+    'autoland',
+    'fx-team'
 ]
 
 
@@ -44,6 +49,7 @@ class Worker(Thread):
             finally:
                 self.queue.task_done()
 
+
 class Downloader(Worker):
 
     def __init__(self, download_queue, **kargs):
@@ -57,185 +63,209 @@ class Downloader(Worker):
 
 
 def getResultSetID(branch, revision):
-    url = "https://treeherder.mozilla.org/api/project/%s/resultset/?format=json&full=true&revision=%s" % (branch, revision)
-    try:
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        cdata = response.json()
-        return cdata
-    except SSLError:
-        pass
+    url = "https://treeherder.mozilla.org/api/project/%s/resultset/" \
+          "?format=json&full=true&revision=%s" % (branch, revision)
+    return fetch_json(url)
+
 
 def getCSetResults(branch, revision):
     """
-      https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34
-
-      no caching as data will change over time.  Some results will be in asap, others will take
-      up to 12 hours (usually < 4 hours)
+    https://tbpl.mozilla.org/php/getRevisionBuilds.php?branch=mozilla-inbound&rev=3435df09ce34.
+    no caching as data will change over time.  Some results will be in asap, others will take
+    up to 12 hours (usually < 4 hours)
     """
-
     rs_data = getResultSetID(branch, revision)
     results_set_id = rs_data['results'][0]['id']
-    url = "https://treeherder.mozilla.org/api/project/%s/jobs/?count=2000&result_set_id=%s&return_type=list" % (branch, results_set_id)
-    try:
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        cdata = response.json()
-        return cdata
-    except SSLError:
-        pass
+
+    done = False
+    offset = 0
+    count = 2000
+    num_results = 0
+    retVal = {}
+    while not done:
+        url = "https://treeherder.mozilla.org/api/project/%s/jobs/" \
+              "?count=%s&offset=%s&result_set_id=%s"
+        data = fetch_json(url % (branch, count, offset, results_set_id))
+        if len(data['results']) < 2000:
+            done = True
+        num_results += len(data['results'])
+        offset += count
+
+        if retVal == {}:
+            retVal = data
+        else:
+            retVal['results'].extend(data['results'])
+            retVal['meta']['count'] = num_results
+
+    return retVal
+
 
 def getPushLog(branch, startdate):
-    """
-      https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19
-    """
-
-    url = "https://hg.mozilla.org/%s/pushlog?startdate=%04d-%02d-%02d&tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month, startdate.day)
-    response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-    data = response.content
+    """https://hg.mozilla.org/integration/mozilla-inbound/pushlog?startdate=2013-06-19"""
+    # TODO: Replace this with fetch_json() using /jsonpushlog
+    url = "https://hg.mozilla.org/%s//json-pushes?startdate=%04d-%02d-%02d&" \
+          "tipsonly=1" % (branch_paths[branch], startdate.year, startdate.month,
+                          startdate.day)
+    response = fetch_json(url)
+    pushids = response.keys()
     pushes = []
-    csetid = re.compile('.*Changeset ([0-9a-f]{12}).*')
-    dateid = re.compile('.*([0-9]{4}\-[0-9]{2}\-[0-9]{2})T([0-9\:]+)Z.*')
-    push = None
     date = None
-    for line in data.split('\n'):
-        matches = csetid.match(line)
-        if matches:
-            push = matches.group(1)
+    for pushid in pushids:
+        # we should switch to 40 characters in the further
+        changeset = response[pushid]['changesets'][0][0:12]
+        if changeset:
+            date = datetime.datetime.fromtimestamp(response[pushid]['date'])
 
-        matches = dateid.match(line)
-        if matches:
-            ymd = map(int, matches.groups(2)[0].split('-'))
-            hms = map(int, matches.groups(2)[1].split(':'))
-            date = datetime.datetime(ymd[0], ymd[1], ymd[2], hms[0], hms[1], hms[2])
-
-        if push and date and date >= startdate:
-            pushes.append([push, date])
-            push = None
+        if changeset and date and date >= startdate:
+            pushes.append([changeset, date])
             date = None
     return pushes
+
 
 def clearResults(branch, startdate):
 
     date_xx_days_ago = datetime.date.today() - datetime.timedelta(days=180)
-    delete_delta_and_old_data = 'delete from testjobs where branch="%s" and (date >= "%04d-%02d-%02d %02d:%02d:%02d" or date < "%04d-%02d-%02d")' % (branch, startdate.year, startdate.month, startdate.day, startdate.hour, startdate.minute, startdate.second, date_xx_days_ago.year, date_xx_days_ago.month, date_xx_days_ago.day)
+    session.query(Testjobs).filter(branch == branch).\
+        filter(and_(Testjobs.date >= startdate), (Testjobs.date < date_xx_days_ago)).\
+        delete(synchronize_session='fetch')
 
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
+    session.commit()
 
-    cur = db.cursor()
-    cur.execute(delete_delta_and_old_data)
-    cur.close()
 
 def uploadResults(data, branch, revision, date):
-    db = MySQLdb.connect(host="localhost",
-                         user="root",
-                         passwd="root",
-                         db="ouija")
-
-    cur = db.cursor()
-
-    if "job_property_names" not in data:
+    if "results" not in data:
         return
 
-    job_property_names = data["job_property_names"]
-    i = lambda x: job_property_names.index(x)
-
-    results = data['results']
+    results = data["results"]
     count = 0
     for r in results:
-        _id, logfile, slave, result, duration, platform, buildtype, testtype, bugid = '', '', '', '', '', '', '', '', ''
-        _id = r[i("id")]
+        _id, slave, result, duration, platform, buildtype, testtype, bugid = \
+            '', '', '', '', '', '', '', ''
 
-        # Skip if result = unknown
-        _result = r[i("result")]
-        if _result == u'unknown':
+# [1468489471, u'taskcluster', u'i-0ba5dce1fab3f3768', u'?', u'unknown', u'opt', u'',
+# 5945, 107, u'success', 4355877, u'-', 6689, u'gecko-decision',
+# u'12626cb1-b7fc-4d8f-bcee-0ee10af509fe/0', u'Gecko Decision Task',
+# u'6751f6b4d53bef7733d3063aa3f72b0832dbde74', u'gecko-decision', u'completed', 503,
+# 1468489740, u'-', u'mozilla-taskcluster-maintenance@mozilla.com',
+# u'102210fe594ee9b33d82058545b1ed14f4c8206e', 1, u'D', u'scheduled', u'fill me', 1, None,
+# u'-', 1468489475, u'-', u'2016-07-14T09:49:00', u'6751f6b4d53bef7733d3063aa3f72b0832dbde74', 2]
+
+        _id = r["id"]
+
+        # Skip if 'result' is unknown
+        result = r["result"]
+        if result == u'unknown':
             continue
 
-        duration = '%s' % (int(r[i("end_timestamp")]) - int(r[i("start_timestamp")]))
+        duration = '%s' % (int(r["end_timestamp"]) - int(r["start_timestamp"]))
 
-        platform = r[i("platform")]
+        platform = r["platform"]
         if not platform:
             continue
 
-        buildtype = r[i("platform_option")]
-                   
-        testtype = r[i("ref_data_name")].split()[-1]
+        buildtype = r["platform_option"]
+        build_system_type = r['build_system_type']
+        # the testtype of builbot job is in 'ref_data_name'
+        # like web-platform-tests-4 in "Ubuntu VM 12.04 x64 mozilla-inbound
+        # but taskcluster's testtype is a part of its 'job_type_name
+        if r['build_system_type'] == 'buildbot':
+            testtype = r['ref_data_name'].split(' ')[-1]
+
+        else:
+            # The test name on taskcluster comes to a sort of combination
+            # (e.g desktop-test-linux64/debug-jittests-3)and asan job can
+            # been referenced as a opt job. we want the build type(debug or opt)
+            # to separate the job_type_name, then get "jittests-3" as testtype
+            # for job_type_name like desktop-test-linux64/debug-jittests-3
+            separator = r['platform_option'] \
+                if r['platform_option'] != 'asan' else 'opt'
+            testtype = r['job_type_name'].split(
+                '{buildtype}-'.format(buildtype=separator))[-1]
+        if r["build_system_type"] == "taskcluster":
+            # TODO: this is fragile, current platforms as of Jan 26, 2016 we see in taskcluster
+            pmap = {"linux64": "Linux64",
+                    "linux32": "Linux32",
+                    "osx-10-7": "MacOSX64",
+                    "gecko-decision": "gecko-decision",
+                    "lint": "lint"}
+            p = platform
+            if platform in pmap:
+                p = pmap[platform]
+            testtype = r["job_type_name"].split(p)[-1]
 
         failure_classification = 0
         try:
-            # https://treeherder.mozilla.org/api/failureclassification/
-            failure_classification = int(r[i("failure_classification_id")])
+            # http://treeherder.mozilla.org/api/failureclassification/
+            failure_classification = int(r["failure_classification_id"])
         except ValueError:
             failure_classification = 0
         except TypeError:
-            logging.warning("Error, failure classification id: expecting an int, but recieved %s instead" % r[i("failure_classification_id")])
+            logging.warning("Error, failure classification id: expecting an int, "
+                            "but recieved %s instead" % r["failure_classification_id"])
             failure_classification = 0
 
         # Get Notes: https://treeherder.mozilla.org/api/project/mozilla-inbound/note/?job_id=5083103
-        if _result != u'success':
+        if result != u'success':
             url = "https://treeherder.mozilla.org/api/project/%s/note/?job_id=%s" % (branch, _id)
-            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-            notes = response.json()
-            if notes:
-                bugid = notes[-1]['note']
+            try:
+                notes = fetch_json(url)
+                if notes:
+                    bugid = notes[-1]['text']
+            except KeyError:
+                if failure_classification == 2:
+                    bugid = revision
+                pass
 
-        # get failure snippets: https://treeherder.mozilla.org/api/project/mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
-        failures = []
+        # Get failure snippets: https://treeherder.mozilla.org/api/project/
+        # mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
+        failures = set()
         if failure_classification == 2:
-            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s&name=Bug+suggestions&type=json" % (branch, _id)
-            response = requests.get(url, headers={'accept-encoding':'json'}, verify=True)
-            snippets = response.json()
+            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s" \
+                  "&name=Bug+suggestions&type=json" % (branch, _id)
+            snippets = fetch_json(url)
             if snippets:
                 for item in snippets[0]["blob"]:
-                    if not item['search_terms'] and len(item['search_terms']) < 1:
+                    if not item["search_terms"] and len(item["search_terms"]) < 1:
                         continue
                     filename = item['search_terms'][0]
-                    if filename.endswith('.js') or filename.endswith('.xul') or filename.endswith('.html'):
+                    if (filename.endswith('.js') or filename.endswith('.xul') or
+                            filename.endswith('.html')):
                         dir = item['search']
                         dir = (dir.split('|')[1]).strip()
                         if dir.endswith(filename):
                             dir = dir.split(filename)[0]
-                            failures.append(dir + '/' + filename)
+                            failures.add(dir + filename)
+            # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
+            url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
+            data1 = fetch_json(url)
 
-        # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
-        url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
-        response = requests.get(url, headers={'accept-encoding':'gzip'}, verify=True)
-        data1 = response.json()
+            slave = data1['machine_name']
 
-        slave = data1['machine_name']
+            # Insert into MySQL Database
+            try:
+                testjob = Testjobs(str(slave), str(result), str(build_system_type),
+                                   str(duration), str(platform), str(buildtype),
+                                   str(testtype), str(bugid), str(branch),
+                                   str(revision), str(date), str(failure_classification),
+                                   str(list(failures)[0:10]))
 
-        if (len(data1.get("logs"))):
-            logfile = data1.get("logs", [])[0].get("url", "")
-
-        # Insert into MySQL Database
-        sql = """insert into testjobs (log, slave, result,
-                                       duration, platform, buildtype, testtype,
-                                       bugid, branch, revision, date,
-                                       failure_classification, failures)
-                             values ('%s', '%s', '%s', %s,
-                                     '%s', '%s', '%s', '%s', '%s',
-                                     '%s', '%s', %s, '%s')""" % \
-              (logfile, slave, _result, \
-               duration, platform, buildtype, testtype, \
-               bugid, branch, revision, date, failure_classification, ','.join(failures))
-
-        try:
-            cur.execute(sql)
-            count += 1
-        except MySQLdb.IntegrityError:
-            # we already have this job
-            logging.warning("sql failed to insert, we probably have this job: %s" % sql)
-            pass
-    cur.close()
-    logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" % (count, len(results), revision, branch, date))
+                session.add(testjob)
+                count += 1
+                session.commit()
+            except Exception as error:
+                session.rollback()
+                logging.warning(error)
+            finally:
+                session.close()
+    logging.info("uploaded %s/(%s) results for rev: %s, branch: %s, date: %s" %
+                 (count, len(results), revision, branch, date))
 
 
 def parseResults(args):
     download_queue = Queue()
 
     for i in range(args.threads):
-        Downloader(download_queue, name="Downloader %s" % (i+1)).start()
+        Downloader(download_queue, name="Downloader %s" % (i + 1)).start()
 
     startdate = datetime.datetime.utcnow() - datetime.timedelta(hours=args.delta)
 
@@ -255,21 +285,28 @@ def parseResults(args):
     download_queue.join()
     logging.info('Downloading completed')
 
-    #Sometimes the parent may exit and the child is not immidiately killed.
-    #This may result in the error like the following -
+    # Sometimes the parent may exit and the child is not immidiately killed.
+    # This may result in the error like the following -
     #
-    #Exception in thread DBHandler (most likely raised during interpreter shutdown):
-    #Traceback (most recent call last):
-    #File "/usr/lib/python2.7/threading.py", line 810, in __bootstrap_inner
-    #File "updatedb.py", line 120, in run
-    #File "/usr/lib/python2.7/Queue.py", line 168, in get
-    #File "/usr/lib/python2.7/threading.py", line 332, in wait
+    # Exception in thread DBHandler (most likely raised during interpreter shutdown):
+    # Traceback (most recent call last):
+    # File "/usr/lib/python2.7/threading.py", line 810, in __bootstrap_inner
+    # File "updatedb.py", line 120, in run
+    # File "/usr/lib/python2.7/Queue.py", line 168, in get
+    # File "/usr/lib/python2.7/threading.py", line 332, in wait
     #: 'NoneType' object is not callable
     #
-    #The following line works as a fix
-    #ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
+    # The following line works as a fix
+    # ref : http://b.imf.cc/blog/2013/06/26/python-threading-and-queue/
 
     time.sleep(0.1)
+
+
+def fetch_json(url):
+    response = requests.get(url, headers=DEFAULT_REQUEST_HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update ouija database.')

@@ -1,17 +1,35 @@
-#!/usr/bin/env python
-
 import os
+import re
 import calendar
-from datetime import datetime, timedelta
+import urlparse
+from src import jobtypes
+from functools import wraps
 from itertools import groupby
 from collections import Counter
-from functools import wraps
+from database.config import session, engine
+from tools.failures import SETA_WINDOW
+from tools.utils import RequestCounter
+from datetime import datetime, timedelta
+from sqlalchemy import and_, func, desc, case, update
+from database.models import (Testjobs, Dailyjobs,
+                             TaskRequests, JobPriorities)
 
-import MySQLdb
 from flask import Flask, request, json, Response, abort
 
-static_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
+JOBSDATA = jobtypes.Treecodes()
+
+# These are necesary setup for postgresql on heroku
+PORT = int(os.environ.get("PORT", 8157))
+urlparse.uses_netloc.append("postgres")
+
+try:
+    DBURL = urlparse.urlparse(os.environ["DATABASE_URL"])
+except:
+    # use mysql
+    pass
 
 class CSetSummary(object):
     def __init__(self, cset_id):
@@ -20,13 +38,6 @@ class CSetSummary(object):
         self.orange = Counter()
         self.red = Counter()
         self.blue = Counter()
-
-
-def create_db_connnection():
-    return MySQLdb.connect(host="localhost",
-                           user="root",
-                           passwd="root",
-                           db="ouija")
 
 
 def serialize_to_json(object):
@@ -39,7 +50,6 @@ def serialize_to_json(object):
 
 def json_response(func):
     """Decorator: Serialize response to json"""
-
     @wraps(func)
     def wrapper(*args, **kwargs):
         result = json.dumps(func(*args, **kwargs) or {"error": "No data found for your request"},
@@ -53,6 +63,21 @@ def json_response(func):
     return wrapper
 
 
+def sanitize_string(input):
+    m = re.search('[a-zA-Z0-9\-\_\.]+', input)
+    if m:
+        return input
+    else:
+        return ''
+
+
+def sanitize_bool(input):
+    if int(input) == 0 or int(input) == 1:
+        return int(input)
+    else:
+        return 0
+
+
 def get_date_range(dates):
     if dates:
         return {'startDate': min(dates).strftime('%Y-%m-%d %H:%M'),
@@ -64,15 +89,19 @@ def clean_date_params(query_dict, delta=7):
     now = datetime.now()
 
     # get dates params
-    start_date_param = query_dict.get('startDate') or query_dict.get('startdate')
-    end_date_param = query_dict.get('endDate') or query_dict.get('enddate')
+    start_date_param = query_dict.get('startDate') or \
+        query_dict.get('startdate') or \
+        query_dict.get('date')
+    end_date_param = query_dict.get('endDate') or \
+        query_dict.get('enddate') or \
+        query_dict.get('date')
 
     # parse dates
     end_date = (parse_date(end_date_param) or now)
     start_date = parse_date(start_date_param) or end_date - timedelta(days=delta)
 
     # validate dates
-    if start_date > now or start_date.date() >= end_date.date():
+    if start_date > now or start_date.date() > end_date.date():
         start_date = now - timedelta(days=7)
         end_date = now + timedelta(days=1)
 
@@ -125,23 +154,67 @@ def binify(bins, data):
     return result
 
 
+#TODO: redo this to have a simpler branch, count, timestamp
+def valve(head_rev, pushlog_id, branch, priority):
+    """Determine which kind of job should been returned"""
+    priority = priority
+    BRANCH_COUNTER.increase_the_counter(branch)
+    request_list = []
+    try:
+        request_list = session.query(TaskRequests.head_rev, TaskRequests.pushlog_id,
+                                     TaskRequests.priority).limit(40)
+    except Exception:
+        session.rollback()
+
+    requests = {}
+    for head_rev, pushlog_id, priority in request_list:
+        requests[pushlog_id] = {'head_rev': head_rev,
+                                'priority': priority}
+
+    # If this pushlog_id has been schduled, we just return
+    # the priority returned before.
+    if pushlog_id in requests.keys():
+        priority = requests.get(pushlog_id)['priority']
+    else:
+
+        # we return all jobs for every 5 pushes.
+        if RequestCounter.BRANCH_COUNTER[branch] >= 5:
+            RequestCounter.reset(branch)
+            priority = None
+        task_request = TaskRequests(str(head_rev), str(pushlog_id), priority)
+        session.add(task_request)
+        session.commit()
+    return priority
+
+
 @app.route("/data/results/flot/day/")
 @json_response
 def run_results_day_flot_query():
-    """ This function returns the total failures/total jobs data per day for all platforms. It is sending the data in the format required by flot.Flot is a jQuery package used for 'attractive' plotting """
-
+    """
+    This function returns the total failures/total jobs data per day for all platforms.
+    It is sending the data in the format required by flot.Flot is a jQuery package used
+    for 'attractive' plotting
+    """
     start_date, end_date = clean_date_params(request.args)
 
-    platforms = ['android4.0', 'android2.3', 'linux32', 'winxp', 'win7', 'win8', 'osx10.6', 'osx10.7', 'osx10.8']
-    db = create_db_connnection()
+    platforms = ['android4.0',
+                 'android2.3',
+                 'linux32',
+                 'winxp',
+                 'win7',
+                 'win8',
+                 'osx10.6',
+                 'osx10.7',
+                 'osx10.8']
 
     data_platforms = {}
     for platform in platforms:
-        cursor = db.cursor()
-        cursor.execute("""select DATE(date) as day,sum(result="%s") as failures,count(*) as totals from testjobs
-                          where platform="%s" and date >= "%s" and date <= "%s" group by day""" % ('testfailed', platform, start_date, end_date))
-
-        query_results = cursor.fetchall()
+        query_results = session.query(Testjobs.date.label('day'),
+                                      func.count(Testjobs.result == 'testfailed'
+                                                 ).label("failures"),
+                                      func.count(Testjobs).label('totals')).filter(
+            and_(Testjobs.platform == platform,
+                 Testjobs.date >= start_date, Testjobs.date <= end_date)).group_by('day').all()
 
         dates = []
         data = {}
@@ -154,11 +227,9 @@ def run_results_day_flot_query():
             data['failures'].append((timestamp, int(fail)))
             data['totals'].append((timestamp, int(total)))
 
-        cursor.close()
-
         data_platforms[platform] = {'data': data, 'dates': get_date_range(dates)}
 
-    db.close()
+    session.close()
     return data_platforms
 
 
@@ -175,17 +246,10 @@ def run_slaves_query():
 
     info = '''Only slaves with more than %d jobs are displayed.''' % jobs
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    cursor.execute("""select slave, result, date from testjobs
-                      where result in
-                      ("retry", "testfailed", "success", "busted", "exception")
-                      and date between "{0}" and "{1}"
-                      order by date;""".format(start_date, end_date))
-
-    query_results = cursor.fetchall()
-    cursor.close()
-    db.close()
+    query_results = session.query(Testjobs.slave, Testjobs.result, Testjobs.date).filter(
+        and_(Testjobs.result.in_(["retry", "testfailed", "success", "busted", "exception"]),
+             Testjobs.date.between(start_date, end_date))).all().order_by(Testjobs.date)
+    session.close()
 
     if not query_results:
         return
@@ -221,7 +285,6 @@ def run_slaves_query():
                                          results['retry'],
                                          results['total'])
         data[slave]['sfr'] = fail_rates
-
 
     platforms = {}
 
@@ -261,23 +324,20 @@ def run_slaves_query():
 @app.route("/data/platform/")
 @json_response
 def run_platform_query():
-    platform = request.args.get("platform")
+    platform = sanitize_string(request.args.get("platform"))
+    build_system_type = sanitize_string(request.args.get("build_system_type"))
     start_date, end_date = clean_date_params(request.args)
 
     log_message = 'platform: %s startDate: %s endDate: %s' % (platform,
-                    start_date.strftime('%Y-%m-%d'),
-                    end_date.strftime('%Y-%m-%d'))
+                                                              start_date.strftime('%Y-%m-%d'),
+                                                              end_date.strftime('%Y-%m-%d'))
     app.logger.debug(log_message)
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    cursor.execute("""select distinct revision from testjobs
-                      where platform = '%s'
-                      and branch = 'mozilla-central'
-                      and date between '%s' and '%s'
-                      order by date desc;""" % (platform, start_date, end_date))
-
-    csets = cursor.fetchall()
+    csets = session.query(Testjobs.revision).distinct().\
+        filter(and_(Testjobs.platform == platform,
+                    Testjobs.branch == 'mozilla-central',
+                    Testjobs.date.between(start_date, end_date),
+                    Testjobs.build_system_type == build_system_type)).order_by(desc(Testjobs.date))
 
     cset_summaries = []
     test_summaries = {}
@@ -290,11 +350,12 @@ def run_platform_query():
         cset_id = cset[0]
         cset_summary = CSetSummary(cset_id)
 
-        cursor.execute("""select result, testtype, date from testjobs
-                          where platform='%s' and buildtype='opt' and revision='%s'
-                          order by testtype""" % (platform, cset_id))
-
-        test_results = cursor.fetchall()
+        test_results = session.query(Testjobs.result, Testjobs.testtype, Testjobs.date).\
+            filter(and_(Testjobs.platform == platform,
+                        Testjobs.buildtype == 'opt',
+                        Testjobs.revision == cset_id,
+                        Testjobs.build_system_type == build_system_type)).all().order_by(
+            Testjobs.testtype)
 
         for res, testtype, date in test_results:
             test_summary = test_summaries.setdefault(testtype, summary.copy())
@@ -314,13 +375,10 @@ def run_platform_query():
             elif res == 'usercancel':
                 app.logger.debug('usercancel')
             else:
-                app.logger.debug('UNRECOGNIZED RESULT: %s' % result)
+                app.logger.debug('UNRECOGNIZED RESULT: %s' % res)
             dates.append(date)
 
         cset_summaries.append(cset_summary)
-
-    cursor.close()
-    db.close()
 
     # sort tests alphabetically and append total & percentage to end of the list
     test_types = sorted(test_summaries.keys())
@@ -343,7 +401,7 @@ def run_platform_query():
 
     test_summaries['total'] = total
     test_summaries['percentage'] = percentage
-
+    session.close()
     return {'testTypes': test_types,
             'byRevision': cset_summaries,
             'byTest': test_summaries,
@@ -351,206 +409,146 @@ def run_platform_query():
             'dates': get_date_range(dates)}
 
 
-def jobtype_query():
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select platform, buildtype, testtype from uniquejobs"
-    cursor.execute(query)
-    jobtypes = []
-    for d in cursor.fetchall():
-        jobtypes.append([d[0], d[1], d[2]])
-
-    return jobtypes
-
 @app.route("/data/jobtypes/")
 @json_response
 def run_jobtypes_query():
-    return {'jobtypes': jobtype_query()}
-
-
-@app.route("/data/create_jobtypes/")
-@json_response
-def run_create_jobtypes_query():
-    # skipping b2g*, android*, mulet*
-    platforms = ['android-2-3-armv7-api9', 'android-4-2-x86', 'android-4-3-armv7-api11', 'osx-10-6', 'osx-10-10', 'windowsxp', 'windows7-32', 'linux32', 'linux64', 'windows8-64']
-
-    # skipping pgo - We run this infrequent enough that we should have all pgo results tested
-    buildtypes = ['debug', 'asan', 'opt']
-
-    now = datetime.now()
-    twoweeks = now - timedelta(days=14)
-    twoweeks = twoweeks.strftime('%Y-%m-%d')
-
-    jobtypes = []
-    db = create_db_connnection()
-    for platform in platforms:
-        for buildtype in buildtypes:
-            # ignore *build* types
-            query = """select distinct testtype from testjobs where date>'%s' and platform='%s'
-                       and buildtype='%s' and testtype not like '%%build%%'
-                       and testtype not like '%%_dep'""" % (twoweeks, platform, buildtype)
-            cursor = db.cursor()
-            cursor.execute(query)
-            types = []
-            for testtype in cursor.fetchall():
-                testtype = testtype[0]
-                # ignore talos, builds, jetpack
-                if testtype in ['svgr', 'svgr-e10s', 'svgr-snow', 'svgr-snow-e10s',
-                                'other', 'other-e10s', 'other-snow', 'other-snow-e10s',
-                                'chromez', 'chromez-e10s', 'chromez-snow', 'chromez-snow-e10s',
-                                'tp5o', 'tp5o-e10s', 'dromaeojs', 'dromaeojs-e10s',
-                                'g1', 'g2', 'g2-e10s', 'g1-e10s', 'g1-snow', 'g1-snow-e10s',
-                                'other_nol64', 'other_nol64-e10s', 'other_l64', 'other_l64-e10s',
-                                'xperf', 'xperf-e10s', 'dep', 'nightly', 'jetpack',
-                                'non-unified', 'valgrind', '5151c298eaed59034a45e3c4e3d4e0003fed4a14']:
-                    continue
-
-                if testtype:
-                    types.append(testtype)
-
-            types.sort()
-            for testtype in types:
-                jobtypes.append([platform, buildtype, testtype])
-
-    cursor.execute("delete from uniquejobs");
-    for j in jobtypes:
-        query = "insert into uniquejobs (platform, buildtype, testtype) values ('%s', '%s', '%s')" % (j[0], j[1], j[2])
-        cursor.execute(query)
-
-    return {'status': 'ok'}
+    return {'jobtypes': JOBSDATA.jobtype_query()}
 
 
 @app.route("/data/seta/")
 @json_response
 def run_seta_query():
-    start_date, end_date = clean_date_params(request.args, delta=180)
+    start_date, end_date = clean_date_params(request.args, delta=SETA_WINDOW)
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select bugid, platform, buildtype, testtype, duration from testjobs \
-             where failure_classification=2 and date>='%s' and date<='%s'" % (start_date, end_date)
-    cursor.execute(query)
+    # we would like to enlarge the datetime range to make sure the latest failures been get.
+    start_date = start_date - timedelta(days=1)
+    end_date = end_date + timedelta(days=1)
+    data = session.query(Testjobs.bugid, Testjobs.platform, Testjobs.buildtype, Testjobs.testtype,
+                         Testjobs.duration).filter(and_(Testjobs.failure_classification == 2,
+                                                        Testjobs.date >= start_date,
+                                                        Testjobs.date <= end_date)).all()
     failures = {}
-    for d in cursor.fetchall():
+    for d in data:
         failures.setdefault(d[0], []).append(d[1:])
 
     return {'failures': failures}
 
 
-@app.route("/data/setasummary/")
-@json_response
-def run_seta_summary_query():
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select distinct date from seta"
-    cursor.execute(query)
-    retVal = {}
-    dates = []
-    for d in cursor.fetchall():
-        dates.append(d[0])
-
-    for d in dates:
-        query = "select count(id) from seta where date='%s'" % d
-        cursor.execute(query)
-        results = cursor.fetchall()
-        retVal['%s' % d] = "%s" % results[0]
-
-    return {'dates': retVal}
-
-
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    date = request.args.get("date", "")
-    active = request.args.get("active", 0)
-    buildbot = request.args.get("buildbot", 0)
-    branch = request.args.get("branch", '')
+    # TODO: remove inactive when buildbot api queries s/inactive/priority/
+    inactive = sanitize_bool(request.args.get("inactive", 0))
+    buildbot = sanitize_bool(request.args.get("buildbot", 0))
+    branch = sanitize_string(request.args.get("branch", ''))
+    taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
+    priority = int(sanitize_string(request.args.get("priority", '1')))
 
-    if date == "" or date == "latest":
-        today = datetime.now()
-        date = today.strftime("%Y-%m-%d")
+    jobnames = JOBSDATA.jobnames_query()
+    date = str(datetime.now().date())
 
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select jobtype from seta where date='%s 00:00:00'" % date
-    cursor.execute(query)
+    if inactive == 1:
+        priority = 5
+    else:
+        priority = 1
+
+    # TODO: we can make this a variable priority in the future based on input
+    query = session.query(JobPriorities.platform,
+                          JobPriorities.buildtype,
+                          JobPriorities.testtype).filter(JobPriorities.priority == 1).all()
     retVal = {}
     retVal[date] = []
     jobtype = []
-    for d in cursor.fetchall():
-        parts = d[0].split("'")
-        jobtype.append([parts[1], parts[3], parts[5]])
 
-    if active:
-        alljobs = jobtype_query()
-        active_jobs = []
-        for job in alljobs:
-            found = False
-            for j in jobtype:
-                if j[0] == job[0] and j[1] == job[1] and j[2] == job[2]:
-                    found = True
-                    break
-            if not found:
-                active_jobs.append(job)
-        jobtype = active_jobs
+    # we only support fx-team, autoland, and mozilla-inbound branch in seta
+    if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True \
+            and str(branch) != '':
+        abort(404)
+    for d in query:
+        jobtype.append([d[0], d[1], d[2]])
 
+    # We call valve to determine what kind of jobs we should return only if
+    # this request is comes from taskcluster. Otherwise, we just return what people
+    # request for.
+    if request.headers.get('User-Agent', '') == 'TaskCluster':
+
+        # We should return full job list as a fallback, if it's a request from
+        # taskcluster and without head_rev or pushlog_id in there
+        if head_rev or pushlog_id:
+            priority = valve(head_rev, pushlog_id, branch, priority)
+        else:
+            priority = 0
+
+    alljobs = JOBSDATA.jobtype_query()
+
+    # Because we store high value jobs in seta table as default,
+    # so we return low value jobs, means no failure related with this job as default
+
+    # priority = 0; run all the jobs
+    if priority == 0:
+        jobtype = alljobs
+    # priority =5 run all low value jobs
+    elif priority == 5:
+        low_value_jobs = [low_value_job for low_value_job in alljobs if
+                          low_value_job not in jobtype]
+        jobtype = low_value_jobs
+    # priority =1, run all high value jobs
+    elif priority == 1:
+        pass # use jobtype as a high value query
+
+    # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
         active_jobs = []
+        # pick up buildbot jobs from job list to faster the filter process
+        buildbot_jobs = [job for job in jobnames if job['buildplatform'] == 'buildbot']
+        # find out the correspond job detail information
         for job in jobtype:
-            active_jobs.append(buildbot_name(job[0], job[1], job[2], branch))
+            for j in buildbot_jobs:
+                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                    active_jobs.append(j['ref_data_name'] if branch is 'mozilla-inbound'
+                                       else j['ref_data_name'].replace('mozilla-inbound', branch))
+
+        jobtype = active_jobs
+
+    # TODO: filter out based on buildsystem from database, either 'taskcluster' or '*'
+    if taskcluster:
+        active_jobs = []
+        taskcluster_jobs = [job for job in jobnames if job['buildplatform'] == 'taskcluster']
+        for job in jobtype:
+            for j in taskcluster_jobs:
+                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                    active_jobs.append(j['ref_data_name'])
         jobtype = active_jobs
 
     retVal[date] = jobtype
-    return {'jobtypes': retVal}
+    return {"jobtypes": retVal}
 
 
-def buildbot_name(platform, buildtype, jobname, branch):
-    platform_map = {}
-    platform_map['android-2-3-armv7-api9'] = "android-2-3-armv7-api9"
-    platform_map['android-4-2-x86'] = "android-4-2-x86"
-    platform_map['android-4-3-armv7-api11'] = "android-4-3-armv7-api11"
-    platform_map['osx-10-10'] = "Rev5 MacOSX Yosemite 10.10"
-    platform_map['osx-10-8'] = "Rev5 MacOSX Mountain Lion 10.8"
-    platform_map['osx-10-6'] = "Rev4 MacOSX Snow Leopard 10.6"
-    platform_map['linux32'] = "Ubuntu VM 12.04"
-    platform_map['linux64'] = "Ubuntu VM 12.04 x64"
-    platform_map['linux64asan'] = "Ubuntu ASAN VM 12.04 x64"
-    platform_map['windowsxp'] = "Windows XP 32-bit"
-    platform_map['windows7-32'] = "Windows 7 32-bit"
-    platform_map['windows8-64'] = "Windows 8 64-bit"
+@app.route("/data/jobnames/")
+@json_response
+def run_jobnames_query():
+    # inbound is a safe default
+    json_jobnames = {'results': JOBSDATA.jobnames_query()}
 
-    buildtype_map = {}
-    buildtype_map["opt"] = "opt"
-    buildtype_map["debug"] = "debug"
-    buildtype_map["asan"] = "opt"
-
-    if buildtype == 'asan':
-        platform = 'linux64asan'
-
-    if not branch:
-        branch = "%s"
-
-    # TODO: do we need to do a jobname conversion?  I don't see a need yet
-    return "%s %s %s test %s" % (platform_map[platform], branch, buildtype_map[buildtype], jobname)
+    return json_jobnames
 
 
 @app.route("/data/dailyjobs/")
 @json_response
 def run_dailyjob_query():
     start_date, end_date = clean_date_params(request.args)
-    db = create_db_connnection()
-    cursor = db.cursor()
-    query = "select date, platform, branch, numpushes, numjobs, sumduration from dailyjobs \
-             where date>='%s' and date <='%s'\
-             order by case platform \
-                when 'linux' then 1 \
-                when 'osx' then 2  \
-                when 'win' then 3  \
-                when 'android' then 4 \
-                end" % (start_date, end_date)
-    cursor.execute(query)
+    start_date = start_date - timedelta(days=1)
+    end_date = end_date + timedelta(days=1)
+    data = session.query(Dailyjobs.date, Dailyjobs.platform, Dailyjobs.branch, Dailyjobs.numjobs,
+                         Dailyjobs.sumduration).\
+        filter(Dailyjobs.date.between(start_date, end_date)).order_by(case([
+            (Dailyjobs.platform == 'linux', 1),
+            (Dailyjobs.platform == 'osx', 2),
+            (Dailyjobs.platform == 'win', 3),
+            (Dailyjobs.platform == 'android', 4)], else_='5')).all()
+
     output = {}
-    for rows in cursor.fetchall():
+    for rows in data:
         date = str(rows[0])
         platform = rows[1]
         branch = rows[2]
@@ -559,11 +557,15 @@ def run_dailyjob_query():
         sumduration = int(rows[5])
 
         if date not in output:
-            output[date] = {'mozilla-inbound': [], 'fx-team': []}
+            output[date] = {'mozilla-inbound': [], 'fx-team': [], 'try': [], 'autoland': []}
         if 'mozilla-inbound' in branch:
             output[date]['mozilla-inbound'].append([platform, numpushes, numjobs, sumduration])
         elif 'fx-team' in branch:
             output[date]['fx-team'].append([platform, numpushes, numjobs, sumduration])
+        elif 'try' in branch:
+            output[date]['try'].append([platform, numpushes, numjobs, sumduration])
+        elif 'autoland' in branch:
+            output[date]['autoland'].append([platform, numpushes, numjobs, sumduration])
     return {'dailyjobs': output}
 
 
@@ -572,9 +574,11 @@ def run_dailyjob_query():
 def handler404(error):
     return {"status": 404, "msg": str(error)}
 
+
 @app.route("/")
 def root_directory():
     return template("index.html")
+
 
 @app.route("/<string:filename>")
 def template(filename):
@@ -585,5 +589,105 @@ def template(filename):
         return response_body
     abort(404)
 
+
+def update_preseed():
+    """ we sync preseed.json to jobpririties in server on startup, since that is
+        the only time we expect preseed.json to change. """
+
+    # get preseed data first
+    preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
+    preseed = []
+    with open(preseed_path, 'r') as fHandle:
+        preseed = json.load(fHandle)
+
+    # Preseed data will have fields: buildtype,testtype,platform,priority,timeout,expires
+    # The expires field defaults to 2 weeks on a new job in the database
+    # Expires field has a date "YYYY-MM-DD", but can have "*" to indicate never
+    # Typical priority will be 1, but if we want to force coalescing we can do that
+    # One hack is that if we have a * in a buildtype,testtype,platform field, then
+    # we assume it is for all flavors of the * field: i.e. linux64,pgo,* - all tests
+    # assumption - preseed fields are sanitized already - move parse_testtype to utils.py ?
+    for job in preseed:
+        _buildsystem = job["build_system_type"]
+
+        data = session.query(JobPriorities.id,
+                             JobPriorities.testtype,
+                             JobPriorities.buildtype,
+                             JobPriorities.platform,
+                             JobPriorities.priority,
+                             JobPriorities.timeout,
+                             JobPriorities.expires,
+                             JobPriorities.buildsystem)
+        if job['testtype'] != '*':
+            data = data.filter(getattr(JobPriorities, 'testtype') == job['testtype'])
+
+        if job['buildtype'] != '*':
+            data = data.filter(getattr(JobPriorities, 'buildtype') == job['buildtype'])
+
+        if job['platform'] != '*':
+            data = data.filter(getattr(JobPriorities, 'platform') == job['platform'])
+
+        data = data.all()
+
+        # TODO: edge case: we add future jobs with a wildcard, when jobs show up
+        #       remove the wildcard, apply priority/timeout/expires to new jobs
+        # Deal with the case where we have a new entry in preseed
+        if len(data) == 0:
+            _expires = job['expires']
+            if _expires == '*':
+                _expires = str(datetime.now().date() + timedelta(days=365))
+
+            print "adding a new unknown job to the database: %s" % job
+            newjob = JobPriorities(job['testtype'],
+                                   job['buildtype'],
+                                   job['platform'],
+                                   job['priority'],
+                                   job['timeout'],
+                                   _expires,
+                                   _buildsystem)
+            session.add(newjob)
+            session.commit()
+            session.close()
+            continue
+
+        # We can have wildcards, so loop on all returned values in data
+        for d in data:
+            print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
+            _expires = job['expires']
+            _priority = job['priority']
+            _timeout = job['timeout']
+
+            # we have a taskcluster job in the db, and new job in preseed
+            if d[7] != _buildsystem:
+                _buildsystem = "*"
+
+            # When we have a defined date to expire a job, parse and use it
+            if _expires == '*':
+                _expires = str(datetime.now().date() + timedelta(days=365))
+
+            try:
+                dv = datetime.strptime(_expires, "%Y-%M-%d").date()
+            except ValueError:
+                continue
+
+            # When we have expired, use existing priority/timeout, reset expires
+            if dv <= datetime.now().date():
+                print "  --  past the expiration date- reset!"
+                _expires = ''
+                _priority = d[4]
+                _timeout = d[5]
+
+            # TODO: do we need to try/except/finally with commit/rollback statements
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(JobPriorities.id == d[0])\
+                          .values(priority=_priority,
+                                  timeout=_timeout,
+                                  expires=_expires,
+                                  buildsystem=_buildsystem)
+            conn.execute(statement)
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8157, debug=False)
+    update_preseed()
+    app.run(host="0.0.0.0", port=PORT, debug=True)

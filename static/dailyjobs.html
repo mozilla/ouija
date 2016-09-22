@@ -13,7 +13,7 @@
 <body>
   <h1>Tracking SETA</h1>
   <p>
-    <a href="http://alertmanager.allizom.org/data/dailyjobs/">Raw Data</a><br />
+    <a href="http://seta-dev.herokuapp.com/data/dailyjobs/">Raw Data</a><br />
     <p>
       Start Date: <input type="text" id="datepicker1">
       End Date: <input type="text" id="datepicker2">
@@ -25,6 +25,7 @@
       Branch: <select id="branch" onchange="changeBranch();">
                 <option id="mozilla-inbound"> mozilla-inbound </option>
                 <option id="fx-team"> fx-team </option>
+                <option id="try"> try </option>
               </select>
       Platform: <select id="platform" onchange="changePlatform();">
                 <option id="all"> All </option>
@@ -122,11 +123,12 @@
         if ( !(date in dictionary) ){
             dictionary[date] = {
               "fx-team": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]],
-              "mozilla-inbound": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]]
+              "mozilla-inbound": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]],
+              "try": [["linux", 0, 0, 0], ["osx", 0, 0, 0], ["win", 0, 0, 0], ["android", 0, 0, 0]]
             };
         }
 
-        var branches = ["fx-team", "mozilla-inbound"];
+        var branches = ["fx-team", "mozilla-inbound", "try"];
         for (var i=0; i<branches.length; i++){
           var weeks_array = dictionary[date][branches[i]];
           var days_array = dict[key][branches[i]];
@@ -142,7 +144,7 @@
     }
 
     function getDailyJobsByDate(start_date, end_date){
-      var url = "http://alertmanager.allizom.org/data/dailyjobs/?";
+      var url = "http://seta-dev.herokuapp.com/data/dailyjobs/?";
       if (typeof start_date !== 'undefined' || typeof end_date !== 'undefined'){
         url += "startDate="+start_date+"&endDate="+end_date;
       }

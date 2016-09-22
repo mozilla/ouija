@@ -4,9 +4,9 @@ CREATE DATABASE ouija;
 USE ouija;
 
 CREATE TABLE IF NOT EXISTS `testjobs` (
-  `log` text NOT NULL,
   `slave` varchar(64) NOT NULL,
   `result` varchar(32) NOT NULL,
+  `build_system_type` varchar(64) NOT NULL,
   `duration` int(11) NOT NULL,
   `platform` varchar(32) NOT NULL,
   `buildtype` varchar(32) NOT NULL,
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `date` datetime NOT NULL,
 -- https://treeherder.mozilla.org/api/failureclassification/
   `failure_classification` int(11) NOT NULL,
+  `failures` varchar(1024) DEFAULT NULL,
   index `revision` (`revision`),
   index `date` (`date`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
