@@ -607,9 +607,10 @@ def update_preseed():
     # One hack is that if we have a * in a buildtype,testtype,platform field, then
     # we assume it is for all flavors of the * field: i.e. linux64,pgo,* - all tests
     # assumption - preseed fields are sanitized already - move parse_testtype to utils.py ?
-    for job in preseed:
-        _buildsystem = job["build_system_type"]
 
+    # TODO: hack here, moving this out of the for loop as it is too expensive to do those queries
+    # TODO: make sure we sanitize preseed.json first to remove duplicates that could conflict with jobpriorities
+    if 1 == 1:
         data = session.query(JobPriorities.id,
                              JobPriorities.testtype,
                              JobPriorities.buildtype,
@@ -628,6 +629,9 @@ def update_preseed():
             data = data.filter(getattr(JobPriorities, 'platform') == job['platform'])
 
         data = data.all()
+
+    for job in preseed:
+        _buildsystem = job["build_system_type"]
 
         # TODO: edge case: we add future jobs with a wildcard, when jobs show up
         #       remove the wildcard, apply priority/timeout/expires to new jobs
