@@ -607,9 +607,10 @@ def update_preseed():
     # One hack is that if we have a * in a buildtype,testtype,platform field, then
     # we assume it is for all flavors of the * field: i.e. linux64,pgo,* - all tests
     # assumption - preseed fields are sanitized already - move parse_testtype to utils.py ?
-    for job in preseed:
-        _buildsystem = job["build_system_type"]
 
+    # TODO: hack here, moving this out of the for loop as it is too expensive to do those queries
+    # TODO: make sure we sanitize preseed.json first to remove duplicates that could conflict with jobpriorities
+    if 1 == 1:
         data = session.query(JobPriorities.id,
                              JobPriorities.testtype,
                              JobPriorities.buildtype,
@@ -628,6 +629,9 @@ def update_preseed():
             data = data.filter(getattr(JobPriorities, 'platform') == job['platform'])
 
         data = data.all()
+
+    for job in preseed:
+        _buildsystem = job["build_system_type"]
 
         # TODO: edge case: we add future jobs with a wildcard, when jobs show up
         #       remove the wildcard, apply priority/timeout/expires to new jobs
@@ -652,6 +656,7 @@ def update_preseed():
 
         # We can have wildcards, so loop on all returned values in data
         for d in data:
+            changed = False
             print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
             _expires = job['expires']
             _priority = job['priority']
@@ -660,6 +665,7 @@ def update_preseed():
             # we have a taskcluster job in the db, and new job in preseed
             if d[7] != _buildsystem:
                 _buildsystem = "*"
+                changed = True
 
             # When we have a defined date to expire a job, parse and use it
             if _expires == '*':
@@ -676,18 +682,20 @@ def update_preseed():
                 _expires = ''
                 _priority = d[4]
                 _timeout = d[5]
+                changed = True
 
-            # TODO: do we need to try/except/finally with commit/rollback statements
-            conn = engine.connect()
-            statement = update(JobPriorities)\
-                          .where(JobPriorities.id == d[0])\
-                          .values(priority=_priority,
-                                  timeout=_timeout,
-                                  expires=_expires,
-                                  buildsystem=_buildsystem)
-            conn.execute(statement)
+            if changed == True:
+                # TODO: do we need to try/except/finally with commit/rollback statements
+                conn = engine.connect()
+                statement = update(JobPriorities)\
+                              .where(JobPriorities.id == d[0])\
+                              .values(priority=_priority,
+                                      timeout=_timeout,
+                                      expires=_expires,
+                                      buildsystem=_buildsystem)
+                conn.execute(statement)
 
 
 if __name__ == "__main__":
-    update_preseed()
     app.run(host="0.0.0.0", port=PORT, debug=True)
+    update_preseed()
