@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ROOT_DIR = get_rootdir()
 SETA_WINDOW = 90
-TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
-                  "runnable_jobs/?decisionTaskID={1}&format=json"
+
 headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',

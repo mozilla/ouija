@@ -18,7 +18,7 @@ headers = {
 }
 logger = logging.getLogger(__name__)
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
-                  "runnable_jobs/?decisionTaskID={1}&format=json"
+                  "runnable_jobs/?decision_task_id={1}&format=json"
 
 def get_rootdir():
 
