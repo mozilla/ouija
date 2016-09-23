@@ -689,5 +689,5 @@ def update_preseed():
 
 
 if __name__ == "__main__":
-    update_preseed()
     app.run(host="0.0.0.0", port=PORT, debug=True)
+    update_preseed()
