@@ -652,6 +652,7 @@ def update_preseed():
 
         # We can have wildcards, so loop on all returned values in data
         for d in data:
+            changed = False
             print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
             _expires = job['expires']
             _priority = job['priority']
@@ -660,6 +661,7 @@ def update_preseed():
             # we have a taskcluster job in the db, and new job in preseed
             if d[7] != _buildsystem:
                 _buildsystem = "*"
+                changed = True
 
             # When we have a defined date to expire a job, parse and use it
             if _expires == '*':
@@ -676,16 +678,18 @@ def update_preseed():
                 _expires = ''
                 _priority = d[4]
                 _timeout = d[5]
+                changed = True
 
-            # TODO: do we need to try/except/finally with commit/rollback statements
-            conn = engine.connect()
-            statement = update(JobPriorities)\
-                          .where(JobPriorities.id == d[0])\
-                          .values(priority=_priority,
-                                  timeout=_timeout,
-                                  expires=_expires,
-                                  buildsystem=_buildsystem)
-            conn.execute(statement)
+            if changed == True:
+                # TODO: do we need to try/except/finally with commit/rollback statements
+                conn = engine.connect()
+                statement = update(JobPriorities)\
+                              .where(JobPriorities.id == d[0])\
+                              .values(priority=_priority,
+                                      timeout=_timeout,
+                                      expires=_expires,
+                                      buildsystem=_buildsystem)
+                conn.execute(statement)
 
 
 if __name__ == "__main__":
