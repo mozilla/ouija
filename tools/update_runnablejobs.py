@@ -170,7 +170,7 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
         for nd in no_duplicates:
             if job['testtype'] == nd['testtype'] and \
                job['platform'] == nd['platform'] and \
-               job['platform_options'] == nd['platform_options']:
+               job['platform_option'] == nd['platform_option']:
                 found = True
                 break
 
