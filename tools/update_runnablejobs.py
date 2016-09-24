@@ -149,19 +149,35 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
     if not new_data:
         return
 
+    no_duplicates = []
+    for job in new_data['results']:
+        found = False
+        for nd in no_duplicates:
+            if job['ref_data_name'] == nd['ref_data_name'] and \
+               job['job_type_name'] == nd['job_type_name'] and \
+               job['platform_options'] == nd['platform_options'] and \
+               job['build_platform'] == nd['build_platform']:
+                found = True
+                break
+
+        if found:
+            if job['build_system_type'] != nd['build_system_type']:
+                job['build_system_type'] = '*'
+        no_duplicates.append(job)
+    new_data['results'] = no_duplicates
+
+    db_data = []
+    db_data = session.query(JobPriorities.id,
+                            JobPriorities.testtype,
+                            JobPriorities.buildtype,
+                            JobPriorities.platform,
+                            JobPriorities.priority,
+                            JobPriorities.timeout,
+                            JobPriorities.expires,
+                            JobPriorities.buildsystem).all()
+
     # TODO: as a perf improvement we can reduce jobs prior to this expensive for loop
     for job in new_data['results']:
-
-        # TODO: potentially ensure no duplicates in new_data and query once outside the loop
-        db_data = []
-        db_data = session.query(JobPriorities.id,
-                                JobPriorities.testtype,
-                                JobPriorities.buildtype,
-                                JobPriorities.platform,
-                                JobPriorities.priority,
-                                JobPriorities.timeout,
-                                JobPriorities.expires,
-                                JobPriorities.buildsystem).all()
 
         platform = parse_platform(job['build_platform'])
         if platform == None or platform == "":
