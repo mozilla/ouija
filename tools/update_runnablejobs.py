@@ -149,14 +149,28 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
     if not new_data:
         return
 
+    # This is a loop to remove duplicates (including buildsystem -> * if needed)
+    # By doing this it allows us to have a single database query
     no_duplicates = []
     for job in new_data['results']:
+        platform = parse_platform(job['build_platform'])
+        if platform == None or platform == "":
+            continue
+
+        testtype = parse_testtype(job['build_system_type'],
+                                  job['ref_data_name'],
+                                  job['platform_option'],
+                                  job['job_type_name'])
+        if testtype == None or testtype == "":
+            continue
+
+        job["platform"] = platform
+        job["testtype"] = testtype
         found = False
         for nd in no_duplicates:
-            if job['ref_data_name'] == nd['ref_data_name'] and \
-               job['job_type_name'] == nd['job_type_name'] and \
-               job['platform_options'] == nd['platform_options'] and \
-               job['build_platform'] == nd['build_platform']:
+            if job['testtype'] == nd['testtype'] and \
+               job['platform'] == nd['platform'] and \
+               job['platform_options'] == nd['platform_options']:
                 found = True
                 break
 
@@ -176,21 +190,12 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
                             JobPriorities.expires,
                             JobPriorities.buildsystem).all()
 
-    # TODO: as a perf improvement we can reduce jobs prior to this expensive for loop
+    # Now loop through the reduced jobs and update the database as needed
     for job in new_data['results']:
-
-        platform = parse_platform(job['build_platform'])
-        if platform == None or platform == "":
-            continue
-
-        testtype = parse_testtype(job['build_system_type'],
-                                  job['ref_data_name'],
-                                  job['platform_option'],
-                                  job['job_type_name'])
-        if testtype == None or testtype == "":
-            continue
-
         _buildsystem = job["build_system_type"]
+        platform = job["platform"]
+        testtype = job["testtype"]
+
         found = False
         found_id = None
         for row in db_data:
@@ -203,7 +208,6 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
                 if row[7] != "*" and _buildsystem != row[7]:
                     _buildsystem = "*"
                     found_id = row[0]
-
 
         # We have new jobs from runnablejobs to add to our master list
         if not found:
