@@ -74,14 +74,16 @@ class TaskRequests(MetaBase):
     __tablename__ = 'taskrequests'
 
     id = Column(Integer, primary_key=True)
-    head_rev = Column(String(128), nullable=False, index=True)
-    pushlog_id = Column(String(8), nullable=False, index=True)
-    priority = Column(Integer)
+    branch = Column(String(128), nullable=False, index=True)
+    counter = Column(Integer, nullable=False)
+    datetime = Column(DateTime, nullable=False)
+    reset_delta = Column(Integer, nullable=False)
 
-    def __init__(self, head_rev, pushlog_id, priority):
-        self.head_rev = head_rev
-        self.pushlog_id = pushlog_id
-        self.priority = priority
+    def __init__(self, branch, counter, datetime, reset_delta):
+        self.branch = branch
+        self.counter = counter
+        self.datetime = datetime
+        self.reset_delta = reset_delta
 
 
 class JobPriorities(MetaBase):
