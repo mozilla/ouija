@@ -20,7 +20,7 @@ SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 JOBSDATA = jobtypes.Treecodes()
-
+RESET_DELTA = 5400
 # These are necesary setup for postgresql on heroku
 PORT = int(os.environ.get("PORT", 8157))
 urlparse.uses_netloc.append("postgres")
@@ -409,7 +409,6 @@ def run_seta_details_query():
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
     priority = int(sanitize_string(request.args.get("priority", '1')))
-    jobtype = []
     jobnames = JOBSDATA.jobnames_query()
     date = str(datetime.now().date())
     retVal = {}
@@ -444,13 +443,12 @@ def run_seta_details_query():
 
         time_of_now = datetime.datetime.now()
         time_of_request = time.strftime("%Y-%m-%d %H:%M:%S")
-
         # If we got nothing related with that branch, we should create it.
         if len(branch_info) == 0:
             # time_of_lastreset is not a good name anyway :(
             # And we treat all branches' reset_delta is 90 seconds, we should find a
             # better delta for them in the further.
-            branch_data = TaskRequests(str(branch), 1, str(time_of_request), 5400)
+            branch_data = TaskRequests(str(branch), 1, str(time_of_request), RESET_DELTA)
             try:
                 session.add(branch_data)
                 session.commit()
@@ -459,18 +457,21 @@ def run_seta_details_query():
 
             finally:
                 session.close()
-            counter, string_time, reset_delta = 1, time_of_request, 5400
+            counter = 1
+            time_string = time_of_request
+            reset_delta = RESET_DELTA
 
         # We should update it if that branch had already been stored.
         else:
-            counter, string_time, reset_delta = branch_info[0]
+            counter, time_string, reset_delta = branch_info[0]
+            counter += 1
             conn = engine.connect()
             statement = update(TaskRequests).where(
                 TaskRequests.branch == branch).value(
-                counter == counter + 1)
+                counter == counter)
             conn.execute(statement)
 
-        last_update_time = datetime.datetime.strptime(string_time, "%Y-%m-%d %H:%M:%S")
+        last_update_time = datetime.datetime.strptime(time_string, "%Y-%m-%d %H:%M:%S")
         delta = (time_of_now - last_update_time).total_seconds()
 
         # we should update the time recorder if the elapse time had
@@ -479,7 +480,7 @@ def run_seta_details_query():
             conn = engine.connect()
             statement = update(TaskRequests).where(
                 TaskRequests.branch == branch).value(
-                datetime == datetime)
+                datetime == time_of_request)
             conn.execute(statement)
 
         for d in query:
@@ -487,7 +488,7 @@ def run_seta_details_query():
             if delta < d[4]:
                 # Due to the priority of all high value jobs is 1, and we
                 # need to return all jobs for every 5 pushes(for now).
-                if counter + 1 % d[3] != 0:
+                if counter % d[3] != 0:
                     jobtype.append([d[0], d[1], d[2]])
 
     # We don't care about the timeout variable of job if it's not a taskcluster request.
