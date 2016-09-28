@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
                   "runnable_jobs/?decision_task_id={1}&format=json"
 
+
 def get_rootdir():
 
     path = os.path.expanduser('~/.mozilla/seta/')
@@ -92,7 +93,7 @@ def query_the_runnablejobs(new_timestamp, task_id=None):
 
 
 def parse_testtype(build_system_type, refdata, platform_option, job_type_name):
-    #TODO: figure out how to ignore build, lint, etc. jobs
+    # TODO: figure out how to ignore build, lint, etc. jobs
 
     if build_system_type == 'buildbot':
         return refdata.split(' ')[-1]
@@ -117,13 +118,13 @@ def parse_testtype(build_system_type, refdata, platform_option, job_type_name):
 
     testtype = testtype.strip(' ')
 
-    #TODO: these changes should have bugs on file to fix the names
+    # TODO: these changes should have bugs on file to fix the names
     testtype = testtype.replace('browser-chrome-e10s', 'e10s-browser-chrome')
     testtype = testtype.replace('devtools-chrome-e10s', 'e10s-devtools-chrome')
     testtype = testtype.replace('[TC] Android 4.3 API15+ ', '')
     testtype = testtype.replace('jittests-', 'jittest-')
 
-    #TODO: fix this in updatedb.py
+    # TODO: fix this in updatedb.py
     testtype = testtype.replace('webgl-', 'gl-')
 
     if testtype.startswith('[funsize'):
@@ -200,9 +201,9 @@ def add_jobs_to_jobpriority(new_data=None, priority=1, timeout=0, set_expired=Fa
         found_id = None
         for row in db_data:
             if (row[1] == testtype and
-                row[3] == platform and
-                row[2] == job["platform_option"]):
-                #TODO: what if we have a race condition with two identical jobs
+                    row[3] == platform and
+                    row[2] == job["platform_option"]):
+                # TODO: what if we have a race condition with two identical jobs
                 # verify the build system type is the same, or make it *
                 found = True
                 if row[7] != "*" and _buildsystem != row[7]:
