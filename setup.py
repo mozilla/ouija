@@ -6,6 +6,7 @@ required = [
     "MarkupSafe",
     "psycopg2",
     "MySQL-python",
+    "sqlalchemy",
     "argparse",
     "requests",
     "redo"
