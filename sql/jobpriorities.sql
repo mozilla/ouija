@@ -1,7 +1,5 @@
 USE ouija;
 
-drop table jobpriorities;
-
 CREATE TABLE IF NOT EXISTS `jobpriorities` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `platform` varchar(32) NOT NULL,
