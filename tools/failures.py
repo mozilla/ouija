@@ -8,17 +8,26 @@ from emails import send_email
 from redo import retry
 from database.models import JobPriorities
 from database.config import session, engine
-from update_runnablejobs import update_runnableapi, get_rootdir
+from update_runnablejobs import update_job_priority_table, get_rootdir
 from sqlalchemy import update, and_
 
 import seta
 
-logger = logging.getLogger(__name__)
-SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-ROOT_DIR = get_rootdir()
-SETA_WINDOW = 90
+# Let's get the root logger - this guarantees seeing all messages from other modules
+LOG = logging.getLogger()
+LOG.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                  datefmt='%I:%M:%S'))
+LOG.addHandler(ch)
+# Silence requests as it is too noisy
+logging.getLogger("requests").setLevel(logging.WARNING)
 
-headers = {
+ROOT_DIR = get_rootdir()
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+# Number of days to go back and gather failures
+SETA_WINDOW = 90
+HEADERS = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
 }
@@ -36,11 +45,11 @@ def get_raw_data(start_date, end_date):
                  (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
     try:
         response = retry(requests.get, args=(url, ),
-                         kwargs={'headers': headers, 'verify': True})
+                         kwargs={'headers': HEADERS, 'verify': True})
         data = json.loads(response.content)
     except Exception as error:
         # we will return an empty 'failures' list if got exception here
-        logger.debug("the request to %s failed, due to %s" % (url, error))
+        LOG.debug("the request to %s failed, due to %s" % (url, error))
         data = {'failures': []}
     return data['failures']
 
@@ -49,8 +58,8 @@ def communicate(failures, to_insert, total_detected, testmode, date):
 
     active_jobs = seta.get_distinct_tuples()
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
-    print "We will detect %.2f%% (%s) of the %s failures" % \
-          (percent_detected, len(total_detected), len(failures))
+    LOG.info("We will detect %.2f%% (%s) of the %s failures" %
+             (percent_detected, len(total_detected), len(failures)))
 
     if testmode:
         return
@@ -59,7 +68,7 @@ def communicate(failures, to_insert, total_detected, testmode, date):
     timeout = 0
     reset_preseed()
     updated_jobs = update_jobpriorities(to_insert, priority, timeout)
-    print "updated %s (%s) jobs" % (len(updated_jobs), len(to_insert))
+    LOG.info("updated %s (%s) jobs" % (len(updated_jobs), len(to_insert)))
 
     if date is None:
         date = datetime.date.today()
@@ -96,8 +105,8 @@ def reset_preseed():
         if dv.date() <= now.date():
             conn = engine.connect()
             statement = update(JobPriorities)\
-                          .where(JobPriorities.id == item[1])\
-                          .values(expires=None)
+                .where(JobPriorities.id == item[1])\
+                .values(expires=None)
             conn.execute(statement)
 
 
@@ -121,11 +130,10 @@ def update_jobpriorities(to_insert, _priority, _timeout):
 
             conn = engine.connect()
             statement = update(JobPriorities)\
-                          .where(and_(JobPriorities.testtype == item[2],
-                                      JobPriorities.buildtype == item[1],
-                                      JobPriorities.platform == item[0]))\
-                          .values(priority=_priority,
-                                  timeout=_timeout)
+                .where(and_(JobPriorities.testtype == item[2],
+                            JobPriorities.buildtype == item[1],
+                            JobPriorities.platform == item[0]))\
+                .values(priority=_priority, timeout=_timeout)
             conn.execute(statement)
 
     return changed_jobs
@@ -143,6 +151,12 @@ def parse_args(argv=None):
                         metavar="YYYY-MM-DD",
                         dest="end_date",
                         help="ending date for comparison."
+                        )
+
+    parser.add_argument("--do-not-analyze",
+                        action="store_true",
+                        dest="do_not_analyze",
+                        help="This option skips analysis of failures."
                         )
 
     parser.add_argument("--testmode",
@@ -173,7 +187,7 @@ def parse_args(argv=None):
 
 def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     failures = get_raw_data(start_date, end_date)
-    print "date: %s, failures: %s" % (end_date, len(failures))
+    LOG.info("date: %s, failures: %s" % (end_date, len(failures)))
     target = 100  # 100% detection
 
     to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
@@ -182,7 +196,7 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
 
 if __name__ == "__main__":
     options = parse_args()
-    update_runnableapi()
+    update_job_priority_table()
 
     if options.end_date:
         end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
@@ -194,5 +208,6 @@ if __name__ == "__main__":
     else:
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
-    analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
-                     options.method)
+    if not options.do_not_analyze:
+        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
+                         options.method)
