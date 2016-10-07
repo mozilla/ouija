@@ -421,7 +421,6 @@ def run_seta_details_query():
         abort(404)
 
     alljobs = JOBSDATA.jobtype_query()
-
     # For the case of TaskCluster request, we don't care which priority the user request.
     # We return jobs depend on the strategy that we return high value jobs as default and
     # return all jobs for every 5 push or 90 minutes for that branch.
@@ -438,11 +437,16 @@ def run_seta_details_query():
 
         # We should return full job list as a fallback, if it's a request from
         # taskcluster and without head_rev or pushlog_id in there
-        branch_info = session.query(TaskRequests.counter, TaskRequests.datetime).filter(
-            TaskRequests.branch == branch).all()
-
-        time_of_now = datetime.datetime.now()
+        try:
+            branch_info = session.query(TaskRequests.counter,
+                                        TaskRequests.datetime,
+                                        TaskRequests.reset_delta).filter(
+                TaskRequests.branch == branch).all()
+        except:
+            branch_info = []
+        time_of_now = datetime.now()
         time_of_request = time.strftime("%Y-%m-%d %H:%M:%S")
+
         # If we got nothing related with that branch, we should create it.
         if len(branch_info) == 0:
             # time_of_lastreset is not a good name anyway :(
@@ -467,25 +471,25 @@ def run_seta_details_query():
             counter += 1
             conn = engine.connect()
             statement = update(TaskRequests).where(
-                TaskRequests.branch == branch).value(
-                counter == counter)
+                TaskRequests.branch == branch).values(
+                counter=counter)
             conn.execute(statement)
 
-        last_update_time = datetime.datetime.strptime(time_string, "%Y-%m-%d %H:%M:%S")
-        delta = (time_of_now - last_update_time).total_seconds()
+        delta = (time_of_now - time_string).total_seconds()
 
         # we should update the time recorder if the elapse time had
         # reach the time limit of that branch.
         if delta >= reset_delta:
             conn = engine.connect()
             statement = update(TaskRequests).where(
-                TaskRequests.branch == branch).value(
-                datetime == time_of_request)
+                TaskRequests.branch == branch).values(
+                datetime=time_string)
             conn.execute(statement)
 
         for d in query:
-            # we only return that job if it hasn't reach the timeout limit.
-            if delta < d[4]:
+            # we only return that job if it hasn't reach the timeout limit. And the
+            # timeout is zero means this job need always running.
+            if delta < d[4] or d[0] == 0:
                 # Due to the priority of all high value jobs is 1, and we
                 # need to return all jobs for every 5 pushes(for now).
                 if counter % d[3] != 0:
@@ -499,19 +503,19 @@ def run_seta_details_query():
                               JobPriorities.priority,
                               ).all()
 
-    # priority = 0; run all the jobs
-    if priority != 1 and priority != 5:
-        priority = 0
+        # priority = 0; run all the jobs
+        if priority != 1 and priority != 5:
+            priority = 0
 
-    # Because we store high value jobs in seta table as default,
-    # so we return low value jobs, means no failure related with this job as default
-    if priority == 0:
-        jobtype = alljobs
-    # priority =5 run all low value jobs
-    else:
-        joblist = [job for job in query if job[3] == priority]
-        for j in joblist:
-            jobtype.append([j[0], j[1], j[2]])
+        # Because we store high value jobs in seta table as default,
+        # so we return low value jobs, means no failure related with this job as default
+        if priority == 0:
+            jobtype = alljobs
+        # priority =5 run all low value jobs
+        else:
+            joblist = [job for job in query if job[3] == priority]
+            for j in joblist:
+                jobtype.append([j[0], j[1], j[2]])
 
     # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
