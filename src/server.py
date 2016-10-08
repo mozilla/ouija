@@ -409,7 +409,7 @@ def run_seta_details_query():
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
-    priority = int(sanitize_string(request.args.get("priority", 5)))
+    priority = int(sanitize_string(request.args.get("priority", '5')))
     jobnames = JOBSDATA.jobnames_query()
     date = str(datetime.now().date())
     retVal = {}
@@ -487,8 +487,11 @@ def run_seta_details_query():
             conn = engine.connect()
             statement = update(TaskRequests).where(
                 TaskRequests.branch == branch).values(
-                datetime=time_string)
+                datetime=time_of_now)
             conn.execute(statement)
+
+            # we must reset the delta after we update the datetime
+            delta = 0
 
         for d in query:
             # we only return that job if it hasn't reach the timeout limit. And the
