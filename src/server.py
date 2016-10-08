@@ -409,7 +409,7 @@ def run_seta_details_query():
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
-    priority = int(sanitize_string(request.args.get("priority", 1)))
+    priority = int(sanitize_string(request.args.get("priority", 5)))
     jobnames = JOBSDATA.jobnames_query()
     date = str(datetime.now().date())
     retVal = {}
