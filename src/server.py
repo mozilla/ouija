@@ -426,6 +426,9 @@ def run_seta_details_query():
     # We return jobs depend on the strategy that we return high value jobs as default and
     # return all jobs for every 5 push or 90 minutes for that branch.
     if request.headers.get('User-Agent', '') == 'TaskCluster':
+        # we make taskcluster to 1 if it's a request from taskcluster, it's more reasonable and
+        # can simplify the request url.
+        taskcluster = 1
 
         # we query all jobs rather than jobs filter by the requested priority in here,
         # Because we need to set the job returning strategy depend on different job priority.
