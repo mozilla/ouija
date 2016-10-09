@@ -1,9 +1,63 @@
-DROP DATABASE IF EXISTS ouija;
+-- MySQL dump 10.13  Distrib 5.7.15, for Linux (x86_64)
+--
+-- Host: localhost    Database: ouija
+-- ------------------------------------------------------
+-- Server version	5.7.15-0ubuntu0.16.04.1
 
-CREATE DATABASE ouija;
-USE ouija;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `testjobs` (
+--
+-- Table structure for table `jobpriorities`
+--
+
+DROP TABLE IF EXISTS `jobpriorities`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `jobpriorities` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `platform` varchar(32) NOT NULL,
+  `buildtype` varchar(32) NOT NULL,
+  `testtype` varchar(64) NOT NULL,
+  `priority` int(11) NOT NULL,
+  `timeout` int(11) NOT NULL,
+  `expires` date DEFAULT NULL,
+  `buildsystem` varchar(32) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `seta`
+--
+
+DROP TABLE IF EXISTS `seta`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `seta` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `jobtype` varchar(256) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `testjobs`
+--
+
+DROP TABLE IF EXISTS `testjobs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `testjobs` (
   `slave` varchar(64) NOT NULL,
   `result` varchar(32) NOT NULL,
   `build_system_type` varchar(64) NOT NULL,
@@ -15,9 +69,20 @@ CREATE TABLE IF NOT EXISTS `testjobs` (
   `branch` varchar(64) NOT NULL,
   `revision` varchar(32) NOT NULL,
   `date` datetime NOT NULL,
--- https://treeherder.mozilla.org/api/failureclassification/
   `failure_classification` int(11) NOT NULL,
   `failures` varchar(1024) DEFAULT NULL,
-  index `revision` (`revision`),
-  index `date` (`date`)
+  KEY `revision` (`revision`),
+  KEY `date` (`date`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2016-10-03 16:20:56

@@ -69,30 +69,43 @@ class Testjobs(MetaBase):
         self.failures = failures
 
 
-class Seta(MetaBase):
-    __tablename__ = 'seta'
-
-    id = Column(Integer, primary_key=True)
-    jobtype = Column(String(256), nullable=False)
-    date = Column(DateTime, nullable=False, index=True)
-
-    def __init__(self, jobtype, date):
-        self.jobtype = jobtype
-        self.date = date
-
-
+# TODO: deprecate this!
 class TaskRequests(MetaBase):
     __tablename__ = 'taskrequests'
 
     id = Column(Integer, primary_key=True)
-    head_rev = Column(String(128), nullable=False, index=True)
-    pushlog_id = Column(String(8), nullable=False, index=True)
-    priority = Column(Integer)
+    branch = Column(String(128), nullable=False, index=True)
+    counter = Column(Integer, nullable=False)
+    datetime = Column(DateTime, nullable=False)
+    reset_delta = Column(Integer, nullable=False)
 
-    def __init__(self, head_rev, pushlog_id, priority):
-        self.head_rev = head_rev
-        self.pushlog_id = pushlog_id
+    def __init__(self, branch, counter, datetime, reset_delta):
+        self.branch = branch
+        self.counter = counter
+        self.datetime = datetime
+        self.reset_delta = reset_delta
+
+
+class JobPriorities(MetaBase):
+    __tablename__ = 'jobpriorities'
+
+    id = Column(Integer, primary_key=True)
+    testtype = Column(String(128), nullable=False, index=True)
+    buildtype = Column(String(64), nullable=False, index=True)
+    platform = Column(String(64), nullable=False, index=True)
+    priority = Column(Integer)
+    timeout = Column(Integer)
+    expires = Column(DateTime)
+    buildsystem = Column(String(64), nullable=False, index=True)
+
+    def __init__(self, testtype, buildtype, platform, priority, timeout, expires, buildsystem):
+        self.testtype = testtype
+        self.buildtype = buildtype
+        self.platform = platform
         self.priority = priority
+        self.timeout = timeout
+        self.expires = expires
+        self.buildsystem = buildsystem
 
 
 if __name__ == "__main__":

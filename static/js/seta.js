@@ -1,87 +1,34 @@
 $(function() {
   var input_date = location.search.substr(1).split('=')[1];
+  var SERVER = "http://seta-dev.herokuapp.com";
+//  var SERVER = "http://localhost:8157";
 
   $error = $("#error");
   $body = $("body");
 
-
-  function loadDate(date) {
-    var parts = date.split('/');
-    var d = parts[2] + '-' + parts[0] + '-' + parts[1];
-    printTable(d);
-  }
-
-  function createDates(data) {
-    var dates = {};
-
-    //NOTE: dates are in: "2015-01-01 00:00:00" format
-    var previous_value = 0;
-    var last_date = '';
-    for(var val in data) {
-      var date = val.split(' ')[0];
-      last_date = date;
-      var current_value = data[val];
-
-      //TODO: consider doing something different for more/less values
-      if (current_value != previous_value) {
-        var parts = date.split('-');
-        date = parts[1] + '/' + parts[2] + '/' + parts[0];
-        dates[new Date(date)] = new Date(date);
-      }
-      previous_value = current_value;
-    }
-
-    $(function() {
-      $("#datepicker").datepicker({
-        numberOfMonths: 3,
-        minDate: new Date(2014, 11-1, 14),
-        showButtonPanel: false,
-        showOtherMonths: true,
-        selectOtherMonths: true,
-        onSelect: loadDate,
-        beforeShowDay: function(date) {
-          var annotated = dates[date];
-          if (annotated) {
-            return [true, 'annotated', ''];
-          } else {
-            return [true, '', ''];
-          }
-        }
-      });
-    });
-
-    $("#datepicker").datepicker("setDate", "-2m");
-
-    document.getElementById("toggle").addEventListener("click", toggleState);
-
-    if (input_date === undefined || input_date === '') {
-      printTable(last_date);
-    } else {
-      printTable(input_date);
-    }
-  }
-
-  function printTable(date) {
-    $.getJSON("http://seta-dev.herokuapp.com/data/setadetails/?priority=high", {date:date}).done(function (data) { getActiveJobs(data, date); });
+  function printTable(date, priority) {
+    $.getJSON(SERVER + "/data/setadetails/?priority=" + priority, {date:date}).done(function (data) { getActiveJobs(data, date); });
   }
 
   function getActiveJobs(details, date) {
-    $.getJSON("http://seta-dev.herokuapp.com/data/jobtypes/").done(function (data) { getTreeNames(data, details, date); });
+    $.getJSON(SERVER + "/data/jobtypes/").done(function (data) { getTreeNames(data, details, date); });
   }
 
   function getTreeNames(activeJobs, details, date) {
-    $.getJSON("http://seta-dev.herokuapp.com/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
+    $.getJSON(SERVER + "/data/jobnames/").done(function (data) { outputTable(data['results'], activeJobs, details, date); });
   }
 
 
   function toggleState() {
+    var priority = 1;
     item = document.getElementById("toggle");
-    fetchData();
     if (item.value == "Show all Jobs") {
+      priority = 5;
       item.value = "Show required Jobs";
     } else {
       item.value = "Show all Jobs";
     }
+    gotSummary(priority);
   }
 
   // determine if we need a strike through or not
@@ -204,9 +151,19 @@ $(function() {
     });
   }
 
-  function gotsummary(data) {
+  function gotSummary(priority) {
     if ($error.is(":visible")) $error.hide();
-    createDates(data.dates);
+    var today = new Date();
+    month = (today.getMonth() + 1)
+    if (month < 10) {
+        month = "0" + month;
+    }
+    day = today.getDate();
+    if (day < 10) {
+        day = "0" + day;
+    }
+    var d = today.getFullYear() + '-' + month + '-' + day;
+    printTable(d, priority);
   }
 
   function fail(error) {
@@ -214,15 +171,11 @@ $(function() {
     $error.text(error).show();
   }
 
-  function fetchData(e) {
-    if (e) e.preventDefault();
-    $.getJSON("http://seta-dev.herokuapp.com/data/setasummary/").done(gotsummary).fail(fail);
-  }
-
   $(document).on("ajaxStart ajaxStop", function (e) {
     (e.type === "ajaxStart") ? $body.addClass("loading") : $body.removeClass("loading");
   });
 
-  fetchData();
+  document.getElementById("toggle").addEventListener("click", toggleState);
+  gotSummary(1);
 
 });

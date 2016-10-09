@@ -2,25 +2,26 @@ import os
 import re
 import calendar
 import urlparse
+import logging
 from src import jobtypes
 from functools import wraps
 from itertools import groupby
 from collections import Counter
-from database.config import session
+from database.config import session, engine
 from tools.failures import SETA_WINDOW
-from tools.utils import RequestCounter
 from datetime import datetime, timedelta
-from sqlalchemy import and_, func, desc, case
-from database.models import (Seta, Testjobs, Dailyjobs,
-                             TaskRequests)
+from sqlalchemy import and_, func, desc, case, update
+from database.models import (Testjobs, Dailyjobs,
+                             TaskRequests, JobPriorities)
 
 from flask import Flask, request, json, Response, abort
 
+logger = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
 JOBSDATA = jobtypes.Treecodes()
-
+RESET_DELTA = 5400
 # These are necesary setup for postgresql on heroku
 PORT = int(os.environ.get("PORT", 8157))
 urlparse.uses_netloc.append("postgres")
@@ -30,6 +31,7 @@ try:
 except:
     # use mysql
     pass
+
 
 class CSetSummary(object):
     def __init__(self, cset_id):
@@ -152,38 +154,6 @@ def binify(bins, data):
     result.append(len(filter(lambda x: x >= bins[-1], data)))
 
     return result
-
-
-def valve(head_rev, pushlog_id, branch, priority):
-    """Determine which kind of job should been returned"""
-    priority = priority
-    BRANCH_COUNTER.increase_the_counter(branch)
-    request_list = []
-    try:
-        request_list = session.query(TaskRequests.head_rev, TaskRequests.pushlog_id,
-                                     TaskRequests.priority).limit(40)
-    except Exception:
-        session.rollback()
-
-    requests = {}
-    for head_rev, pushlog_id, priority in request_list:
-        requests[pushlog_id] = {'head_rev': head_rev,
-                                'priority': priority}
-
-    # If this pushlog_id has been schduled, we just return
-    # the priority returned before.
-    if pushlog_id in requests.keys():
-        priority = requests.get(pushlog_id)['priority']
-    else:
-
-        # we return all jobs for every 5 pushes.
-        if RequestCounter.BRANCH_COUNTER[branch] >= 5:
-            RequestCounter.reset(branch)
-            priority = None
-        task_request = TaskRequests(str(head_rev), str(pushlog_id), priority)
-        session.add(task_request)
-        session.commit()
-    return priority
 
 
 @app.route("/data/results/flot/day/")
@@ -433,87 +403,128 @@ def run_seta_query():
     return {'failures': failures}
 
 
-@app.route("/data/setasummary/")
-@json_response
-def run_seta_summary_query():
-    query = session.query(Seta.date).distinct().all()
-    retVal = {}
-    dates = []
-    for d in query:
-        dates.append(d[0].strftime("%Y-%m-%d"))
-
-    for d in dates:
-        count = session.query(Seta.id).filter(Seta.date == d).count()
-        retVal['%s' % d] = "%s" % int(count)
-
-    return {'dates': retVal}
-
-
 @app.route("/data/setadetails/")
 @json_response
 def run_seta_details_query():
-    startDate, date = clean_date_params(request.args)
-    active = sanitize_bool(request.args.get("active", 0))
     buildbot = sanitize_bool(request.args.get("buildbot", 0))
     branch = sanitize_string(request.args.get("branch", ''))
     taskcluster = sanitize_bool(request.args.get("taskcluster", 0))
-    priority = sanitize_string(request.args.get("priority", 0))
-    head_rev = sanitize_string(request.args.get("head_rev", ''))
-    pushlog_id = sanitize_string(request.args.get("pushlog_id", ''))
+    priority = int(sanitize_string(request.args.get("priority", '5')))
     jobnames = JOBSDATA.jobnames_query()
-    if date == "" or date == "latest":
-        today = datetime.now()
-        date = today.strftime("%Y-%m-%d")
-    date = "%s" % date
-    query = session.query(Seta.jobtype).filter(Seta.date == date).all()
+    date = str(datetime.now().date())
     retVal = {}
     retVal[date] = []
     jobtype = []
 
-    # we only support fx-team and mozilla-inbound branch in seta
+    # we only support fx-team, autoland, and mozilla-inbound branch in seta
     if (str(branch) in ['fx-team', 'mozilla-inbound', 'autoland']) is not True \
             and str(branch) != '':
         abort(404)
-    for d in query:
-        parts = d[0].split("'")
-        jobtype.append([parts[1], parts[3], parts[5]])
-    # We call valve to determine what kind of jobs we should return only if
-    # this request is comes from taskcluster. Otherwise, we just return what people
-    # request for.
+
+    alljobs = JOBSDATA.jobtype_query()
+    # For the case of TaskCluster request, we don't care which priority the user request.
+    # We return jobs depend on the strategy that we return high value jobs as default and
+    # return all jobs for every 5 push or 90 minutes for that branch.
     if request.headers.get('User-Agent', '') == 'TaskCluster':
+        # we make taskcluster to 1 if it's a request from taskcluster, it's more reasonable and
+        # can simplify the request url.
+        taskcluster = 1
+
+        # we query all jobs rather than jobs filter by the requested priority in here,
+        # Because we need to set the job returning strategy depend on different job priority.
+        query = session.query(JobPriorities.platform,
+                              JobPriorities.buildtype,
+                              JobPriorities.testtype,
+                              JobPriorities.priority,
+                              JobPriorities.timeout
+                              ).all()
 
         # We should return full job list as a fallback, if it's a request from
         # taskcluster and without head_rev or pushlog_id in there
-        if head_rev or pushlog_id:
-            priority = valve(head_rev, pushlog_id, branch, priority)
+        try:
+            branch_info = session.query(TaskRequests.counter,
+                                        TaskRequests.datetime,
+                                        TaskRequests.reset_delta).filter(
+                TaskRequests.branch == branch).all()
+        except:
+            branch_info = []
+        time_of_now = datetime.now()
+
+        # If we got nothing related with that branch, we should create it.
+        if len(branch_info) == 0:
+            # time_of_lastreset is not a good name anyway :(
+            # And we treat all branches' reset_delta is 90 seconds, we should find a
+            # better delta for them in the further.
+            branch_data = TaskRequests(str(branch), 1, time_of_now, RESET_DELTA)
+            try:
+                session.add(branch_data)
+                session.commit()
+            except Exception as error:
+                logger.debug(error)
+                session.rollback()
+
+            finally:
+                session.close()
+            counter = 1
+            time_string = time_of_now
+            reset_delta = RESET_DELTA
+
+        # We should update it if that branch had already been stored.
         else:
-            priority = None
+            counter, time_string, reset_delta = branch_info[0]
+            counter += 1
+            conn = engine.connect()
+            statement = update(TaskRequests).where(
+                TaskRequests.branch == branch).values(
+                counter=counter)
+            conn.execute(statement)
 
-    alljobs = JOBSDATA.jobtype_query()
+        delta = (time_of_now - time_string).total_seconds()
 
-    # Because we store high value jobs in seta table as default,
-    # so we return low value jobs, means no failure related with this job as default
-    # when the priority is 0, otherwise we return high value jobs(1 ~ 5).
-    if priority == 0:
-        low_value_jobs = [low_value_job for low_value_job in alljobs if
-                          low_value_job not in jobtype]
-        jobtype = low_value_jobs
+        # we should update the time recorder if the elapse time had
+        # reach the time limit of that branch.
+        if delta >= reset_delta:
+            conn = engine.connect()
+            statement = update(TaskRequests).where(
+                TaskRequests.branch == branch).values(
+                datetime=time_of_now)
+            conn.execute(statement)
 
-    elif priority is None:
-        jobtype = []
+            # we must reset the delta after we update the datetime
+            delta = 0
 
-    if active:
-        active_jobs = []
-        for job in alljobs:
-            found = False
-            for j in jobtype:
-                if j[0] == job[0] and j[1] == job[1] and j[2] == job[2]:
-                    found = True
-                    break
-            if not found:
-                active_jobs.append(job)
-        jobtype = active_jobs
+        for d in query:
+            # we only return that job if it hasn't reach the timeout limit. And the
+            # timeout is zero means this job need always running.
+            if delta < d[4] or d[0] == 0:
+                # Due to the priority of all high value jobs is 1, and we
+                # need to return all jobs for every 5 pushes(for now).
+                if counter % d[3] != 0:
+                    jobtype.append([d[0], d[1], d[2]])
 
+    # We don't care about the timeout variable of job if it's not a taskcluster request.
+    else:
+        query = session.query(JobPriorities.platform,
+                              JobPriorities.buildtype,
+                              JobPriorities.testtype,
+                              JobPriorities.priority,
+                              ).all()
+
+        # priority = 0; run all the jobs
+        if priority != 1 and priority != 5:
+            priority = 0
+
+        # Because we store high value jobs in seta table as default,
+        # so we return low value jobs, means no failure related with this job as default
+        if priority == 0:
+            jobtype = alljobs
+        # priority =5 run all low value jobs
+        else:
+            joblist = [job for job in query if job[3] == priority]
+            for j in joblist:
+                jobtype.append([j[0], j[1], j[2]])
+
+    # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
         active_jobs = []
         # pick up buildbot jobs from job list to faster the filter process
@@ -527,6 +538,7 @@ def run_seta_details_query():
 
         jobtype = active_jobs
 
+    # TODO: filter out based on buildsystem from database, either 'taskcluster' or '*'
     if taskcluster:
         active_jobs = []
         taskcluster_jobs = [job for job in jobnames if job['buildplatform'] == 'taskcluster']
@@ -605,5 +617,110 @@ def template(filename):
         return response_body
     abort(404)
 
+
+def update_preseed():
+    """ we sync preseed.json to jobpririties in server on startup, since that is
+        the only time we expect preseed.json to change. """
+
+    # get preseed data first
+    preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
+    preseed = []
+    with open(preseed_path, 'r') as fHandle:
+        preseed = json.load(fHandle)
+
+    # Preseed data will have fields: buildtype,testtype,platform,priority,timeout,expires
+    # The expires field defaults to 2 weeks on a new job in the database
+    # Expires field has a date "YYYY-MM-DD", but can have "*" to indicate never
+    # Typical priority will be 1, but if we want to force coalescing we can do that
+    # One hack is that if we have a * in a buildtype,testtype,platform field, then
+    # we assume it is for all flavors of the * field: i.e. linux64,pgo,* - all tests
+    # assumption - preseed fields are sanitized already - move parse_testtype to utils.py ?
+
+    for job in preseed:
+        data = session.query(JobPriorities.id,
+                             JobPriorities.testtype,
+                             JobPriorities.buildtype,
+                             JobPriorities.platform,
+                             JobPriorities.priority,
+                             JobPriorities.timeout,
+                             JobPriorities.expires,
+                             JobPriorities.buildsystem)
+        if job['testtype'] != '*':
+            data = data.filter(getattr(JobPriorities, 'testtype') == job['testtype'])
+
+        if job['buildtype'] != '*':
+            data = data.filter(getattr(JobPriorities, 'buildtype') == job['buildtype'])
+
+        if job['platform'] != '*':
+            data = data.filter(getattr(JobPriorities, 'platform') == job['platform'])
+
+        data = data.all()
+
+        _buildsystem = job["build_system_type"]
+
+        # TODO: edge case: we add future jobs with a wildcard, when jobs show up
+        #       remove the wildcard, apply priority/timeout/expires to new jobs
+        # Deal with the case where we have a new entry in preseed
+        if len(data) == 0:
+            _expires = job['expires']
+            if _expires == '*':
+                _expires = str(datetime.now().date() + timedelta(days=365))
+
+            print "adding a new unknown job to the database: %s" % job
+            newjob = JobPriorities(job['testtype'],
+                                   job['buildtype'],
+                                   job['platform'],
+                                   job['priority'],
+                                   job['timeout'],
+                                   _expires,
+                                   _buildsystem)
+            session.add(newjob)
+            session.commit()
+            session.close()
+            continue
+
+        # We can have wildcards, so loop on all returned values in data
+        for d in data:
+            changed = False
+            print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
+            _expires = job['expires']
+            _priority = job['priority']
+            _timeout = job['timeout']
+
+            # we have a taskcluster job in the db, and new job in preseed
+            if d[7] != _buildsystem:
+                _buildsystem = "*"
+                changed = True
+
+            # When we have a defined date to expire a job, parse and use it
+            if _expires == '*':
+                _expires = str(datetime.now().date() + timedelta(days=365))
+
+            try:
+                dv = datetime.strptime(_expires, "%Y-%M-%d").date()
+            except ValueError:
+                continue
+
+            # When we have expired, use existing priority/timeout, reset expires
+            if dv <= datetime.now().date():
+                print "  --  past the expiration date- reset!"
+                _expires = ''
+                _priority = d[4]
+                _timeout = d[5]
+                changed = True
+
+            if changed:
+                # TODO: do we need to try/except/finally with commit/rollback statements
+                conn = engine.connect()
+                statement = update(JobPriorities).where(
+                    JobPriorities.id == d[0]).values(
+                    priority=_priority,
+                    timeout=_timeout,
+                    expires=_expires,
+                    buildsystem=_buildsystem)
+                conn.execute(statement)
+
+
 if __name__ == "__main__":
+    update_preseed()
     app.run(host="0.0.0.0", port=PORT, debug=True)

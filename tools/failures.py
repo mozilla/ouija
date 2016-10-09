@@ -6,9 +6,10 @@ import datetime
 from argparse import ArgumentParser
 from emails import send_email
 from redo import retry
-from database.models import Seta
-from database.config import session
+from database.models import JobPriorities
+from database.config import session, engine
 from update_runnablejobs import update_runnableapi, get_rootdir
+from sqlalchemy import update, and_
 
 import seta
 
@@ -16,8 +17,7 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ROOT_DIR = get_rootdir()
 SETA_WINDOW = 90
-TREEHERDER_HOST = "https://treeherder.mozilla.org/api/project/{0}/" \
-                  "runnable_jobs/?decisionTaskID={1}&format=json"
+
 headers = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
@@ -54,15 +54,18 @@ def communicate(failures, to_insert, total_detected, testmode, date):
 
     if testmode:
         return
-    prepare_the_database()
-    insert_in_database(to_insert, date)
+
+    priority = 1
+    timeout = 0
+    reset_preseed()
+    updated_jobs = update_jobpriorities(to_insert, priority, timeout)
+    print "updated %s (%s) jobs" % (len(updated_jobs), len(to_insert))
 
     if date is None:
         date = datetime.date.today()
-    change = print_diff("%s" % (date - datetime.timedelta(days=1)).strftime('%Y-%m-%d'), '%s' %
-                        date.strftime('%Y-%m-%d'))
+
     try:
-        total_changes = len(change)
+        total_changes = len(updated_jobs)
     except TypeError:
         total_changes = 0
 
@@ -72,69 +75,60 @@ def communicate(failures, to_insert, total_detected, testmode, date):
 #                   admin=True, results=False)
 #    else:
 #        send_email(len(failures), len(to_insert), date, str(total_changes) +
-#                   " changes from previous day", change, admin=True, results=True)
+#                   " changes from previous day", updated_jobs, admin=True, results=True)
 
 
-def insert_in_database(to_insert, date=None):
-    if not date:
-        date = datetime.datetime.now().strftime('%Y-%m-%d')
-    else:
-        date = date.strftime('%Y-%m-%d')
+def reset_preseed():
+    data = session.query(JobPriorities.expires, JobPriorities.id)\
+                  .filter(JobPriorities.expires != None).all()
 
-    session.query(Seta).filter(Seta.date == date).delete(synchronize_session='fetch')
-    session.commit()
-    for jobtype in to_insert:
-        job = Seta(str(jobtype), date)
-        session.add(job)
-        session.commit()
-    session.close()
+    now = datetime.datetime.now()
+    for item in data:
+        try:
+            dv = datetime.datetime.strptime(item[0], "%Y-%M-%d")
+        except ValueError:
+            # TODO: consider updating column to have expires=None?
+            continue
+        except TypeError:
+            dv = datetime.datetime.combine(item[0].today(), datetime.datetime.min.time())
 
-
-def prepare_the_database():
-    # wipe up the job data older than 90 days
-    date = (datetime.datetime.now() - datetime.timedelta(days=SETA_WINDOW)).strftime('%Y-%m-%d')
-    session.query(Seta).filter(Seta.date <= date)
-
-
-def check_data(query_date):
-    ret_val = []
-    data = session.query(Seta.jobtype).filter(Seta.date == query_date).all()
-    if not data:
-        print "The database does not have data for the given %s date." % query_date
-        for date in range(-3, 4):
-            current_date = query_date + datetime.timedelta(date)
-            jobtype = session.query(Seta).filter(Seta.date == current_date)
-            if jobtype:
-                print "The data is available for date=%s" % current_date
-        return ret_val
-
-    for job in data:
-        parts = job[0].split("'")
-        ret_val.append("%s" % [str(parts[1]), str(parts[3]), str(parts[5])])
-
-    return ret_val
+        # reset expire field if date is today or in the past
+        if dv.date() <= now.date():
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(JobPriorities.id == item[1])\
+                          .values(expires=None)
+            conn.execute(statement)
 
 
-def print_diff(start_date, end_date):
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    start_tuple = check_data(start_date)
-    end_tuple = check_data(end_date)
+def update_jobpriorities(to_insert, _priority, _timeout):
+    # to_insert is currently high priority, pri=1 jobs, all else are pri=5 jobs
 
-    start_tuple.sort()
-    end_tuple.sort()
+    changed_jobs = []
+    for item in to_insert:
+        # NOTE: we ignore JobPriorities with expires as they take precendence
+        data = session.query(JobPriorities.id, JobPriorities.priority)\
+                      .filter(and_(JobPriorities.testtype == item[2],
+                                   JobPriorities.buildtype == item[1],
+                                   JobPriorities.platform == item[0],
+                                   JobPriorities.expires == None)).all()
+        if len(data) != 1:
+            # TODO: if 0 items, do we add the job?  if >1 do we alert and cleanup?
+            continue
 
-    if start_tuple is None or end_tuple is None:
-        print "NO DATA: %s, %s" % (start_date, end_date)
-        return []
-    else:
-        deletion = list(set(start_tuple) - set(end_tuple))
-        deletion.sort()
-        if not deletion:
-            deletion = ''
-        print "%s: These jobs have changed from the previous day: %s" % \
-              (end_date.strftime("%Y-%m-%d"), deletion)
-        return deletion
+        if data[0][1] != _priority:
+            changed_jobs.append(item)
+
+            conn = engine.connect()
+            statement = update(JobPriorities)\
+                          .where(and_(JobPriorities.testtype == item[2],
+                                      JobPriorities.buildtype == item[1],
+                                      JobPriorities.platform == item[0]))\
+                          .values(priority=_priority,
+                                  timeout=_timeout)
+            conn.execute(statement)
+
+    return changed_jobs
 
 
 def parse_args(argv=None):
@@ -156,13 +150,6 @@ def parse_args(argv=None):
                         dest="testmode",
                         help="This mode is for testing without interaction with \
                               database and emails."
-                        )
-
-    parser.add_argument("--diff",
-                        action="store_true",
-                        dest="diff",
-                        help="This mode is for printing a diff between two dates. \
-                              requires --start_date and --end_date."
                         )
 
     parser.add_argument("--ignore-failure",
@@ -189,45 +176,23 @@ def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
     print "date: %s, failures: %s" % (end_date, len(failures))
     target = 100  # 100% detection
 
-    if method == "failures":
-        to_insert, total_detected = seta.failures_by_jobtype(failures, target, ignore_failure)
-    else:
-        to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
-
-    preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
-    preseed = []
-    with open(preseed_path, 'r') as fHandle:
-        preseed = json.load(fHandle)
-
-    for job in preseed:
-        # TODO: if expired, ignore
-        jobspec = [job['platform'], job['buildtype'], job['name']]
-        if jobspec in to_insert and job['action'] == 'coalesce':
-            to_insert.remove(jobspec)
-        elif jobspec not in to_insert and job['action'] == 'run':
-            to_insert.append(jobspec)
-
+    to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
     communicate(failures, to_insert, total_detected, testmode, end_date)
 
 
 if __name__ == "__main__":
     options = parse_args()
     update_runnableapi()
-    if options.diff:
-        if options.start_date and options.end_date:
-            print_diff(options.start_date, options.end_date)
-        else:
-            print "when using --diff please provide a --start_date and an --end_date"
+
+    if options.end_date:
+        end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
     else:
-        if options.end_date:
-            end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
-        else:
-            end_date = datetime.datetime.now()
+        end_date = datetime.datetime.now()
 
-        if options.start_date:
-            start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
-        else:
-            start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
+    if options.start_date:
+        start_date = datetime.datetime.strptime(options.start_date, "%Y-%m-%d")
+    else:
+        start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
-        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
-                         options.method)
+    analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
+                     options.method)
