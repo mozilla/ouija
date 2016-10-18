@@ -1,9 +1,9 @@
 import os
 import json
 import logging
-from tools.update_runnablejobs import update_runnableapi, get_rootdir
+from tools.update_runnablejobs import update_job_priority_table, get_runnable_jobs_path
 LOG = logging.getLogger(__name__)
-JSONPATH = get_rootdir() + '/runnablejobs.json'
+JSONPATH = get_runnable_jobs_path()
 
 
 def _getgroup(name):
@@ -53,7 +53,8 @@ class Treecodes:
 
         # we need to verify if the runnablejobs.json is exist and download it if not
         if not os.path.isfile(JSONPATH):
-            update_runnableapi()
+            update_job_priority_table()
+
         with open(JSONPATH) as data:
             joblist = json.loads(data.read())['results']
 
