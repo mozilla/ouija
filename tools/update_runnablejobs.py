@@ -40,6 +40,10 @@ def get_rootdir():
     return path
 
 
+def get_runnable_jobs_path():
+    return os.path.join(get_rootdir(), 'runnable_jobs.json')
+
+
 def sanitized_data(runnable_jobs_data):
     '''We receive data from runnable jobs api and return the sanitized data that meets our needs.
 
@@ -189,6 +193,11 @@ def query_the_runnablejobs(task_id, repo_name='mozilla-inbound'):
     url = RUNNABLE_API.format(repo_name, task_id)
     try:
         data = retry(requests.get, args=(url, ), kwargs={'headers': HEADERS}).json()
+        if data:
+            # A lot of code components still rely on the file being on disk
+            with open(get_runnable_jobs_path(), 'w') as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+
         return data
     except:
         LOG.warning("We failed to get runnablejobs via %s" % url)
@@ -348,4 +357,4 @@ def _update_job_priority_table(data):
 
 
 if __name__ == "__main__":
-    update_runnableapi()
+    update_job_priority_table()

@@ -17,9 +17,8 @@ except KeyError:
     # You could set url as below if you are using postgresql:
     # postgresql+psycopg2://root:root@localhost/ouija2
     engine = create_engine('mysql+mysqldb://root:root@localhost/ouija', echo=False)
-
-if not database_exists(engine.url):
-    create_database(engine.url)
+    if not database_exists(engine.url):
+        create_database(engine.url)
 
 Session = sessionmaker(engine)
 
