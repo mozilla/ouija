@@ -4,7 +4,7 @@ import os
 import requests
 import datetime
 from argparse import ArgumentParser
-from emails import send_email
+# from emails import send_email
 from redo import retry
 from database.models import JobPriorities
 from database.config import session, engine
@@ -51,21 +51,11 @@ def get_raw_data(start_date, end_date):
     We return the obtained data or an empty structure if we failed to fetch it.
 
     [1]
-	{
-	  "failures": {
-		"44d29bac3654": [
-		  [
-			"android-4-0-armv7-api15",
-			"opt",
-			"android-lint",
-			2804
-		  ],
-		  [
-			"android-4-0-armv7-api15",
-			"opt",
-			"android-api-15-gradle-dependencies",
-			2801
-		  ],
+    {
+      "failures": {
+        "44d29bac3654": [
+          ["android-4-0-armv7-api15", "opt", "android-lint", 2804 ],
+          ["android-4-0-armv7-api15", "opt", "android-api-15-gradle-dependencies", 2801],
     '''
     if not end_date:
         end_date = datetime.datetime.now()
@@ -91,7 +81,7 @@ def get_raw_data(start_date, end_date):
 
 def communicate(failures, to_insert, total_detected, testmode, date):
 
-    active_jobs = seta.get_distinct_tuples()
+    seta.get_distinct_tuples()  # active jobs
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     LOG.info("We will detect %.2f%% (%s) of the %s failures" %
              (percent_detected, len(total_detected), len(failures)))
@@ -108,18 +98,20 @@ def communicate(failures, to_insert, total_detected, testmode, date):
     if date is None:
         date = datetime.date.today()
 
+    '''
     try:
         total_changes = len(updated_jobs)
     except TypeError:
         total_changes = 0
 
-# TODO: we need to setup username/password to work in Heroku, probably via env variables
-#    if total_changes == 0:
-#        send_email(len(failures), len(to_insert), date, "no changes from previous day",
-#                   admin=True, results=False)
-#    else:
-#        send_email(len(failures), len(to_insert), date, str(total_changes) +
-#                   " changes from previous day", updated_jobs, admin=True, results=True)
+    # TODO: we need to setup username/password to work in Heroku, probably via env variables
+    if total_changes == 0:
+        send_email(len(failures), len(to_insert), date, "no changes from previous day",
+                   admin=True, results=False)
+    else:
+        send_email(len(failures), len(to_insert), date, str(total_changes) +
+                   " changes from previous day", updated_jobs, admin=True, results=True)
+    '''
 
 
 def reset_preseed():

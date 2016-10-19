@@ -5,6 +5,7 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+
 def get_distinct_tuples():
     url = "http://seta-dev.herokuapp.com/data/jobtypes/"
     response = requests.get(url, headers={'accept-encoding': 'json'}, verify=True)

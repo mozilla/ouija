@@ -25,7 +25,7 @@ def migration(args):
         response = {'result': []}
     datasets = response['result']
 
-    session.query(Testjobs).filter(Testjobs.date>='%s 00:00:00' % startDate).delete()
+    session.query(Testjobs).filter(Testjobs.date >= '%s 00:00:00' % startDate).delete()
 
     while len(datasets) > 0:
         for data in datasets:
@@ -71,7 +71,8 @@ def migration(args):
                 continue
 
             # hidden/lower tier tests, not sure of CI system, old jobs
-            if testtype in ['media-youtube-tests', 'external-media-tests', 'luciddream', 'media-tests']:
+            if testtype in ['media-youtube-tests', 'external-media-tests', 'luciddream',
+                            'media-tests']:
                 continue
 
             Testjob = Testjobs(data['slave'], data['result'], data['build_system_type'],
@@ -101,7 +102,8 @@ if __name__ == '__main__':
     parser.add_argument('--limit', dest='limit', default=10000,
                         help='How much data sets will be migrated for one time.')
     parser.add_argument('--startDate', dest='startDate', default='',
-                        help='YYYY-MM-DD format for date of when to start migrating data, default 2 days ago.')
+                        help='YYYY-MM-DD format for date of when to start migrating data, '
+                        'default 2 days ago.')
 
     args = parser.parse_args()
 

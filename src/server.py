@@ -619,8 +619,10 @@ def template(filename):
 
 
 def update_preseed():
-    """ we sync preseed.json to jobpririties in server on startup, since that is
-        the only time we expect preseed.json to change. """
+    """
+    We sync preseed.json to jobpririties in server on startup, since that is
+    the only time we expect preseed.json to change.
+    """
 
     # get preseed data first
     preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')

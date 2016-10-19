@@ -117,7 +117,7 @@ def query_sanitized_data(repo_name='mozilla-inbound'):
         "data": {},
         "expires": "2017-10-06T18:30:18.428Z"
       }
-     [3] https://treeherder.mozilla.org/api/project/mozilla-inbound/runnable_jobs/?decision_task_id=Pp7ZxoH0SKyU6wnhX_Fp0g&format=json
+     [3] https://treeherder.mozilla.org/api/project/mozilla-inbound/runnable_jobs/?decision_task_id=Pp7ZxoH0SKyU6wnhX_Fp0g&format=json  # flake8: noqa
      [4] NOTE: I Skip some data that is not relevant to failures.py
      {
       meta: {
