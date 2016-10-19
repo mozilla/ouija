@@ -338,13 +338,15 @@ def _update_job_priority_table(data):
                 )
                 session.add(jobpriority)
                 session.commit()
+                LOG.info('New job was found ({},{},{},{})'.format(
+                    job['testtype'], job['platform_option'], job['platform'], _buildsystem,))
+                new_jobs += 1
             except Exception as error:
                 session.rollback()
                 LOG.warning(error)
                 failed_changes += 1
             finally:
                 session.close()
-                new_jobs += 1
 
     LOG.info('We have {} new jobs and {} updated jobs out of {} total jobs processed.'.format(
         new_jobs, updated_jobs, total_jobs
