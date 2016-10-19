@@ -141,13 +141,13 @@ def update_jobpriorities(to_insert, _priority, _timeout):
 
 def parse_args(argv=None):
     parser = ArgumentParser()
-    parser.add_argument("-s", "--start_date",
+    parser.add_argument("-s", "--start-date",
                         metavar="YYYY-MM-DD",
                         dest="start_date",
                         help="starting date for comparison."
                         )
 
-    parser.add_argument("-e", "--end_date",
+    parser.add_argument("-e", "--end-date",
                         metavar="YYYY-MM-DD",
                         dest="end_date",
                         help="ending date for comparison."
