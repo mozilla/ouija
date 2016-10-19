@@ -1,7 +1,9 @@
 import requests
 import json
 import copy
+import logging
 
+LOG = logging.getLogger(__name__)
 
 def get_distinct_tuples():
     url = "http://seta-dev.herokuapp.com/data/jobtypes/"
@@ -69,7 +71,7 @@ def build_removals(active_jobs, master, target):
                 if key not in remaining_failures:
                     root_cause.append(key)
                     master_root_cause.append(key)
-            print "jobtype: %s, root failure(s): %s" % (jobtype, root_cause)
+            LOG.info("jobtype: %s, root failure(s): %s" % (jobtype, root_cause))
 
     return ret_val, master_root_cause
 
@@ -131,7 +133,7 @@ def failures_by_jobtype(failures, target, ignore_failure):
         try:
             active_jobs.remove(low_value_job)
         except ValueError:
-            print "%s is missing from the job list" % low_value_job
+            LOG.info("%s is missing from the job list" % low_value_job)
     total_detected = check_removal(failures, to_remove)
     high_value_jobs = active_jobs
     return high_value_jobs, total_detected
@@ -140,7 +142,7 @@ def failures_by_jobtype(failures, target, ignore_failure):
 def weighted_by_jobtype(failures, target, ignore_failure):
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
-    print "working with %s failures" % total
+    LOG.info("working with %s failures" % total)
     active_jobs = get_distinct_tuples()
 
     target = int(total * (target / 100))
@@ -149,7 +151,7 @@ def weighted_by_jobtype(failures, target, ignore_failure):
     to_remove, master_root_cause = build_removals(active_jobs, failures, target)
 
     while ignore_failure > 0:
-        print "\n--------------new pass----------------\n"
+        LOG.info("\n--------------new pass----------------\n")
         copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
         total = len(copy_failures)
         to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)
@@ -159,7 +161,7 @@ def weighted_by_jobtype(failures, target, ignore_failure):
         try:
             active_jobs.remove(low_value_job)
         except ValueError:
-            print "%s is missing from the job list" % low_value_job
+            LOG.info("%s is missing from the job list" % low_value_job)
     total_detected = check_removal(failures, to_remove)
     high_value_jobs = active_jobs
     return high_value_jobs, total_detected

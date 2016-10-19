@@ -16,7 +16,7 @@ from database.models import (Testjobs, Dailyjobs,
 
 from flask import Flask, request, json, Response, abort
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
@@ -460,7 +460,7 @@ def run_seta_details_query():
                 session.add(branch_data)
                 session.commit()
             except Exception as error:
-                logger.debug(error)
+                LOG.debug(error)
                 session.rollback()
 
             finally:
@@ -666,7 +666,7 @@ def update_preseed():
             if _expires == '*':
                 _expires = str(datetime.now().date() + timedelta(days=365))
 
-            print "adding a new unknown job to the database: %s" % job
+            LOG.info("adding a new unknown job to the database: %s" % job)
             newjob = JobPriorities(job['testtype'],
                                    job['buildtype'],
                                    job['platform'],
@@ -682,7 +682,7 @@ def update_preseed():
         # We can have wildcards, so loop on all returned values in data
         for d in data:
             changed = False
-            print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
+            LOG.info("updating existing job %s/%s/%s" % (d[1], d[2], d[3]))
             _expires = job['expires']
             _priority = job['priority']
             _timeout = job['timeout']
@@ -703,7 +703,7 @@ def update_preseed():
 
             # When we have expired, use existing priority/timeout, reset expires
             if dv <= datetime.now().date():
-                print "  --  past the expiration date- reset!"
+                LOG.info("  --  past the expiration date- reset!")
                 _expires = ''
                 _priority = d[4]
                 _timeout = d[5]

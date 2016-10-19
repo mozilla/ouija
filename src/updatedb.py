@@ -15,6 +15,7 @@ DEFAULT_REQUEST_HEADERS = {
     'Accept': 'application/json',
     'User-Agent': 'ouija',
 }
+LOG = logging.getLogger(__name__)
 
 branch_paths = {
     'mozilla-central': 'mozilla-central',
@@ -317,9 +318,9 @@ if __name__ == '__main__':
     parser.add_argument('--threads', dest='threads', type=int, default=1,
                         help='Number of threads to use.')
     args = parser.parse_args()
-    if args.branch != 'all' and args.branch not in branches:
-        print('error: unknown branch: ' + args.branch)
-        sys.exit(1)
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("requests").setLevel(logging.WARNING)
+    if args.branch != 'all' and args.branch not in branches:
+        LOG.error(('error: unknown branch: ' + args.branch))
+        sys.exit(1)
     parseResults(args)

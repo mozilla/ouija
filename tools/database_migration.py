@@ -9,7 +9,7 @@ from database.models import Testjobs
 
 # alertmanager server URL
 URL = "http://alertmanager.allizom.org/data/dump/?startDate=%s&limit=%d&offset=%d"
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 def migration(args):
@@ -21,7 +21,7 @@ def migration(args):
         response = retry(requests.get, args=(url, )).json()
     except Exception as error:
         # we will return an empty 'result' list if got exception here
-        logger.debug("the request to %s failed, due to %s" % (url, error))
+        LOG.debug("the request to %s failed, due to %s" % (url, error))
         response = {'result': []}
     datasets = response['result']
 
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     if args.startDate == '':
         now = "%s" % str(datetime.datetime.now() - datetime.timedelta(days=2))
         args.startDate = now.split(' ')[0]
-        logger.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
+        LOG.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
 
     migration(args)
     sys.exit(0)

@@ -5,7 +5,7 @@ from sqlalchemy import and_, func
 from argparse import ArgumentParser
 import logging
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 revisions_dict = {}
 
 branches = ["mozilla-inbound", "fx-team", "try"]
@@ -41,7 +41,7 @@ def updatedb(date, platform, branch, numpushes, numjobs, sumduration):
     try:
         session.add(dailyjob)
     except Exception as e:
-        logger.warning(e)
+        LOG.warning(e)
         session.rollback()
 
     session.close()
