@@ -9,3 +9,5 @@ def trigger_migratedb():
 def trigger_failures():
     os.system("python tools/failures.py")
 
+def trigger_update_job_priority_table():
+    os.system("python tools/update_runnablejobs.py")
