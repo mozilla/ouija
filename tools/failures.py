@@ -35,6 +35,38 @@ HOST = "http://seta-dev.herokuapp.com/"
 
 
 def get_raw_data(start_date, end_date):
+    '''Reach the data/seta endpoint for all failures that have been marked as "fixed by commit"
+
+    The endpoint returns a dictionary with a key per revision or bug ID (the bug ID is used for
+    intermittent failures and the revision is used for real failures). The failures for *real
+    failures* will contain all jobs that have been starred as "fixed by commit".
+
+    Notice that the raw data does not tell you on which repository a root failure was fixed.
+
+    For instance, in the raw data you might see a reference to 9fa614d8310d which is a back out and
+    it is reference by 12 starred jobs:
+        https://treeherder.mozilla.org/#/jobs?repo=autoland&filter-searchStr=android%20debug%20cpp&tochange=9fa614d8310db9aabe85cc3c3cff6281fe1edb0c
+    The raw data will show those 12 jobs.
+
+    We return the obtained data or an empty structure if we failed to fetch it.
+
+    [1]
+	{
+	  "failures": {
+		"44d29bac3654": [
+		  [
+			"android-4-0-armv7-api15",
+			"opt",
+			"android-lint",
+			2804
+		  ],
+		  [
+			"android-4-0-armv7-api15",
+			"opt",
+			"android-api-15-gradle-dependencies",
+			2801
+		  ],
+    '''
     if not end_date:
         end_date = datetime.datetime.now()
 
@@ -43,14 +75,17 @@ def get_raw_data(start_date, end_date):
 
     url = HOST + "data/seta/?startDate=%s&endDate=%s" % \
                  (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    LOG.info('Grabbing information from {}'.format(url))
     try:
         response = retry(requests.get, args=(url, ),
                          kwargs={'headers': HEADERS, 'verify': True})
         data = json.loads(response.content)
     except Exception as error:
         # we will return an empty 'failures' list if got exception here
-        LOG.debug("the request to %s failed, due to %s" % (url, error))
+        LOG.warning("The request for %s failed due to %s" % (url, error))
+        LOG.warning("We will work with an empty list of failures")
         data = {'failures': []}
+
     return data['failures']
 
 
