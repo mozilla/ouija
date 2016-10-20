@@ -11,7 +11,7 @@ from sqlalchemy import update, and_
 from database.models import JobPriorities
 from database.config import session, engine
 from update_runnablejobs import update_job_priority_table, get_rootdir
-from seta import get_distinct_tuples, weighted_by_jobtype
+from seta import weighted_by_jobtype
 
 
 # Let's get the root logger - this guarantees seeing all messages from other modules
@@ -193,7 +193,6 @@ def analyze_failures(start_date, end_date, dry_run, ignore_failure, method):
 
     high_value_jobs, total_detected = weighted_by_jobtype(failures, target, ignore_failure)
 
-    get_distinct_tuples()  # active jobs
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     LOG.info("We will detect %.2f%% (%s) of the %s failures" %
              (percent_detected, len(total_detected), len(failures)))
