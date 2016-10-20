@@ -35,7 +35,7 @@ HOST = "http://seta-dev.herokuapp.com/"
 
 
 def get_raw_data(start_date, end_date):
-    '''Reach the data/seta endpoint for all failures that have been marked as "fixed by commit"
+    """Reach the data/seta endpoint for all failures that have been marked as "fixed by commit"
 
     The endpoint returns a dictionary with a key per revision or bug ID (the bug ID is used for
     intermittent failures and the revision is used for real failures). The failures for *real
@@ -56,7 +56,7 @@ def get_raw_data(start_date, end_date):
         "44d29bac3654": [
           ["android-4-0-armv7-api15", "opt", "android-lint", 2804 ],
           ["android-4-0-armv7-api15", "opt", "android-api-15-gradle-dependencies", 2801],
-    '''
+    """
     if not end_date:
         end_date = datetime.datetime.now()
 
@@ -136,12 +136,12 @@ def reset_preseed():
 
 
 def increase_jobs_priority(high_value_jobs, priority=1, timeout=0):
-    '''For every high value job try to see if we need to update increase its priority
+    """For every high value job try to see if we need to update increase its priority
 
     Currently, high value jobs have a priority of 1 and a timeout of 0.
 
     Return how many jobs had their priority increased
-    '''
+    """
     changed_jobs = []
     for item in high_value_jobs:
         # NOTE: we ignore JobPriorities with expires as they take precendence
@@ -154,7 +154,7 @@ def increase_jobs_priority(high_value_jobs, priority=1, timeout=0):
             # TODO: if 0 items, do we add the job?  if >1 do we alert and cleanup?
             continue
 
-        if data[0][1] != _priority:
+        if data[0][1] != priority:
             changed_jobs.append(item)
 
             conn = engine.connect()
@@ -162,7 +162,7 @@ def increase_jobs_priority(high_value_jobs, priority=1, timeout=0):
                 .where(and_(JobPriorities.testtype == item[2],
                             JobPriorities.buildtype == item[1],
                             JobPriorities.platform == item[0]))\
-                .values(priority=_priority, timeout=_timeout)
+                .values(priority=priority, timeout=timeout)
             conn.execute(statement)
 
     return changed_jobs

@@ -59,13 +59,13 @@ def check_removal(master, removals):
 
 
 def build_removals(active_jobs, master, target):
-    '''
+    """
     active_jobs - all possible desktop & android jobs on Treeherder (no PGO)
     master - list of all failures
     target - number of failures we want to process
 
     Return list of jobs to remove and list of revisions that are regressed
-    '''
+    """
     low_value_jobs = []
     master_root_cause = []
     for jobtype in active_jobs:
@@ -151,11 +151,11 @@ def failures_by_jobtype(failures, target, ignore_failure):
 
 
 def weighted_by_jobtype(failures, target, ignore_failure):
-    '''
+    """
     failures - jobs that have been starred for fixing a commit or associated to a bug
     target - precentage of failures to analyze
     ignore_failure - which failures to ignore
-    '''
+    """
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
     LOG.info("working with %s failures" % total)

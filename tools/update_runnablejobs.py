@@ -22,13 +22,13 @@ RUNNABLE_API = TREEHERDER_HOST + '/api/project/{0}/runnable_jobs/?decision_task_
 
 
 def _unique_key(job):
-    '''Return a key to query our uniqueness mapping system.
+    """Return a key to query our uniqueness mapping system.
 
     This makes sure that we use a consistent key between our code and selecting jobs from the
     table.
 
     See row[1:4] usage in the code which selects the 2nd to 4th columns from jobpriority table.
-    '''
+    """
     return (job['testtype'], job['platform_option'], job['platform'])
 
 
@@ -45,7 +45,7 @@ def get_runnable_jobs_path():
 
 
 def sanitized_data(runnable_jobs_data):
-    '''We receive data from runnable jobs api and return the sanitized data that meets our needs.
+    """We receive data from runnable jobs api and return the sanitized data that meets our needs.
 
     This is a loop to remove duplicates (including buildsystem -> * transformations if needed)
     By doing this, it allows us to have a single database query
@@ -54,7 +54,7 @@ def sanitized_data(runnable_jobs_data):
     * jobs that don't specify the build_platform
     * jobs that don't specify the testtype
     * if the job appears again, we replace build_system_type with '*'
-    '''
+    """
     map = {}
     sanitized_list = []
     if not runnable_jobs_data:
@@ -101,7 +101,7 @@ def sanitized_data(runnable_jobs_data):
 
 
 def query_sanitized_data(repo_name='mozilla-inbound'):
-    '''Return sanitized jobs data based on runnable api. None if failed to obtain or no new data.
+    """Return sanitized jobs data based on runnable api. None if failed to obtain or no new data.
 
      We need to find the latest gecko decision task ID (by querying the index [1][2])
      in order to know which task ID to pass to the runnable api [3][4].
@@ -141,7 +141,7 @@ def query_sanitized_data(repo_name='mozilla-inbound'):
             "platform_option": "opt",
             "ref_data_name": "desktop-test-linux64/opt-reftest-8",
         },
-    '''
+    """
     url = "https://index.taskcluster.net/v1/task/gecko.v2.%s.latest.firefox.decision/"
     try:
         latest_task = retry(
@@ -258,7 +258,7 @@ def valid_platform(platform):
 
 
 def _update_job_priority_table(data):
-    '''Add new jobs to the priority table and update the build system if required.'''
+    """Add new jobs to the priority table and update the build system if required."""
     LOG.info('Fetch all rows from the job priority table.')
     # Get all rows of job priorities
     db_data = session.query(JobPriorities.id,

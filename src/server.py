@@ -213,7 +213,7 @@ def run_slaves_query():
     else:
         jobs = int(round(days_to_show * 0.4))
 
-    info = '''Only slaves with more than %d jobs are displayed.''' % jobs
+    info = 'Only slaves with more than %d jobs are displayed.' % jobs
 
     query_results = session.query(Testjobs.slave, Testjobs.result, Testjobs.date).filter(
         and_(Testjobs.result.in_(["retry", "testfailed", "success", "busted", "exception"]),
