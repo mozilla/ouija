@@ -94,7 +94,7 @@ class Treecodes:
                 except Exception as e:
                     LOG.error(e)
 
-    def _testtype_job_identifier(job):
+    def _testtype_job_identifier(self, job):
         job_identifier = None
         testtype = None
 
