@@ -79,21 +79,19 @@ def get_raw_data(start_date, end_date):
     return data['failures']
 
 
-def communicate(failures, to_insert, total_detected, testmode, date):
+def communicate(failures, high_value_jobs, total_detected, dry_run, date):
 
     seta.get_distinct_tuples()  # active jobs
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     LOG.info("We will detect %.2f%% (%s) of the %s failures" %
              (percent_detected, len(total_detected), len(failures)))
 
-    if testmode:
+    if dry_run:
         return
 
-    priority = 1
-    timeout = 0
     reset_preseed()
-    updated_jobs = update_jobpriorities(to_insert, priority, timeout)
-    LOG.info("updated %s (%s) jobs" % (len(updated_jobs), len(to_insert)))
+    updated_jobs = increase_jobs_priority(high_value_jobs)
+    LOG.info("updated %s (%s) jobs" % (len(updated_jobs), len(high_value_jobs)))
 
     if date is None:
         date = datetime.date.today()
@@ -106,10 +104,10 @@ def communicate(failures, to_insert, total_detected, testmode, date):
 
     # TODO: we need to setup username/password to work in Heroku, probably via env variables
     if total_changes == 0:
-        send_email(len(failures), len(to_insert), date, "no changes from previous day",
+        send_email(len(failures), len(high_value_jobs), date, "no changes from previous day",
                    admin=True, results=False)
     else:
-        send_email(len(failures), len(to_insert), date, str(total_changes) +
+        send_email(len(failures), len(high_value_jobs), date, str(total_changes) +
                    " changes from previous day", updated_jobs, admin=True, results=True)
     '''
 
@@ -137,17 +135,21 @@ def reset_preseed():
             conn.execute(statement)
 
 
-def update_jobpriorities(to_insert, _priority, _timeout):
-    # to_insert is currently high priority, pri=1 jobs, all else are pri=5 jobs
+def increase_jobs_priority(high_value_jobs, priority=1, timeout=0):
+    '''For every high value job try to see if we need to update increase its priority
 
+    Currently, high value jobs have a priority of 1 and a timeout of 0.
+
+    Return how many jobs had their priority increased
+    '''
     changed_jobs = []
-    for item in to_insert:
+    for item in high_value_jobs:
         # NOTE: we ignore JobPriorities with expires as they take precendence
         data = session.query(JobPriorities.id, JobPriorities.priority)\
                       .filter(and_(JobPriorities.testtype == item[2],
                                    JobPriorities.buildtype == item[1],
                                    JobPriorities.platform == item[0],
-                                   JobPriorities.expires == None)).all()
+                                   JobPriorities.expires is None)).all()
         if len(data) != 1:
             # TODO: if 0 items, do we add the job?  if >1 do we alert and cleanup?
             continue
@@ -186,9 +188,9 @@ def parse_args(argv=None):
                         help="This option skips analysis of failures."
                         )
 
-    parser.add_argument("--testmode",
+    parser.add_argument("--dry-run",
                         action="store_true",
-                        dest="testmode",
+                        dest="dry_run",
                         help="This mode is for testing without interaction with \
                               database and emails."
                         )
@@ -212,13 +214,13 @@ def parse_args(argv=None):
     return options
 
 
-def analyze_failures(start_date, end_date, testmode, ignore_failure, method):
+def analyze_failures(start_date, end_date, dry_run, ignore_failure, method):
     failures = get_raw_data(start_date, end_date)
     LOG.info("date: %s, failures: %s" % (end_date, len(failures)))
     target = 100  # 100% detection
 
-    to_insert, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
-    communicate(failures, to_insert, total_detected, testmode, end_date)
+    high_value_jobs, total_detected = seta.weighted_by_jobtype(failures, target, ignore_failure)
+    communicate(failures, high_value_jobs, total_detected, dry_run, end_date)
 
 
 if __name__ == "__main__":
@@ -236,5 +238,5 @@ if __name__ == "__main__":
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     if not options.do_not_analyze:
-        analyze_failures(start_date, end_date, options.testmode, options.ignore_failure,
+        analyze_failures(start_date, end_date, options.dry_run, options.ignore_failure,
                          options.method)
