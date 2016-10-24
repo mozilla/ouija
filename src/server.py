@@ -10,6 +10,7 @@ from collections import Counter
 from database.config import session, engine
 from tools.failures import SETA_WINDOW
 from datetime import datetime, timedelta
+from flask_cors import CORS
 from sqlalchemy import and_, func, desc, case, update
 from database.models import (Testjobs, Dailyjobs,
                              TaskRequests, JobPriorities)
@@ -20,6 +21,7 @@ LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
+CORS(app)
 JOBSDATA = jobtypes.Treecodes()
 RESET_DELTA = 5400
 # These are necesary setup for postgresql on heroku

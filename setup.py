@@ -6,6 +6,7 @@ required = [
     "MarkupSafe",
     "psycopg2",
     "MySQL-python",
+    "flask-cors",
     "sqlalchemy",
     "argparse",
     "requests",
