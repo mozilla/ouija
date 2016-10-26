@@ -550,6 +550,12 @@ def run_seta_details_query():
                     active_jobs.append(j['ref_data_name'])
         jobtype = active_jobs
 
+    # we need to retranslate the jobtype back to the proper data form after all.
+    for j in jobtype:
+        j[2] = j[2].replace('e10s-browser-chrome', 'browser-chrome-e10s')
+        j[2] = j[2].replace('e10s-devtools-chrome', 'devtools-chrome-e10s')
+        j[2] = j[2].replace('jittest-', 'jittests-')
+
     retVal[date] = jobtype
     return {"jobtypes": retVal}
 
