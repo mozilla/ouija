@@ -526,6 +526,12 @@ def run_seta_details_query():
             for j in joblist:
                 jobtype.append([j[0], j[1], j[2]])
 
+    # we need to retranslate the jobtype back to the proper data form after all.
+    for j in jobtype:
+        j[2] = j[2].replace('e10s-browser-chrome', 'browser-chrome-e10s')
+        j[2] = j[2].replace('e10s-devtools-chrome', 'devtools-chrome-e10s')
+        j[2] = j[2].replace('jittest-', 'jittests-')
+
     # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
         active_jobs = []
@@ -549,12 +555,6 @@ def run_seta_details_query():
                 if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
                     active_jobs.append(j['ref_data_name'])
         jobtype = active_jobs
-
-    # we need to retranslate the jobtype back to the proper data form after all.
-    for j in jobtype:
-        j[2] = j[2].replace('e10s-browser-chrome', 'browser-chrome-e10s')
-        j[2] = j[2].replace('e10s-devtools-chrome', 'devtools-chrome-e10s')
-        j[2] = j[2].replace('jittest-', 'jittests-')
 
     retVal[date] = jobtype
     return {"jobtypes": retVal}
