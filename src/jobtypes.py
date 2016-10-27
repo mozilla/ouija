@@ -59,10 +59,6 @@ class Treecodes:
             joblist = json.loads(data.read())['results']
 
         for job in joblist:
-            # skipping pgo - We run this infrequent enough that we should have all
-            # pgo results tested
-            if job['platform_option'] == 'pgo':
-                continue
 
             testtype, job_identifier = self._testtype_job_identifier(job)
 
