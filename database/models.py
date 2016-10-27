@@ -1,12 +1,21 @@
 """This file define all the model we will need in seta"""
 import logging
-from sqlalchemy import Column, Integer, String, DateTime, Text
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.schema import MetaData
 from sqlalchemy.ext.declarative import declarative_base
+
 from config import engine
 
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 Metadata = MetaData(bind=engine)
 MetaBase = declarative_base(metadata=Metadata)
 
@@ -97,6 +106,10 @@ class JobPriorities(MetaBase):
     timeout = Column(Integer)
     expires = Column(DateTime)
     buildsystem = Column(String(64), nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint('testtype', 'buildtype', 'platform', name='unique_job'),
+    )
 
     def __init__(self, testtype, buildtype, platform, priority, timeout, expires, buildsystem):
         self.testtype = testtype

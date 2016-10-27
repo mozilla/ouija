@@ -10,16 +10,18 @@ from collections import Counter
 from database.config import session, engine
 from tools.failures import SETA_WINDOW
 from datetime import datetime, timedelta
+from flask_cors import CORS
 from sqlalchemy import and_, func, desc, case, update
 from database.models import (Testjobs, Dailyjobs,
                              TaskRequests, JobPriorities)
 
 from flask import Flask, request, json, Response, abort
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(os.path.dirname(SCRIPT_DIR), "static")
 app = Flask(__name__, static_url_path="", static_folder=static_path)
+CORS(app)
 JOBSDATA = jobtypes.Treecodes()
 RESET_DELTA = 5400
 # These are necesary setup for postgresql on heroku
@@ -213,7 +215,7 @@ def run_slaves_query():
     else:
         jobs = int(round(days_to_show * 0.4))
 
-    info = '''Only slaves with more than %d jobs are displayed.''' % jobs
+    info = 'Only slaves with more than %d jobs are displayed.' % jobs
 
     query_results = session.query(Testjobs.slave, Testjobs.result, Testjobs.date).filter(
         and_(Testjobs.result.in_(["retry", "testfailed", "success", "busted", "exception"]),
@@ -460,7 +462,7 @@ def run_seta_details_query():
                 session.add(branch_data)
                 session.commit()
             except Exception as error:
-                logger.debug(error)
+                LOG.debug(error)
                 session.rollback()
 
             finally:
@@ -523,6 +525,12 @@ def run_seta_details_query():
             joblist = [job for job in query if job[3] == priority]
             for j in joblist:
                 jobtype.append([j[0], j[1], j[2]])
+
+    # we need to retranslate the jobtype back to the proper data form after all.
+    for j in jobtype:
+        j[2] = j[2].replace('e10s-browser-chrome', 'browser-chrome-e10s')
+        j[2] = j[2].replace('e10s-devtools-chrome', 'devtools-chrome-e10s')
+        j[2] = j[2].replace('jittest-', 'jittests-')
 
     # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
     if buildbot:
@@ -619,8 +627,10 @@ def template(filename):
 
 
 def update_preseed():
-    """ we sync preseed.json to jobpririties in server on startup, since that is
-        the only time we expect preseed.json to change. """
+    """
+    We sync preseed.json to jobpririties in server on startup, since that is
+    the only time we expect preseed.json to change.
+    """
 
     # get preseed data first
     preseed_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'src', 'preseed.json')
@@ -666,7 +676,7 @@ def update_preseed():
             if _expires == '*':
                 _expires = str(datetime.now().date() + timedelta(days=365))
 
-            print "adding a new unknown job to the database: %s" % job
+            LOG.info("adding a new unknown job to the database: %s" % job)
             newjob = JobPriorities(job['testtype'],
                                    job['buildtype'],
                                    job['platform'],
@@ -682,7 +692,7 @@ def update_preseed():
         # We can have wildcards, so loop on all returned values in data
         for d in data:
             changed = False
-            print "updating existing job %s/%s/%s" % (d[1], d[2], d[3])
+            LOG.info("updating existing job %s/%s/%s" % (d[1], d[2], d[3]))
             _expires = job['expires']
             _priority = job['priority']
             _timeout = job['timeout']
@@ -703,7 +713,7 @@ def update_preseed():
 
             # When we have expired, use existing priority/timeout, reset expires
             if dv <= datetime.now().date():
-                print "  --  past the expiration date- reset!"
+                LOG.info("  --  past the expiration date- reset!")
                 _expires = ''
                 _priority = d[4]
                 _timeout = d[5]

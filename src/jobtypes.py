@@ -1,9 +1,9 @@
 import os
 import json
 import logging
-from tools.update_runnablejobs import update_runnableapi, get_rootdir
+from tools.update_runnablejobs import update_job_priority_table, get_runnable_jobs_path
 LOG = logging.getLogger(__name__)
-JSONPATH = get_rootdir() + '/runnablejobs.json'
+JSONPATH = get_runnable_jobs_path()
 
 
 def _getgroup(name):
@@ -53,72 +53,76 @@ class Treecodes:
 
         # we need to verify if the runnablejobs.json is exist and download it if not
         if not os.path.isfile(JSONPATH):
-            update_runnableapi()
+            update_job_priority_table()
+
         with open(JSONPATH) as data:
             joblist = json.loads(data.read())['results']
 
-        # skipping pgo - We run this infrequent enough that we should have all pgo results tested
-        self.joblist = [job for job in joblist if job['platform_option'] != 'pgo']
-        if len(self.joblist) > 0:
-            for job in self.joblist:
-                testtype = ''
+        for job in joblist:
 
-                # the testtype of builbot job can been found in 'ref_data_name'
-                # like web-platform-tests-4 in "Ubuntu VM 12.04 x64 mozilla-inbound
-                #  opt test web-platform-tests-4"
-                if job['build_system_type'] == 'buildbot':
-                    testtype = job['ref_data_name'].split(' ')[-1]
-                    job_identifier = job['ref_data_name']
+            testtype, job_identifier = self._testtype_job_identifier(job)
 
-                # taskcluster's testtype is a part of its 'job_type_name' like reftest-2
-                # for [TC] Linux64 reftest-2
-                else:
-                    # The test name on taskcluster comes to a sort of combination
-                    # (e.g desktop-test-linux64/debug-jittests-3) and asan job can
-                    # been referenced as a opt job. BTW, job like
-                    # 'MacOSX64 Static Analysis Opt' will been leave aside because
-                    # they are not test job anyway.
-                    if job['ref_data_name'].startswith('desktop-test') or \
-                            job['ref_data_name'].startswith('android-test'):
+            if not testtype:
+                LOG.info('Ignoring {}'.format(job['ref_data_name']))
+                continue
 
-                        # we want the build type(debug or opt) to separate the job_type_name
-                        # (e.g desktop-test-linux64/debug-jittests-3)
-                        separator = job['platform_option'] \
-                            if job['platform_option'] != 'asan' else 'opt'
-                        # we should get "jittests-3" as testtype for job_type_name like
-                        # desktop-test-linux64/debug-jittests-3
-                        testtype = job['job_type_name'].split(
-                            '{buildtype}-'.format(buildtype=separator))[-1]
-                        job_identifier = job['ref_data_name']
+            # we don't need non-test job for seta, but we still need to verify this type list
+            if testtype in ['dep', 'nightly', 'non-unified', 'valgrind', 'build']:
+                continue
 
-                    # we only care about the test job.
-                    else:
-                        continue
+            elif 'mulet' in job['platform']:
+                continue
 
-                # we don't need non-test job for seta, but we still need to verify this type list
-                if testtype in ['dep', 'nightly', 'non-unified', 'valgrind', 'build']:
-                    continue
+            else:
+                try:
+                    platform = job['platform']
+                    buildtype = job['platform_option']
+                    self.jobtypes.append([platform, buildtype, testtype])
 
-                elif 'mulet' in job['platform']:
-                    continue
+                    # It's about get jobnames and both buildbot and taskcluster job has '?'
+                    # when the job_group_symbol is unknown.
+                    self.jobnames.append(self._get_jobnames(job, testtype, job_identifier))
+                    job_group_symbol = job['job_group_symbol'] \
+                        if job['job_group_symbol'] != '?' else ''
+                    job_type_symbol = job['job_type_symbol'] if job['job_type_symbol'] else ''
+                    self.tbplnames.update({testtype: {'group': job_group_symbol,
+                                                      'code': job_type_symbol}})
+                except Exception as e:
+                    LOG.error(e)
 
-                else:
-                    try:
-                        platform = job['platform']
-                        buildtype = job['platform_option']
-                        self.jobtypes.append([platform, buildtype, testtype])
+    def _testtype_job_identifier(self, job):
+        job_identifier = None
+        testtype = None
 
-                        # It's about get jobnames and both buildbot and taskcluster job has '?'
-                        # when the job_group_symbol is unknown.
-                        self.jobnames.append(self._get_jobnames(job, testtype,
-                                                                job_identifier))
-                        job_group_symbol = job['job_group_symbol'] \
-                            if job['job_group_symbol'] != '?' else ''
-                        job_type_symbol = job['job_type_symbol'] if job['job_type_symbol'] else ''
-                        self.tbplnames.update({testtype: {'group': job_group_symbol,
-                                                          'code': job_type_symbol}})
-                    except Exception as e:
-                        LOG.error(e)
+        # the testtype of builbot job can been found in 'ref_data_name'
+        # like web-platform-tests-4 in "Ubuntu VM 12.04 x64 mozilla-inbound
+        #  opt test web-platform-tests-4"
+        if job['build_system_type'] == 'buildbot':
+            testtype = job['ref_data_name'].split(' ')[-1]
+            job_identifier = job['ref_data_name']
+
+        # taskcluster's testtype is a part of its 'job_type_name' like reftest-2
+        # for [TC] Linux64 reftest-2
+        elif job['build_system_type'] == 'taskcluster':
+            # The test name on taskcluster comes to a sort of combination
+            # (e.g desktop-test-linux64/debug-jittests-3) and asan job can
+            # been referenced as a opt job.
+            # NOTE: jobs like 'MacOSX64 Static Analysis Opt' will be left aside
+            # because they are not a test job.
+            if job['ref_data_name'].startswith('desktop-test') or \
+               job['ref_data_name'].startswith('android-test'):
+
+                # we want the build type(debug or opt) to separate the job_type_name
+                # (e.g desktop-test-linux64/debug-jittests-3)
+                separator = job['platform_option'] \
+                    if job['platform_option'] != 'asan' else 'opt'
+                # we should get "jittests-3" as testtype for job_type_name like
+                # desktop-test-linux64/debug-jittests-3
+                testtype = job['job_type_name'].split(
+                    '{buildtype}-'.format(buildtype=separator))[-1]
+                job_identifier = job['ref_data_name']
+
+        return testtype, job_identifier
 
     def jobtype_query(self):
         """Query all available jobtypes and return it as list"""

@@ -9,7 +9,7 @@ from database.models import Testjobs
 
 # alertmanager server URL
 URL = "http://alertmanager.allizom.org/data/dump/?startDate=%s&limit=%d&offset=%d"
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 def migration(args):
@@ -21,11 +21,11 @@ def migration(args):
         response = retry(requests.get, args=(url, )).json()
     except Exception as error:
         # we will return an empty 'result' list if got exception here
-        logger.debug("the request to %s failed, due to %s" % (url, error))
+        LOG.debug("the request to %s failed, due to %s" % (url, error))
         response = {'result': []}
     datasets = response['result']
 
-    session.query(Testjobs).filter(Testjobs.date>='%s 00:00:00' % startDate).delete()
+    session.query(Testjobs).filter(Testjobs.date >= '%s 00:00:00' % startDate).delete()
 
     while len(datasets) > 0:
         for data in datasets:
@@ -71,7 +71,8 @@ def migration(args):
                 continue
 
             # hidden/lower tier tests, not sure of CI system, old jobs
-            if testtype in ['media-youtube-tests', 'external-media-tests', 'luciddream', 'media-tests']:
+            if testtype in ['media-youtube-tests', 'external-media-tests', 'luciddream',
+                            'media-tests']:
                 continue
 
             Testjob = Testjobs(data['slave'], data['result'], data['build_system_type'],
@@ -101,14 +102,15 @@ if __name__ == '__main__':
     parser.add_argument('--limit', dest='limit', default=10000,
                         help='How much data sets will be migrated for one time.')
     parser.add_argument('--startDate', dest='startDate', default='',
-                        help='YYYY-MM-DD format for date of when to start migrating data, default 2 days ago.')
+                        help='YYYY-MM-DD format for date of when to start migrating data, '
+                        'default 2 days ago.')
 
     args = parser.parse_args()
 
     if args.startDate == '':
         now = "%s" % str(datetime.datetime.now() - datetime.timedelta(days=2))
         args.startDate = now.split(' ')[0]
-        logger.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
+        LOG.debug("setting startDate to 2 days prior to today: %s" % args.startDate)
 
     migration(args)
     sys.exit(0)

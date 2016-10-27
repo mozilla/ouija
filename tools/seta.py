@@ -1,6 +1,9 @@
 import requests
 import json
 import copy
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 def get_distinct_tuples():
@@ -56,22 +59,32 @@ def check_removal(master, removals):
 
 
 def build_removals(active_jobs, master, target):
-    ret_val = []
+    """
+    active_jobs - all possible desktop & android jobs on Treeherder (no PGO)
+    master - list of all failures
+    target - number of failures we want to process
+
+    Return list of jobs to remove and list of revisions that are regressed
+    """
+    low_value_jobs = []
     master_root_cause = []
     for jobtype in active_jobs:
+        # Determine if removing an active job will reduce the number of failures we will catch
+        # or stay the same
         remaining_failures = check_removal(master, [jobtype])
+
         if len(remaining_failures) >= target:
-            ret_val.append(jobtype)
+            low_value_jobs.append(jobtype)
             master = remaining_failures
         else:
             root_cause = []
-            for key in master:
-                if key not in remaining_failures:
-                    root_cause.append(key)
-                    master_root_cause.append(key)
-            print "jobtype: %s, root failure(s): %s" % (jobtype, root_cause)
+            for revision in master:
+                if revision not in remaining_failures:
+                    root_cause.append(revision)
+                    master_root_cause.append(revision)
+            LOG.info("jobtype: %s is the root failure(s) of %s" % (jobtype, root_cause))
 
-    return ret_val, master_root_cause
+    return low_value_jobs, master_root_cause
 
 
 def remove_root_cause_failures(failures, master_root_cause):
@@ -119,47 +132,56 @@ def failures_by_jobtype(failures, target, ignore_failure):
         if job_needed is not None:
             remaining_jobs.append(job_needed)
 
-    to_remove = [x for x in active_jobs if str(x) not in remaining_jobs]
+    low_value_jobs = [x for x in active_jobs if str(x) not in remaining_jobs]
 
     while ignore_failure > 0:
         copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
         total = len(copy_failures)
-        to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)
+        low_value_jobs, master_root_cause = build_removals(active_jobs, copy_failures, total)
         ignore_failure -= 1
     # only return high value job we want
-    for low_value_job in to_remove:
+    for low_value_job in low_value_jobs:
         try:
             active_jobs.remove(low_value_job)
         except ValueError:
-            print "%s is missing from the job list" % low_value_job
-    total_detected = check_removal(failures, to_remove)
+            LOG.info("%s is missing from the job list" % low_value_job)
+    total_detected = check_removal(failures, low_value_jobs)
     high_value_jobs = active_jobs
     return high_value_jobs, total_detected
 
 
 def weighted_by_jobtype(failures, target, ignore_failure):
+    """
+    failures - jobs that have been starred for fixing a commit or associated to a bug
+    target - precentage of failures to analyze
+    ignore_failure - which failures to ignore
+    """
     total = len(failures)
     copy_failures = copy.deepcopy(failures)
-    print "working with %s failures" % total
+    LOG.info("working with %s failures" % total)
+    # Fetch the jobtypes' endpoint
+    # List of jobs (platform, platform_opt, testtype)
+    # It reads the runnable API, it calculates the testtype for each build system type
+    # It also skips PGO jobs
+    # XXX: We could query the job priorities table and skip the PGO jobs here
     active_jobs = get_distinct_tuples()
 
     target = int(total * (target / 100))
-    to_remove = []
-
-    to_remove, master_root_cause = build_removals(active_jobs, failures, target)
+    low_value_jobs, master_root_cause = build_removals(active_jobs, failures, target)
 
     while ignore_failure > 0:
-        print "\n--------------new pass----------------\n"
+        LOG.info("\n--------------new pass----------------\n")
         copy_failures = remove_root_cause_failures(copy_failures, master_root_cause)
         total = len(copy_failures)
-        to_remove, master_root_cause = build_removals(active_jobs, copy_failures, total)
+        low_value_jobs, master_root_cause = build_removals(active_jobs, copy_failures, total)
         ignore_failure -= 1
     # only return high value job we want
-    for low_value_job in to_remove:
+    for low_value_job in low_value_jobs:
         try:
             active_jobs.remove(low_value_job)
         except ValueError:
-            print "%s is missing from the job list" % low_value_job
-    total_detected = check_removal(failures, to_remove)
+            LOG.info("%s is missing from the job list" % low_value_job)
+    total_detected = check_removal(failures, low_value_jobs)
     high_value_jobs = active_jobs
+
     return high_value_jobs, total_detected
