@@ -552,7 +552,7 @@ def run_seta_details_query():
         taskcluster_jobs = [job for job in jobnames if job['buildplatform'] == 'taskcluster']
         for job in jobtype:
             for j in taskcluster_jobs:
-                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                if job[2] in j['name'] and j['platform'] == job[0] and j['buildtype'] == job[1]:
                     active_jobs.append(j['ref_data_name'])
         jobtype = active_jobs
 
