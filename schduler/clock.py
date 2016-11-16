@@ -5,6 +5,7 @@ from rq import Queue
 from worker import conn
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+logger = logging.info(__name__)
 sched = BlockingScheduler()
 q = Queue(connection=conn)
 
