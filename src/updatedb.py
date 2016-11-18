@@ -223,6 +223,7 @@ def uploadResults(data, branch, revision, date):
         testtype = testtype.replace('devtools-chrome-e10s', 'e10s-devtools-chrome')
         testtype = testtype.replace('[TC] Android 4.3 API15+ ', '')
         testtype = testtype.replace('jittests-', 'jittest-')
+        testtype = testtype.replace('webgl-', 'gl-')
 
         if testtype.startswith('[funsize'):
             continue
@@ -250,25 +251,11 @@ def uploadResults(data, branch, revision, date):
                     bugid = revision
                 pass
 
+        # NOTE: this is deprecated so we removed it, ideally we can reimplement this in the future
         # Get failure snippets: https://treeherder.mozilla.org/api/project/
         # mozilla-inbound/artifact/?job_id=11651377&name=Bug+suggestions&type=json
         failures = []
-        if failure_classification == 2:
-            url = "https://treeherder.mozilla.org/api/project/%s/artifact/?job_id=%s" \
-                  "&name=Bug+suggestions&type=json" % (branch, _id)
-            snippets = fetch_json(url)
-            if snippets:
-                for item in snippets[0]["blob"]:
-                    if not item["search_terms"] and len(item["search_terms"]) < 1:
-                        continue
-                    filename = item['search_terms'][0]
-                    if (filename.endswith('.js') or filename.endswith('.xul') or
-                            filename.endswith('.html')):
-                        dir = item['search']
-                        dir = (dir.split('|')[1]).strip()
-                        if dir.endswith(filename):
-                            dir = dir.split(filename)[0]
-                            failures.append(dir + '/' + filename)
+
         # https://treeherder.mozilla.org/api/project/mozilla-central/jobs/1116367/
         url = "https://treeherder.mozilla.org/api/project/%s/jobs/%s/" % (branch, _id)
         data1 = fetch_json(url)
