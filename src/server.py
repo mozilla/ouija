@@ -535,7 +535,8 @@ def run_seta_details_query():
                 for j in buildbot_jobs:
                     if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
                         active_jobs.append(j['ref_data_name'] if branch is 'mozilla-inbound'
-                                           else j['ref_data_name'].replace('mozilla-inbound', branch))
+                                           else j['ref_data_name'].replace(
+                                               'mozilla-inbound', branch))
 
             jobtype = active_jobs
 
