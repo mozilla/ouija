@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from argparse import ArgumentParser
+import cProfile
 
 import requests
 from redo import retry
@@ -218,5 +219,5 @@ if __name__ == "__main__":
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     if not options.do_not_analyze:
-        analyze_failures(start_date, end_date, options.dry_run, options.ignore_failure,
-                         options.method)
+        cProfile.run(analyze_failures(start_date, end_date, options.dry_run, options.ignore_failure,
+                         options.method))
