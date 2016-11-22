@@ -1,5 +1,4 @@
 import logging
-import os
 
 from rq import Queue
 from worker import conn
@@ -8,7 +7,7 @@ from trigger_jobs import (
     trigger_failures,
     trigger_migratedb,
     trigger_update_job_priority_table,
- )
+)
 
 logger = logging.info(__name__)
 sched = BlockingScheduler()
@@ -28,12 +27,13 @@ def timed_trigger_updatedb_sec():
 
 
 @sched.scheduled_job('cron', day_of_week='mon-sun', hour=12)
-def timed_trigger_updatedb():
+def timed_trigger_update_job_priority_table():
     q.enqueue(trigger_update_job_priority_table)
 
 
 @sched.scheduled_job('cron', day_of_week='mon-sun', hour=14)
 def timed_trigger_failures():
     q.enqueue(trigger_failures)
+
 
 sched.start()
