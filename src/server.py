@@ -423,7 +423,6 @@ def run_seta_details_query():
             and str(branch) != '':
         abort(404)
 
-    alljobs = JOBSDATA.jobtype_query()
     # For the case of TaskCluster request, we don't care which priority the user request.
     # We return jobs depend on the strategy that we return high value jobs as default and
     # return all jobs for every 5 push or 90 minutes for that branch.
@@ -431,15 +430,6 @@ def run_seta_details_query():
         # we make taskcluster to 1 if it's a request from taskcluster, it's more reasonable and
         # can simplify the request url.
         taskcluster = 1
-
-        # we query all jobs rather than jobs filter by the requested priority in here,
-        # Because we need to set the job returning strategy depend on different job priority.
-        query = session.query(JobPriorities.platform,
-                              JobPriorities.buildtype,
-                              JobPriorities.testtype,
-                              JobPriorities.priority,
-                              JobPriorities.timeout
-                              ).all()
 
         # We should return full job list as a fallback, if it's a request from
         # taskcluster and without head_rev or pushlog_id in there
@@ -495,6 +485,15 @@ def run_seta_details_query():
             # we must reset the delta after we update the datetime
             delta = 0
 
+        # we query all jobs rather than jobs filter by the requested priority in here,
+        # Because we need to set the job returning strategy depend on different job priority.
+        query = session.query(JobPriorities.platform,
+                              JobPriorities.buildtype,
+                              JobPriorities.testtype,
+                              JobPriorities.priority,
+                              JobPriorities.timeout
+                              ).all()
+
         for d in query:
             # we only return that job if it hasn't reach the timeout limit. And the
             # timeout is zero means this job need always running.
@@ -519,26 +518,27 @@ def run_seta_details_query():
         # Because we store high value jobs in seta table as default,
         # so we return low value jobs, means no failure related with this job as default
         if priority == 0:
-            jobtype = alljobs
+            jobtype = JOBSDATA.jobtype_query()  # All jobs regardless of priority
         # priority =5 run all low value jobs
         else:
             joblist = [job for job in query if job[3] == priority]
             for j in joblist:
                 jobtype.append([j[0], j[1], j[2]])
 
-    # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
-    if buildbot:
-        active_jobs = []
-        # pick up buildbot jobs from job list to faster the filter process
-        buildbot_jobs = [job for job in jobnames if job['buildplatform'] == 'buildbot']
-        # find out the correspond job detail information
-        for job in jobtype:
-            for j in buildbot_jobs:
-                if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
-                    active_jobs.append(j['ref_data_name'] if branch is 'mozilla-inbound'
-                                       else j['ref_data_name'].replace('mozilla-inbound', branch))
+        # TODO: filter out based on buildsystem from database, either 'buildbot' or '*'
+        if buildbot:
+            active_jobs = []
+            # pick up buildbot jobs from job list to faster the filter process
+            buildbot_jobs = [job for job in jobnames if job['buildplatform'] == 'buildbot']
+            # find out the correspond job detail information
+            for job in jobtype:
+                for j in buildbot_jobs:
+                    if j['name'] == job[2] and j['platform'] == job[0] and j['buildtype'] == job[1]:
+                        active_jobs.append(j['ref_data_name'] if branch is 'mozilla-inbound'
+                                           else j['ref_data_name'].replace(
+                                               'mozilla-inbound', branch))
 
-        jobtype = active_jobs
+            jobtype = active_jobs
 
     # TODO: filter out based on buildsystem from database, either 'taskcluster' or '*'
     if taskcluster:
