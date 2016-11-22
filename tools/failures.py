@@ -219,5 +219,4 @@ if __name__ == "__main__":
         start_date = end_date - datetime.timedelta(days=SETA_WINDOW)
 
     if not options.do_not_analyze:
-        cProfile.run(analyze_failures(start_date, end_date, options.dry_run, options.ignore_failure,
-                         options.method))
+        cProfile.run('analyze_failures(start_date, end_date, options.dry_run, options.ignore_failure, options.method)')
