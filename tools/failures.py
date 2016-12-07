@@ -168,6 +168,13 @@ def parse_args(argv=None):
                               database and emails."
                         )
 
+    parser.add_argument("--offline",
+                        action="store_true",
+                        dest="offline",
+                        help="This mode is for testing without a network connection \
+                              will populate data if missing cached files (tools/*.json)."
+                        )
+
     parser.add_argument("--ignore-failure",
                         type=int,
                         dest="ignore_failure",
@@ -187,12 +194,23 @@ def parse_args(argv=None):
     return options
 
 
-def analyze_failures(start_date, end_date, dry_run, ignore_failure, method):
-    failures = get_raw_data(start_date, end_date)
+def analyze_failures(start_date, end_date, dry_run, ignore_failure, offline, method):
+    if offline:
+        cache_name = 'seta_cache.json'
+        if os.path.exists(cache_name):
+            with open(cache_name, 'r') as f:
+                failures = json.load(f)
+        else:
+            failures = get_raw_data(start_date, end_date)
+            with open(cache_name, 'w') as f:
+                f.write(failures)
+    else:
+        failures = get_raw_data(start_date, end_date)
+
     LOG.info("date: %s, failures: %s" % (end_date, len(failures)))
     target = 100  # 100% detection
 
-    high_value_jobs, total_detected = weighted_by_jobtype(failures, target, ignore_failure)
+    high_value_jobs, total_detected = weighted_by_jobtype(failures, target, ignore_failure, offline)
 
     percent_detected = ((len(total_detected) / (len(failures) * 1.0)) * 100)
     LOG.info("We will detect %.2f%% (%s) of the %s failures" %
@@ -206,7 +224,8 @@ def analyze_failures(start_date, end_date, dry_run, ignore_failure, method):
 
 if __name__ == "__main__":
     options = parse_args()
-    update_job_priority_table()
+    if not options.dry_run:
+        update_job_priority_table()
 
     if options.end_date:
         end_date = datetime.datetime.strptime(options.end_date, "%Y-%m-%d")
@@ -223,4 +242,5 @@ if __name__ == "__main__":
                          end_date,
                          options.dry_run,
                          options.ignore_failure,
+                         options.offline,
                          options.method)
