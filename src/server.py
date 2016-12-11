@@ -431,6 +431,10 @@ def run_seta_details_query():
         # can simplify the request url.
         taskcluster = 1
 
+        # we will return all jobs for every 90 minutes, so the return_all_jobs flag will been
+        # set to true if the time limit been reached.
+        return_all_jobs = False
+
         # We should return full job list as a fallback, if it's a request from
         # taskcluster and without head_rev or pushlog_id in there
         try:
@@ -482,8 +486,8 @@ def run_seta_details_query():
                 datetime=time_of_now)
             conn.execute(statement)
 
-            # we must reset the delta after we update the datetime
-            delta = 0
+            # we need to set the return_all_jobs flag to true.
+            return_all_jobs = True
 
         # we query all jobs rather than jobs filter by the requested priority in here,
         # Because we need to set the job returning strategy depend on different job priority.
@@ -497,11 +501,16 @@ def run_seta_details_query():
         for d in query:
             # we only return that job if it hasn't reach the timeout limit. And the
             # timeout is zero means this job need always running.
-            if delta < d[4] or d[0] == 0:
+            if delta < d[4] or d[4] == 0:
                 # Due to the priority of all high value jobs is 1, and we
                 # need to return all jobs for every 5 pushes(for now).
                 if counter % d[3] != 0:
                     jobtype.append([d[0], d[1], d[2]])
+
+            # we need to return all jobs for every 90 minutes, so all jobs will been returned
+            # if the delta is larger than 5400
+            elif return_all_jobs:
+                jobtype.append([d[0], d[1], d[2]])
 
     # We don't care about the timeout variable of job if it's not a taskcluster request.
     else:
