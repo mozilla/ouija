@@ -319,8 +319,8 @@ def _update_job_priority_table(data):
                         statement = update(JobPriorities).where(
                             JobPriorities.id == map[key]['pk_key']).values(buildsystem=_buildsystem)
                     except Exception as e:
-                        LOG.info("exception updating jobPriorities: " + e)
                         LOG.info("key = %s, buildsystem = %s" % (key, _buildsystem))
+                        LOG.info("exception updating jobPriorities: %s" % e)
                     conn.execute(statement)
                     LOG.info('Updated {}/{} from {} to {}'.format(
                         job['testtype'], job['platform_option'],

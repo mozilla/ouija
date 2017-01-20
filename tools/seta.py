@@ -9,51 +9,6 @@ BIT_MASK_8BIT = 255
 BUILDTYPE_BYTE_SHIFT = 8
 TESTTYPE_BYTE_SHIFT = 16
 
-# globals used for maps_to_indexes - this stores a unique value for every
-# possible job as an array, then we use the array index and map to a bit
-# field.  See map_to_indexes for more details.
-PLATFORMS = []
-BUILDTYPES = []
-TESTTYPES = []
-
-
-def map_to_text(bitmaskData):
-    """
-       bitmaskData is a 32 bit integer, ex:
-       bitmaskData = 197121
-       testtype = 3
-       buildtype = 2
-       platform = 1
-    """
-    return [PLATFORMS[bitmaskData & BIT_MASK_8BIT],
-            BUILDTYPES[(bitmaskData >> BUILDTYPE_BYTE_SHIFT) & BIT_MASK_8BIT],
-            TESTTYPES[(bitmaskData >> TESTTYPE_BYTE_SHIFT)]]
-
-
-def map_to_indexes(data):
-    global PLATFORMS
-    global BUILDTYPES
-    global TESTTYPES
-
-    indexed_data = []
-    # ideally we can just use the index of this data, but we need to map to failures as well
-    for item in data:
-        if item[0] not in PLATFORMS:
-            PLATFORMS.append(item[0])
-        if item[1] not in BUILDTYPES:
-            BUILDTYPES.append(item[1])
-        if item[2] not in TESTTYPES:
-            TESTTYPES.append(item[2])
-
-        # platforms < 256 - 8 bit mask
-        # buildtypes < 256 - 8 bit mask
-        # testtypes > 256 - 16 bit mask
-        # fit in a 32 bit int field- packed as platform|buildtype|testtype
-        value = TESTTYPES.index(item[2]) << TESTTYPE_BYTE_SHIFT
-        value += BUILDTYPES.index(item[1]) << BUILDTYPE_BYTE_SHIFT
-        value += PLATFORMS.index(item[0])
-        indexed_data.append(value)
-    return indexed_data
 
 # globals used for maps_to_indexes - this stores a unique value for every
 # possible job as an array, then we use the array index and map to a bit
