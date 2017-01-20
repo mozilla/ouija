@@ -318,15 +318,15 @@ def _update_job_priority_table(data):
                         conn = engine.connect()
                         statement = update(JobPriorities).where(
                             JobPriorities.id == map[key]['pk_key']).values(buildsystem=_buildsystem)
+                        conn.execute(statement)
+                        LOG.info('Updated {}/{} from {} to {}'.format(
+                            job['testtype'], job['platform_option'],
+                            job['build_system_type'], _buildsystem
+                        ))
+                        updated_jobs += 1
                     except Exception as e:
                         LOG.info("key = %s, buildsystem = %s" % (key, _buildsystem))
                         LOG.info("exception updating jobPriorities: %s" % e)
-                    conn.execute(statement)
-                    LOG.info('Updated {}/{} from {} to {}'.format(
-                        job['testtype'], job['platform_option'],
-                        job['build_system_type'], _buildsystem
-                    ))
-                    updated_jobs += 1
 
         else:
             # We have a new job from runnablejobs to add to our master list
