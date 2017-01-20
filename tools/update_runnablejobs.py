@@ -318,7 +318,7 @@ def _update_job_priority_table(data):
                         conn = engine.connect()
                         statement = update(JobPriorities).where(
                             JobPriorities.id == map[key]['pk_key']).values(buildsystem=_buildsystem)
-                    except e:
+                    except Exception as e:
                         LOG.info("exception updating jobPriorities: " + e)
                         LOG.info("key = %s, buildsystem = %s" % (key, _buildsystem))
                     conn.execute(statement)

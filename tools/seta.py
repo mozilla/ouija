@@ -8,6 +8,7 @@ LOG = logging.getLogger(__name__)
 BIT_MASK_8BIT = 255
 BUILDTYPE_BYTE_SHIFT = 8
 TESTTYPE_BYTE_SHIFT = 16
+
 # globals used for maps_to_indexes - this stores a unique value for every
 # possible job as an array, then we use the array index and map to a bit
 # field.  See map_to_indexes for more details.
